@@ -1,13 +1,13 @@
-# MDVClans 1.6.1
+# MDVClans 1.6.2
 
 Sistema de clanes social para MDVCRAFT, pensado para Purpur/Paper 1.21.6.
 
-## V1 base incluida
+## Base incluida
 
 - Crear clan con ID + nombre.
 - Costo configurable por Vault, desactivado por defecto.
 - Límite de miembros configurable.
-- Invitación y clanes abiertos.
+- Invitación, clanes abiertos y solicitudes de ingreso para clanes cerrados.
 - Miembros con roles numéricos 0-5.
 - Nombres personalizados de roles por clan.
 - Chat de clan toggle y mensaje directo.
@@ -15,60 +15,33 @@ Sistema de clanes social para MDVCRAFT, pensado para Purpur/Paper 1.21.6.
 - Cancelación de PvP entre miembros.
 - Lista e info de clanes.
 - Relaciones básicas: neutral, aliado, enemigo.
-- PlaceholderAPI para LPC.
-- SQLite.
-- Menú nativo dinámico con `/clan menu`.
-- GUIs de miembros, info, relaciones, almacén/banco, lista de clanes, buzón, bajas y ranking.
-- Tablero de clan editable por rangos.
-- Buzón de clan interno con correos entre clanes.
-
-## Nuevo en V1.5
-
-- Banco de clan con Vault:
-  - todos pueden depositar por defecto.
-  - rangos altos pueden retirar.
-- Almacén compartido de clan.
-- Estandarte oficial del clan.
-- Nametags por relación:
-  - mismo clan verde.
-  - aliados azul.
-  - enemigos rojo.
-  - neutrales gris.
-- Logs básicos por clan.
-- Top simple de clanes por fuerza, kills y banco.
+- Banco de clan.
+- Almacén compartido.
+- Banner oficial con `WHITE_BANNER` por defecto.
+- Nametags por relación.
+- Logs básicos.
+- Top simple de clanes.
 - Estadísticas de kills entre clanes.
-- Menús YAML compatibles con MDVSocial generados en `plugins/MDVClans/Menus`.
-- Base SQLite guardada en `plugins/MDVClans/Data/clans.db`.
-- Config preparada para futura migración a MySQL.
+- Menús nativos con paginación y margen.
+- Menús puente para MDVSocial.
+- SQLite organizado en `plugins/MDVClans/Data/clans.db`.
+- `messages.yml` para prefijo y mensajes principales editables.
 
+## Cambios 1.6.2
 
-## Nuevo en V1.6.1
-
-- Botón de **Ajustes del clan** en el menú principal.
-- Menú de ajustes para rangos altos:
-  - cambiar nombre del clan.
-  - cambiar ID/tag del clan.
-  - cambiar nombres de rangos.
-  - cambiar/quitar banner.
-  - ver permisos por rango.
-  - alternar clan abierto/invitación.
-  - instrucciones para disolver.
-- Solicitudes pendientes de ingreso:
-  - si un clan está cerrado, `/clan unirse <ID>` crea solicitud.
-  - el menú muestra cabezas con nombre, estado, nivel y raza si PlaceholderAPI/MMOCore responde.
-  - click izquierdo acepta; click derecho borra.
-  - si el jugador entra a otro clan, su solicitud se limpia.
-- Click en miembro ahora abre submenú de acciones.
-- Click en clan de la lista ahora abre submenú de acciones.
-- Click en correo ahora abre submenú para responder o eliminar.
-- Acciones bloqueadas aparecen como `GRAY_DYE` si no tienes rango.
-- Menús puente nuevos: `clan_ajustes.yml` y `clan_solicitudes.yml`.
+- `/clan menu` ahora actúa como entrada limpia desde MDVSocial:
+  - con clan: abre directamente **Gestión del clan**.
+  - sin clan: abre **Lista de clanes / Crear clan**.
+- El panel completo queda disponible con `/clan menu principal`, `/clan menu completo` o haciendo click en el banner del menú de gestión.
+- Las listas grandes usan margen de 1 bloque y paginación: miembros, clanes, relaciones, buzón, logs y solicitudes.
+- El banner del menú de información ahora solo permite ver; para cambiarlo se usa Ajustes del clan.
+- Reforzada la validación de ID/nombre duplicados al crear y renombrar.
+- Añadido `messages.yml`.
 
 ## Comandos principales
 
 ```txt
 /clan ayuda
-/clan menu
 /clan crear <ID> <nombre>
 /clan info [ID]
 /clan lista [pagina]
@@ -87,18 +60,20 @@ Sistema de clanes social para MDVCRAFT, pensado para Purpur/Paper 1.21.6.
 /clan setbase
 /clan base
 /clan relacion <ID> <neutral|aliado|enemigo>
-/clan banco
-/clan banco depositar <cantidad>
-/clan banco retirar <cantidad>
+/clan banco [depositar|retirar|log]
 /clan depositar <cantidad>
 /clan retirar <cantidad>
 /clan almacen
-/clan estandarte set
-/clan estandarte ver
-/clan estandarte quitar
+/clan estandarte <set|ver|quitar>
 /clan logs [pagina]
 /clan top [fuerza|kills|banco]
-/clan bajas [ID]
+/clan bajas
+/clan tablero <ver|set|limpiar>
+/clan correo <ver|clan|borrar>
+/clan editar <nombre|id> <valor>
+/clan solicitudes
+/clan menu
+/clan menu principal
 /clan disolver confirmar
 /mdvclans reload
 ```
@@ -115,13 +90,9 @@ Sistema de clanes social para MDVCRAFT, pensado para Purpur/Paper 1.21.6.
 %mdvclans_member_count%
 %mdvclans_is_in_clan%
 %mdvclans_open%
-%mdvclans_bank%
-%mdvclans_kills%
-%mdvclans_deaths%
-%mdvclans_strength%
 ```
 
-Para LPC puedes usar, por ejemplo:
+Para LPC puedes usar:
 
 ```txt
 {prefix}%mdvclans_lpc_tag%{name} » {message}
@@ -129,14 +100,10 @@ Para LPC puedes usar, por ejemplo:
 
 ## Menús MDVSocial
 
-MDVClans genera estos archivos:
+Se generan en:
 
 ```txt
-plugins/MDVClans/Menus/clan.yml
-plugins/MDVClans/Menus/clan_gestion.yml
-plugins/MDVClans/Menus/clan_rankings.yml
-plugins/MDVClans/Menus/clan_ajustes.yml
-plugins/MDVClans/Menus/clan_solicitudes.yml
+plugins/MDVClans/Menus/
 ```
 
 Puedes copiarlos a:
@@ -145,7 +112,7 @@ Puedes copiarlos a:
 plugins/MDVSocial/Menus/
 ```
 
-Luego recarga MDVSocial para que los lea.
+Recomendación: desde el menú principal de MDVSocial, usa un botón con `COMMAND_PLAYER` y comando `clan menu` para evitar un menú intermedio.
 
 ## Build
 
@@ -155,31 +122,8 @@ Requiere Java 21 y Maven.
 mvn clean package
 ```
 
-El jar quedará en:
+El jar queda en:
 
 ```txt
-target/MDVClans-1.6.1.jar
+target/MDVClans-1.6.2.jar
 ```
-
-El proyecto incluye GitHub Actions para compilarlo en la nube.
-
-## Compatibilidad MDVSocial
-
-MDVClans V1.6.1 mantiene `softdepend: MDVSocial`, pero no depende de MDVSocial para funcionar. Los menús se entregan como YAML compatibles para copiarlos manualmente a la carpeta de menús de MDVSocial.
-
-
-## Menús nativos V1.6
-
-Usa `/clan menu` para abrir la interfaz dinámica. Si el jugador no tiene clan, verá lista de clanes y crear clan. Si tiene clan, verá miembros, tablero/info, relaciones, almacén/banco, lista de clanes y base.
-
-## Tablero y correo de clan
-
-```txt
-/clan tablero ver
-/clan tablero set <texto>
-/clan tablero limpiar
-/clan correo clan <ID> <mensaje>
-/clan correo borrar <id>
-```
-
-Los menús YAML generados en `plugins/MDVClans/Menus/` son accesos rápidos para MDVSocial; puedes copiarlos a `plugins/MDVSocial/Menus/`.

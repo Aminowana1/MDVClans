@@ -65,10 +65,10 @@ items:
     name: '&f&lEstandarte oficial'
     lore:
       - ''
-      - '&7Ver o guardar el banner'
-      - '&7oficial del clan.'
+      - '&7Ver el banner oficial'
+      - '&7del clan.'
       - ''
-      - '&7Guardar: &f/clan estandarte set'
+      - '&8Para cambiarlo usa Ajustes.'
       - '&eClick para ver.'
     action: COMMAND_PLAYER
     commands:

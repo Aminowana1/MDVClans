@@ -1,34 +1,24 @@
-# Menú puente para MDVSocial. Copiar a plugins/MDVSocial/Menus/clan.yml.
-# Este menú abre la GUI nativa dinámica de MDVClans.
+# MDVSocial bridge recomendado.
+# Mejor opción: desde tu menú principal de MDVSocial usa directamente COMMAND_PLAYER: clan menu.
+# Si aun quieres abrir un menú intermedio, este botón ejecuta /clan menu y MDVClans decide:
+# - con clan: abre Gestión del clan
+# - sin clan: abre Lista/Crear clan
 title: '&8&lClanes'
 size: 27
 items:
   abrir:
     slot: 13
     material: SHIELD
-    name: '&6&lAbrir clanes'
+    name: '&6&lClanes de MDVCRAFT'
     lore:
       - ''
-      - '&7Abre la interfaz dinámica'
-      - '&7de MDVClans.'
+      - '&7Con clan: abre gestión.'
+      - '&7Sin clan: lista y creación.'
       - ''
       - '&eClick para abrir.'
     action: COMMAND_PLAYER
     commands:
       - 'clan menu'
-  lista:
-    slot: 11
-    material: BOOK
-    name: '&b&lLista de clanes'
-    lore:
-      - ''
-      - '&7Abre la lista dinámica'
-      - '&7de clanes de MDVCRAFT.'
-      - ''
-      - '&eClick para abrir.'
-    action: COMMAND_PLAYER
-    commands:
-      - 'clan menu lista'
   volver:
     slot: 22
     material: ARROW

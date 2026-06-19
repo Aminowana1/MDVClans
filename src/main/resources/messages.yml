@@ -1,0 +1,33 @@
+# MDVClans 1.6.2 - Mensajes editables
+# Nota: esta versión centraliza el prefijo y deja preparada la estructura para ir moviendo
+# todos los textos del plugin a este archivo sin romper compatibilidad.
+prefix: '&8[&6MDVClans&8]&r '
+
+common:
+  no-permission: '&cNo tienes permiso.'
+  player-only: '&cEste comando solo puede usarlo un jugador.'
+  internal-sql-error: '&cOcurrió un error interno de base de datos.'
+  unknown-command: '&cSubcomando desconocido. Usa &e/clan ayuda&c.'
+  no-clan: '&cNo perteneces a ningún clan.'
+  clan-not-found: '&cClan no encontrado.'
+  player-not-found: '&cEse jugador no está conectado.'
+  cancel-word: 'cancelar'
+
+creation:
+  usage: '&cUso: &e/clan crear <ID> <nombre del clan>'
+  already-in-clan: '&cYa perteneces a un clan.'
+  max-clans: '&cEl servidor alcanzó el máximo de clanes.'
+  duplicate-id: '&cYa existe un clan con ese ID.'
+  duplicate-name: '&cYa existe un clan con ese nombre.'
+  created: '&aClan creado: &8[&b{id}&8] &f{name}'
+  chat-prompt: '&7Escribe en el chat: &eID Nombre del clan&7. Ejemplo: &fMDV Medieval Craft&7. Escribe &ccancelar &7para cancelar.'
+
+edit:
+  name-prompt: '&7Escribe el nuevo &enombre &7del clan. Escribe &ccancelar &7para cancelar.'
+  id-prompt: '&7Escribe el nuevo &eID &7del clan. Escribe &ccancelar &7para cancelar.'
+  duplicate-id: '&cYa existe un clan con ese ID.'
+  duplicate-name: '&cYa existe un clan con ese nombre.'
+
+menu:
+  no-rank: '&cNo tienes rango para esta función.'
+  locked-line: '&8No puedes usar esta función.'
