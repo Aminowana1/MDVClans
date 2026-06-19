@@ -1,0 +1,21 @@
+name: MDVClans
+version: 1.0.0
+main: com.mdvcraft.mdvclans.MDVClansPlugin
+api-version: '1.21'
+author: MDVCRAFT
+softdepend: [Vault, PlaceholderAPI, MDVSocial, LPC]
+commands:
+  clan:
+    description: Sistema de clanes de MDVCRAFT.
+    usage: /clan ayuda
+    aliases: [clanes, mdvclan]
+  mdvclans:
+    description: Comando administrativo de MDVClans.
+    usage: /mdvclans reload
+permissions:
+  mdvclans.use:
+    description: Permite usar comandos básicos de clan.
+    default: true
+  mdvclans.admin:
+    description: Permite administrar MDVClans.
+    default: op

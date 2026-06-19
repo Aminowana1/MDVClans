@@ -1,0 +1,72 @@
+prefix: '&8[&6MDVClans&8]&r '
+
+storage:
+  sqlite-file: 'clans.db'
+
+worlds:
+  # Si está vacío, permite todos. Recomendado para MDVCRAFT: world, world_nether, world_the_end.
+  allowed: ['world', 'world_nether', 'world_the_end']
+
+creation:
+  enabled: true
+  cost-enabled: false
+  cost: 10.0
+  id-min: 3
+  id-max: 5
+  name-min: 3
+  name-max: 19
+  id-regex: '^[A-Za-z0-9]+$'
+
+limits:
+  max-clans: 60
+  max-members: 20
+
+invites:
+  expire-seconds: 120
+
+roles:
+  min: 0
+  max: 5
+  defaults:
+    '0': 'Recluta'
+    '1': 'Plebeyo'
+    '2': 'Caballero'
+    '3': 'Conde'
+    '4': 'Noble'
+    '5': 'Líder'
+
+rank-permissions:
+  invite: 3
+  kick: 3
+  promote: 4
+  demote: 4
+  set-rank: 5
+  rename-role: 5
+  setbase: 4
+  relation: 4
+  open: 4
+  disband: 5
+
+chat:
+  format: '&8[&3Clan&8] &b{player}&7: &f{message}'
+  spy-permission: 'mdvclans.admin'
+
+base:
+  teleport-delay-seconds: 10
+  cooldown-seconds: 60
+  cancel-on-move: true
+  cancel-on-damage: true
+
+friendly-fire:
+  cancel-members: true
+  cancel-allies: false
+  message-cooldown-seconds: 3
+
+relations:
+  # Aliado necesita confirmación del otro clan.
+  ally-requires-accept: true
+
+placeholders:
+  no-clan: ''
+  tag-format: '&8[&b{id}&8]&r'
+  lpc-tag-format: '&8[&b{id}&8]&r '
