@@ -1,0 +1,28 @@
+# Puente MDVSocial -> GUI nativa de miembros.
+title: '&8&lMiembros del clan'
+size: 27
+items:
+  abrir:
+    slot: 13
+    material: PLAYER_HEAD
+    name: '&a&lMiembros del clan'
+    lore:
+      - ''
+      - '&7Abre la GUI con cabezas,'
+      - '&7roles y acciones rápidas.'
+      - ''
+      - '&eClick para abrir.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan menu miembros'
+  volver:
+    slot: 22
+    material: ARROW
+    name: '&6&lVolver'
+    action: OPEN_MENU
+    target-menu: clan
+  cerrar:
+    slot: 26
+    material: BARRIER
+    name: '&c&lCerrar'
+    action: CLOSE

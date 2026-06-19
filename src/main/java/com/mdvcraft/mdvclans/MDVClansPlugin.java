@@ -1,5 +1,6 @@
 package com.mdvcraft.mdvclans;
 
+import me.clip.placeholderapi.PlaceholderAPI;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
@@ -22,12 +23,17 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.projectiles.ProjectileSource;
@@ -46,11 +52,13 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -79,6 +87,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private final Map<UUID, Long> baseCooldowns = new ConcurrentHashMap<>();
     private final Map<UUID, Long> friendlyFireMessageCooldowns = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> openStorageViewers = new ConcurrentHashMap<>();
+    private final Set<UUID> pendingClanCreate = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> pendingBoardEdit = ConcurrentHashMap.newKeySet();
     private int nametagTaskId = -1;
 
     @Override
@@ -116,7 +126,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.5.0 habilitado.");
+        getLogger().info("MDVClans 1.6.0 habilitado.");
     }
 
     @Override
@@ -176,6 +186,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     "bank_balance REAL NOT NULL DEFAULT 0," +
                     "banner TEXT," +
                     "storage TEXT," +
+                    "board_message TEXT," +
                     "base_world TEXT," +
                     "base_x REAL," +
                     "base_y REAL," +
@@ -241,14 +252,28 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     "last_kill_at INTEGER NOT NULL," +
                     "PRIMARY KEY(attacker_uuid, victim_uuid)" +
                     ")");
+            st.executeUpdate("CREATE TABLE IF NOT EXISTS clan_mails (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "from_clan_id INTEGER NOT NULL," +
+                    "to_clan_id INTEGER NOT NULL," +
+                    "sender_uuid TEXT," +
+                    "sender_name TEXT," +
+                    "sent_at INTEGER NOT NULL," +
+                    "message TEXT NOT NULL," +
+                    "deleted INTEGER NOT NULL DEFAULT 0," +
+                    "FOREIGN KEY(from_clan_id) REFERENCES clans(id) ON DELETE CASCADE," +
+                    "FOREIGN KEY(to_clan_id) REFERENCES clans(id) ON DELETE CASCADE" +
+                    ")");
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_members_clan ON members(clan_id)");
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_invites_target ON invites(target_uuid)");
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_logs_clan ON clan_logs(clan_id, time DESC)");
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_kills_victim ON clan_kills(victim_clan_id)");
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_mails_to ON clan_mails(to_clan_id, sent_at DESC)");
         }
         addColumnIfMissing("clans", "bank_balance", "REAL NOT NULL DEFAULT 0");
         addColumnIfMissing("clans", "banner", "TEXT");
         addColumnIfMissing("clans", "storage", "TEXT");
+        addColumnIfMissing("clans", "board_message", "TEXT");
     }
 
     private synchronized void addColumnIfMissing(String table, String column, String definition) {
@@ -283,6 +308,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         try {
             switch (sub) {
                 case "crear", "create" -> handleCreate(player, args);
+                case "menu", "gui", "menú" -> handleClanMenuCommand(player, args);
                 case "info" -> handleInfo(player, args);
                 case "lista", "list" -> handleList(player, args);
                 case "invitar", "invite" -> handleInvite(player, args);
@@ -306,6 +332,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 case "almacen", "almacén" -> handleStorage(player);
                 case "estandarte", "banner" -> handleBanner(player, args);
                 case "logs", "registro", "registros" -> handleLogs(player, args);
+                case "tablero" -> handleBoard(player, args);
+                case "correo", "correos" -> handleClanMail(player, args);
                 case "top" -> handleTop(player, args);
                 case "bajas", "estadisticas", "estadísticas" -> handleKillStats(player, args);
                 case "disolver", "disband" -> handleDisband(player, args);
@@ -358,6 +386,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         player.sendMessage(color("&e/clan top [fuerza|kills|banco] &7- Ranking."));
         player.sendMessage(color("&e/clan bajas &7- Estadísticas de kills."));
         player.sendMessage(color("&e/clan logs &7- Registro básico."));
+        player.sendMessage(color("&e/clan menu &7- Abre la interfaz principal."));
+        player.sendMessage(color("&e/clan tablero set <texto> &7- Edita el tablero."));
+        player.sendMessage(color("&e/clan correo clan <ID> <mensaje> &7- Envía correo a otro clan."));
     }
 
     private void handleCreate(Player player, String[] args) throws SQLException {
@@ -850,6 +881,108 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
 
+
+    private void handleClanMenuCommand(Player player, String[] args) throws SQLException {
+        if (args.length <= 1) {
+            openMainMenu(player);
+            return;
+        }
+        String sub = args[1].toLowerCase(Locale.ROOT);
+        switch (sub) {
+            case "miembros" -> openMembersMenu(player, 1);
+            case "info" -> openClanInfoMenu(player);
+            case "relaciones" -> openRelationsMenu(player);
+            case "almacen", "almacén" -> openStorageHubMenu(player);
+            case "lista", "clanes" -> openClanListMenu(player, 1);
+            case "correo", "buzon", "buzón" -> openMailboxMenu(player, 1);
+            case "top", "ranking" -> openTopGui(player, "fuerza");
+            case "bajas" -> openKillStatsGui(player);
+            case "logs" -> openLogsGui(player, 1);
+            default -> openMainMenu(player);
+        }
+    }
+
+    private void handleBoard(Player player, String[] args) throws SQLException {
+        Member member = requireMember(player);
+        if (member == null) return;
+        Clan clan = getClan(member.clanId()).orElseThrow();
+        if (args.length == 1 || equalsAny(args[1], "ver", "info")) {
+            msg(player, "&6Tablero del clan &8[&b" + clan.tag() + "&8]&7:");
+            for (String line : boardLines(clan.boardMessage())) player.sendMessage(color("&8- &f" + line));
+            return;
+        }
+        if (equalsAny(args[1], "set", "poner", "editar")) {
+            if (!hasRank(player, member, "board-edit")) return;
+            if (args.length < 3) {
+                pendingBoardEdit.add(player.getUniqueId());
+                player.closeInventory();
+                msg(player, "&7Escribe en el chat el nuevo texto del tablero. Usa &e| &7para separar líneas. Escribe &ccancelar &7para cancelar.");
+                return;
+            }
+            String text = join(args, 2);
+            setClanBoard(member.clanId(), text);
+            logAction(member.clanId(), player, "TABLERO", "Actualizó el tablero");
+            broadcastToClan(member.clanId(), "&e" + player.getName() + " &aactualizó el tablero del clan.");
+            return;
+        }
+        if (equalsAny(args[1], "limpiar", "clear")) {
+            if (!hasRank(player, member, "board-edit")) return;
+            setClanBoard(member.clanId(), null);
+            logAction(member.clanId(), player, "TABLERO", "Limpió el tablero");
+            broadcastToClan(member.clanId(), "&7El tablero del clan fue limpiado.");
+            return;
+        }
+        msg(player, "&cUso: &e/clan tablero <ver|set|limpiar>");
+    }
+
+    private void handleClanMail(Player player, String[] args) throws SQLException {
+        Member member = requireMember(player);
+        if (member == null) return;
+        if (args.length == 1 || equalsAny(args[1], "ver", "buzon", "buzón")) {
+            openMailboxMenu(player, 1);
+            return;
+        }
+        if (equalsAny(args[1], "clan", "enviar")) {
+            if (!hasRank(player, member, "mail-send")) return;
+            if (args.length < 4) {
+                msg(player, "&cUso: &e/clan correo clan <ID> <mensaje>");
+                return;
+            }
+            Optional<Clan> targetOpt = getClanByTag(args[2]);
+            if (targetOpt.isEmpty()) {
+                msg(player, "&cClan destino no encontrado.");
+                return;
+            }
+            Clan own = getClan(member.clanId()).orElseThrow();
+            Clan target = targetOpt.get();
+            if (own.id() == target.id()) {
+                msg(player, "&cNo puedes enviar correo a tu propio clan desde aquí.");
+                return;
+            }
+            String message = join(args, 3);
+            createClanMail(own.id(), target.id(), player.getUniqueId(), player.getName(), message);
+            logAction(own.id(), player, "CORREO", "Envió correo a " + target.tag());
+            notifyClan(target.id(), "&dEl clan &e" + own.tag() + " &dles envió un correo de clan.");
+            msg(player, "&aCorreo enviado al clan &e" + target.tag() + "&a.");
+            return;
+        }
+        if (equalsAny(args[1], "borrar", "eliminar")) {
+            if (!hasRank(player, member, "mail-delete")) return;
+            if (args.length < 3) {
+                msg(player, "&cUso: &e/clan correo borrar <id>");
+                return;
+            }
+            int id;
+            try { id = Integer.parseInt(args[2]); } catch (NumberFormatException e) { msg(player, "&cID inválido."); return; }
+            if (deleteClanMail(member.clanId(), id)) {
+                logAction(member.clanId(), player, "CORREO", "Eliminó correo #" + id);
+                msg(player, "&aCorreo eliminado.");
+            } else msg(player, "&cNo se encontró ese correo para tu clan.");
+            return;
+        }
+        msg(player, "&cUso: &e/clan correo <ver|clan|borrar>");
+    }
+
     private void handleBankShortcut(Player player, String[] args, boolean deposit) throws SQLException {
         if (args.length < 2) {
             msg(player, "&cUso: &e/clan " + (deposit ? "depositar" : "retirar") + " <cantidad>");
@@ -1123,6 +1256,20 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
     }
 
+
+    @EventHandler(ignoreCancelled = true)
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (!(event.getInventory().getHolder() instanceof ClanMenuHolder holder)) return;
+        event.setCancelled(true);
+        try {
+            handleMenuClick(player, holder, event.getSlot(), event.getClick());
+        } catch (SQLException e) {
+            getLogger().warning("Error en GUI de clan: " + e.getMessage());
+            msg(player, "&cOcurrió un error usando el menú de clan.");
+        }
+    }
+
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
         if (!(event.getPlayer() instanceof Player player)) return;
@@ -1140,6 +1287,37 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     @EventHandler(priority = EventPriority.NORMAL)
     public void onChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
+        if (pendingClanCreate.remove(player.getUniqueId())) {
+            event.setCancelled(true);
+            String text = event.getMessage().trim();
+            if (text.equalsIgnoreCase("cancelar")) {
+                msg(player, "&7Creación de clan cancelada.");
+                return;
+            }
+            String[] split = text.split(" ", 2);
+            if (split.length < 2) {
+                msg(player, "&cFormato inválido. Escribe: &eID Nombre del clan");
+                return;
+            }
+            Bukkit.getScheduler().runTask(this, () -> {
+                try { handleCreate(player, new String[]{"crear", split[0], split[1]}); }
+                catch (SQLException e) { getLogger().warning("Error creando clan desde chat: " + e.getMessage()); }
+            });
+            return;
+        }
+        if (pendingBoardEdit.remove(player.getUniqueId())) {
+            event.setCancelled(true);
+            String text = event.getMessage().trim();
+            if (text.equalsIgnoreCase("cancelar")) {
+                msg(player, "&7Edición de tablero cancelada.");
+                return;
+            }
+            Bukkit.getScheduler().runTask(this, () -> {
+                try { handleBoard(player, new String[]{"tablero", "set", text}); }
+                catch (SQLException e) { getLogger().warning("Error editando tablero desde chat: " + e.getMessage()); }
+            });
+            return;
+        }
         try {
             Optional<Member> memberOpt = getMember(player.getUniqueId());
             if (memberOpt.isEmpty() || !memberOpt.get().chatToggle()) return;
@@ -1552,6 +1730,87 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
     }
 
+
+    private synchronized void setClanBoard(int clanId, String text) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("UPDATE clans SET board_message=? WHERE id=?")) {
+            ps.setString(1, text);
+            ps.setInt(2, clanId);
+            ps.executeUpdate();
+        }
+    }
+
+    private synchronized void createClanMail(int fromClanId, int toClanId, UUID senderUuid, String senderName, String message) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("INSERT INTO clan_mails(from_clan_id,to_clan_id,sender_uuid,sender_name,sent_at,message,deleted) VALUES(?,?,?,?,?,?,0)")) {
+            ps.setInt(1, fromClanId);
+            ps.setInt(2, toClanId);
+            ps.setString(3, senderUuid == null ? null : senderUuid.toString());
+            ps.setString(4, senderName == null ? "Sistema" : senderName);
+            ps.setLong(5, System.currentTimeMillis());
+            ps.setString(6, message);
+            ps.executeUpdate();
+        }
+    }
+
+    private synchronized List<ClanMail> getClanMails(int clanId, int page, int pageSize) throws SQLException {
+        List<ClanMail> list = new ArrayList<>();
+        int offset = Math.max(0, page - 1) * pageSize;
+        try (PreparedStatement ps = connection.prepareStatement("SELECT * FROM clan_mails WHERE to_clan_id=? AND deleted=0 ORDER BY sent_at DESC LIMIT ? OFFSET ?")) {
+            ps.setInt(1, clanId);
+            ps.setInt(2, pageSize);
+            ps.setInt(3, offset);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) list.add(new ClanMail(rs.getInt("id"), rs.getInt("from_clan_id"), rs.getInt("to_clan_id"), rs.getString("sender_name"), rs.getLong("sent_at"), rs.getString("message")));
+            }
+        }
+        return list;
+    }
+
+    private synchronized int countClanMails(int clanId) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("SELECT COUNT(*) FROM clan_mails WHERE to_clan_id=? AND deleted=0")) {
+            ps.setInt(1, clanId);
+            try (ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getInt(1) : 0; }
+        }
+    }
+
+    private synchronized boolean deleteClanMail(int clanId, int mailId) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("UPDATE clan_mails SET deleted=1 WHERE id=? AND to_clan_id=?")) {
+            ps.setInt(1, mailId);
+            ps.setInt(2, clanId);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    private synchronized List<ClanRelationView> getVisibleRelations(int clanId) throws SQLException {
+        List<ClanRelationView> list = new ArrayList<>();
+        try (PreparedStatement ps = connection.prepareStatement("SELECT target_clan_id, relation FROM relations WHERE clan_id=? AND relation<>? ORDER BY relation ASC")) {
+            ps.setInt(1, clanId);
+            ps.setString(2, REL_NEUTRAL);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String rel = rs.getString("relation");
+                    if (!REL_ALLY.equals(rel) && !REL_ENEMY.equals(rel) && !REL_ALLY_REQUEST.equals(rel)) continue;
+                    Optional<Clan> c = getClan(rs.getInt("target_clan_id"));
+                    c.ifPresent(clan -> list.add(new ClanRelationView(clan, rel)));
+                }
+            }
+        }
+        return list;
+    }
+
+    private synchronized List<ClanTopEntry> topEntries(String mode) throws SQLException {
+        List<ClanTopEntry> entries = new ArrayList<>();
+        for (Clan clan : listClans()) {
+            double value = switch (mode) {
+                case "kills" -> getTotalKillsByClan(clan.id());
+                case "banco" -> clan.bankBalance();
+                default -> calculateStrength(clan);
+            };
+            entries.add(new ClanTopEntry(clan, value));
+        }
+        entries.sort(Comparator.comparingDouble(ClanTopEntry::value).reversed());
+        return entries;
+    }
+
     private synchronized void disbandClan(int clanId) throws SQLException {
         try (PreparedStatement ps = connection.prepareStatement("DELETE FROM clans WHERE id=?")) {
             ps.setInt(1, clanId);
@@ -1736,10 +1995,409 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
     }
 
+
+    private void openMainMenu(Player player) throws SQLException {
+        Optional<Member> memberOpt = getMember(player.getUniqueId());
+        Inventory inv = Bukkit.createInventory(new ClanMenuHolder("main", 1, -1, null, -1), 27, color("&8&lClanes"));
+        fill(inv);
+        if (memberOpt.isEmpty()) {
+            inv.setItem(11, item(Material.BOOK, "&b&lLista de clanes", List.of("", "&7Mira los clanes creados", "&7en MDVCRAFT.", "", "&eClick para abrir.")));
+            inv.setItem(15, item(Material.EMERALD, "&a&lCrear clan", List.of("", "&7Te pedirá en el chat:", "&fID Nombre del clan", "", "&8Ejemplo: MDV Medieval Craft", "", "&eClick para empezar.")));
+        } else {
+            Clan clan = getClan(memberOpt.get().clanId()).orElseThrow();
+            inv.setItem(4, clanBannerItem(clan, "&6&l" + clan.name(), List.of("&7ID: &b" + clan.tag(), "&7Miembros: &e" + countMembers(clan.id()), "&7Banco: &e" + formatNumber(clan.bankBalance()), "&7Fuerza: &6" + formatNumber(calculateStrength(clan)))));
+            inv.setItem(10, item(Material.PLAYER_HEAD, "&a&lMiembros", List.of("", "&7Cabezas de jugadores, roles", "&7y acciones rápidas.", "", "&eClick para abrir.")));
+            inv.setItem(11, item(Material.WRITABLE_BOOK, "&e&lTablero e información", List.of("", "&7Banner, tablero, buzón", "&7y registros del clan.", "", "&eClick para abrir.")));
+            inv.setItem(12, item(Material.RED_BANNER, "&c&lRelaciones", List.of("", "&7Aliados, enemigos, bajas", "&7y ranking de clanes.", "", "&eClick para abrir.")));
+            inv.setItem(13, item(Material.CHEST, "&6&lAlmacén y banco", List.of("", "&7Acceso al almacén", "&7y banco del clan.", "", "&eClick para abrir.")));
+            inv.setItem(14, item(Material.ENDER_PEARL, "&b&lIr a la base", List.of("", "&7Ejecuta &f/clan base&7.", "", "&eClick para viajar.")));
+            inv.setItem(15, item(Material.BOOK, "&b&lLista de clanes", List.of("", "&7Mira todos los clanes", "&7de MDVCRAFT.", "", "&eClick para abrir.")));
+            inv.setItem(16, item(Material.BARRIER, "&c&lAbandonar clan", List.of("", "&7Ejecuta &f/clan salir&7.", "&8Cuidado, mi broc.", "", "&eClick para salir.")));
+        }
+        inv.setItem(22, item(Material.BARRIER, "&c&lCerrar", List.of("&7Cierra el menú.")));
+        player.openInventory(inv);
+    }
+
+    private void openMembersMenu(Player player, int page) throws SQLException {
+        Member viewer = requireMember(player); if (viewer == null) return;
+        Clan clan = getClan(viewer.clanId()).orElseThrow();
+        List<Member> members = getMembers(clan.id());
+        Inventory inv = Bukkit.createInventory(new ClanMenuHolder("members", page, clan.id(), null, -1), 54, color("&8Miembros &b" + clan.tag()));
+        fill(inv);
+        int pageSize = 45;
+        int start = Math.max(0, page - 1) * pageSize;
+        for (int i = start; i < Math.min(start + pageSize, members.size()); i++) {
+            Member m = members.get(i);
+            inv.setItem(i - start, memberHead(m, clan.id(), player));
+        }
+        nav(inv, page, members.size(), pageSize, "members", clan.id());
+        inv.setItem(49, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa al menú principal.")));
+        player.openInventory(inv);
+    }
+
+    private void openClanInfoMenu(Player player) throws SQLException {
+        Member member = requireMember(player); if (member == null) return;
+        Clan clan = getClan(member.clanId()).orElseThrow();
+        Inventory inv = Bukkit.createInventory(new ClanMenuHolder("info", 1, clan.id(), null, -1), 27, color("&8Info &b" + clan.tag()));
+        fill(inv);
+        inv.setItem(10, clanBannerItem(clan, "&f&lEstandarte oficial", List.of("&7Click: ver", "&7Shift-click: guardar banner en mano", "&8Sin banner: WHITE_BANNER por defecto")));
+        inv.setItem(12, item(Material.WRITABLE_BOOK, "&e&lTablero de información", boardItemLore(clan)));
+        inv.setItem(14, item(Material.CHEST, "&d&lBuzón del clan", List.of("", "&7Mensajes enviados por otros clanes.", "&7Todos pueden leer.", "&7Rangos altos pueden borrar/responder.", "", "&eClick para abrir.")));
+        inv.setItem(16, item(Material.BOOK, "&6&lCreación y registros", List.of("", "&7Creado: &f" + date(clan.createdAt()), "&7Miembros: &e" + countMembers(clan.id()), "&7Banco: &e" + formatNumber(clan.bankBalance()), "", "&eClick para ver logs.")));
+        inv.setItem(22, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa al menú principal.")));
+        player.openInventory(inv);
+    }
+
+    private void openRelationsMenu(Player player) throws SQLException {
+        Member member = requireMember(player); if (member == null) return;
+        Inventory inv = Bukkit.createInventory(new ClanMenuHolder("relations", 1, member.clanId(), null, -1), 27, color("&8Relaciones"));
+        fill(inv);
+        inv.setItem(11, item(Material.BLUE_BANNER, "&9&lRelaciones con clanes", List.of("", "&7Muestra aliados y enemigos.", "&7Los neutrales se omiten.", "", "&eClick para abrir.")));
+        inv.setItem(13, item(Material.IRON_SWORD, "&c&lKills y bajas", List.of("", "&7Banners de clanes que han", "&7matado miembros de tu clan.", "", "&eClick para abrir.")));
+        inv.setItem(15, item(Material.NETHER_STAR, "&6&lRanking", List.of("", "&7Top por fuerza, kills", "&7y banco.", "", "&eClick para abrir.")));
+        inv.setItem(22, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa al menú principal.")));
+        player.openInventory(inv);
+    }
+
+    private void openStorageHubMenu(Player player) throws SQLException {
+        Member member = requireMember(player); if (member == null) return;
+        Clan clan = getClan(member.clanId()).orElseThrow();
+        Inventory inv = Bukkit.createInventory(new ClanMenuHolder("storagehub", 1, clan.id(), null, -1), 27, color("&8Almacén y banco"));
+        fill(inv);
+        inv.setItem(11, item(Material.CHEST, "&a&lAlmacén del clan", List.of("", "&7Inventario compartido.", "&7Todos pueden usarlo según config.", "", "&eClick para abrir.")));
+        inv.setItem(15, item(Material.GOLD_BLOCK, "&e&lBanco del clan", List.of("", "&7Balance: &e" + formatNumber(clan.bankBalance()), "", "&7Comandos:", "&f/clan banco depositar <cantidad>", "&f/clan banco retirar <cantidad>", "", "&eClick para ver balance.")));
+        inv.setItem(22, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa al menú principal.")));
+        player.openInventory(inv);
+    }
+
+    private void openClanListMenu(Player player, int page) throws SQLException {
+        List<Clan> clans = listClans();
+        Inventory inv = Bukkit.createInventory(new ClanMenuHolder("clanlist", page, -1, null, -1), 54, color("&8Clanes de MDVCRAFT"));
+        fill(inv);
+        int pageSize = 45;
+        int start = Math.max(0, page - 1) * pageSize;
+        boolean hasClan = getMember(player.getUniqueId()).isPresent();
+        for (int i = start; i < Math.min(start + pageSize, clans.size()); i++) {
+            Clan c = clans.get(i);
+            List<String> lore = new ArrayList<>();
+            lore.add("&7ID: &b" + c.tag());
+            lore.add("&7Miembros: &e" + countMembers(c.id()) + "&7/&e" + getConfig().getInt("limits.max-members", 20));
+            lore.add("&7Entrada: " + (c.open() ? "&aAbierta" : "&cInvitación"));
+            lore.add("&7Fuerza: &6" + formatNumber(calculateStrength(c)));
+            lore.add("");
+            if (hasClan) {
+                lore.add("&eClick izq: ver info");
+                lore.add("&9Click der: proponer alianza");
+                lore.add("&cShift der: declarar enemigo");
+                lore.add("&7Shift izq: neutral");
+                lore.add("&dClick medio: comando de correo");
+            } else {
+                lore.add(c.open() ? "&eClick para unirte." : "&8Solo invitación.");
+            }
+            inv.setItem(i - start, clanBannerItem(c, "&8[&b" + c.tag() + "&8] &f" + c.name(), lore));
+        }
+        nav(inv, page, clans.size(), pageSize, "clanlist", -1);
+        inv.setItem(49, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa al menú principal.")));
+        player.openInventory(inv);
+    }
+
+    private void openRelationsListMenu(Player player, int page) throws SQLException {
+        Member member = requireMember(player); if (member == null) return;
+        List<ClanRelationView> relations = getVisibleRelations(member.clanId());
+        Inventory inv = Bukkit.createInventory(new ClanMenuHolder("relationslist", page, member.clanId(), null, -1), 54, color("&8Aliados y enemigos"));
+        fill(inv);
+        int pageSize = 45, start = Math.max(0, page - 1) * pageSize;
+        for (int i = start; i < Math.min(start + pageSize, relations.size()); i++) {
+            ClanRelationView r = relations.get(i);
+            String relName = REL_ALLY.equals(r.relation()) ? "&9Aliado" : REL_ENEMY.equals(r.relation()) ? "&cEnemigo" : "&eSolicitud";
+            inv.setItem(i - start, clanBannerItem(r.clan(), relName + " &8[&b" + r.clan().tag() + "&8]", List.of("&7Clan: &f" + r.clan().name(), "&7Relación: " + relName, "", "&eClick para ver info.")));
+        }
+        nav(inv, page, relations.size(), pageSize, "relationslist", member.clanId());
+        inv.setItem(49, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa a Relaciones.")));
+        player.openInventory(inv);
+    }
+
+    private void openKillStatsGui(Player player) throws SQLException {
+        Member member = requireMember(player); if (member == null) return;
+        Clan clan = getClan(member.clanId()).orElseThrow();
+        Inventory inv = Bukkit.createInventory(new ClanMenuHolder("bajas", 1, clan.id(), null, -1), 54, color("&8Kills y bajas"));
+        fill(inv);
+        inv.setItem(0, clanBannerItem(clan, "&a&lTu clan", List.of("&7Kills hechas: &a" + getTotalKillsByClan(clan.id()), "&7Bajas sufridas: &c" + getTotalDeathsByClan(clan.id()), "&7Fuerza: &6" + formatNumber(calculateStrength(clan)))));
+        List<ClanTopEntry> suffered = getTopKillersAgainst(clan.id(), 44);
+        for (int i = 0; i < Math.min(44, suffered.size()); i++) {
+            ClanTopEntry e = suffered.get(i);
+            inv.setItem(i + 1, clanBannerItem(e.clan(), "&c" + e.clan().tag() + " &7nos hizo &c" + (int)e.value() + " &7bajas", List.of("&7Clan: &f" + e.clan().name(), "&7Kills contra nosotros: &c" + (int)e.value())));
+        }
+        inv.setItem(49, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa a Relaciones.")));
+        player.openInventory(inv);
+    }
+
+    private void openTopGui(Player player, String mode) throws SQLException {
+        if (!equalsAny(mode, "fuerza", "kills", "banco")) mode = "fuerza";
+        List<ClanTopEntry> entries = topEntries(mode);
+        Inventory inv = Bukkit.createInventory(new ClanMenuHolder("top:" + mode, 1, -1, null, -1), 54, color("&8Ranking: " + mode));
+        fill(inv);
+        inv.setItem(0, item(Material.NETHER_STAR, "&6&lTop fuerza", List.of("&eClick para ver.")));
+        inv.setItem(1, item(Material.IRON_SWORD, "&c&lTop kills", List.of("&eClick para ver.")));
+        inv.setItem(2, item(Material.GOLD_BLOCK, "&e&lTop banco", List.of("&eClick para ver.")));
+        for (int i = 0; i < Math.min(45, entries.size()); i++) {
+            ClanTopEntry e = entries.get(i);
+            inv.setItem(i + 9, clanBannerItem(e.clan(), "&e#" + (i + 1) + " &8[&b" + e.clan().tag() + "&8]", List.of("&7Clan: &f" + e.clan().name(), "&7Valor: &6" + formatNumber(e.value()), "&7Miembros: &e" + countMembers(e.clan().id()))));
+        }
+        inv.setItem(49, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa a Relaciones.")));
+        player.openInventory(inv);
+    }
+
+    private void openMailboxMenu(Player player, int page) throws SQLException {
+        Member member = requireMember(player); if (member == null) return;
+        List<ClanMail> mails = getClanMails(member.clanId(), page, 45);
+        Inventory inv = Bukkit.createInventory(new ClanMenuHolder("mailbox", page, member.clanId(), null, -1), 54, color("&8Buzón del clan"));
+        fill(inv);
+        for (int i = 0; i < mails.size(); i++) {
+            ClanMail mail = mails.get(i);
+            Optional<Clan> from = getClan(mail.fromClanId());
+            ItemStack icon = from.map(c -> clanBannerItem(c, "&dCorreo #" + mail.id() + " &7de &b" + c.tag(), List.of("&7Enviado por: &f" + mail.senderName(), "&7Fecha: &f" + date(mail.sentAt()), "", "&f" + mail.message(), "", "&eClick: instrucciones para responder", "&cShift der: borrar"))).orElse(item(Material.PAPER, "&dCorreo #" + mail.id(), List.of("&f" + mail.message())));
+            inv.setItem(i, icon);
+        }
+        nav(inv, page, countClanMails(member.clanId()), 45, "mailbox", member.clanId());
+        inv.setItem(49, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa a Información.")));
+        player.openInventory(inv);
+    }
+
+    private void openLogsGui(Player player, int page) throws SQLException {
+        Member member = requireMember(player); if (member == null) return;
+        if (!hasRank(player, member, "logs-view")) return;
+        List<ClanLog> logs = getLogs(member.clanId(), null, page, 45);
+        Inventory inv = Bukkit.createInventory(new ClanMenuHolder("logs", page, member.clanId(), null, -1), 54, color("&8Registros del clan"));
+        fill(inv);
+        for (int i = 0; i < logs.size(); i++) {
+            ClanLog log = logs.get(i);
+            inv.setItem(i, item(Material.PAPER, "&e" + log.action(), List.of("&7Actor: &f" + log.actorName(), "&7Fecha: &f" + date(log.time()), "", "&7" + log.detail())));
+        }
+        inv.setItem(49, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa a Información.")));
+        player.openInventory(inv);
+    }
+
+    private void handleMenuClick(Player player, ClanMenuHolder holder, int slot, ClickType click) throws SQLException {
+        String menu = holder.menu();
+        if (slot == 49 && !menu.equals("main")) { openMainMenu(player); return; }
+        if (slot == 45 && holder.page() > 1) { openPaged(player, menu, holder.page() - 1); return; }
+        if (slot == 53) { openPaged(player, menu, holder.page() + 1); return; }
+        switch (menu) {
+            case "main" -> handleMainClick(player, slot);
+            case "members" -> handleMembersClick(player, holder.page(), slot, click);
+            case "info" -> handleInfoClick(player, slot, click);
+            case "relations" -> { if (slot == 11) openRelationsListMenu(player,1); else if (slot == 13) openKillStatsGui(player); else if (slot == 15) openTopGui(player,"fuerza"); else if (slot == 22) openMainMenu(player); }
+            case "storagehub" -> { if (slot == 11) { player.closeInventory(); handleStorage(player); } else if (slot == 15) { player.closeInventory(); handleBank(player, new String[]{"banco"}); } else if (slot == 22) openMainMenu(player); }
+            case "clanlist" -> handleClanListClick(player, holder.page(), slot, click);
+            case "relationslist" -> handleRelationsListClick(player, holder.page(), slot);
+            case "mailbox" -> handleMailboxClick(player, holder.page(), slot, click);
+            case "bajas" -> { if (slot == 49) openRelationsMenu(player); }
+            case "logs" -> { if (slot == 49) openClanInfoMenu(player); }
+            default -> { if (menu.startsWith("top:")) handleTopGuiClick(player, slot); }
+        }
+    }
+
+    private void handleMainClick(Player player, int slot) throws SQLException {
+        boolean hasClan = getMember(player.getUniqueId()).isPresent();
+        if (!hasClan) {
+            if (slot == 11) openClanListMenu(player, 1);
+            else if (slot == 15) { pendingClanCreate.add(player.getUniqueId()); player.closeInventory(); msg(player, "&7Escribe en el chat: &eID Nombre del clan&7. Ejemplo: &fMDV Medieval Craft&7. Escribe &ccancelar &7para cancelar."); }
+            else if (slot == 22) player.closeInventory();
+            return;
+        }
+        if (slot == 10) openMembersMenu(player, 1);
+        else if (slot == 11) openClanInfoMenu(player);
+        else if (slot == 12) openRelationsMenu(player);
+        else if (slot == 13) openStorageHubMenu(player);
+        else if (slot == 14) { player.closeInventory(); player.performCommand("clan base"); }
+        else if (slot == 15) openClanListMenu(player, 1);
+        else if (slot == 16) { player.closeInventory(); player.performCommand("clan salir"); }
+        else if (slot == 22) player.closeInventory();
+    }
+
+    private void handleMembersClick(Player player, int page, int slot, ClickType click) throws SQLException {
+        Member actor = requireMember(player); if (actor == null) return;
+        List<Member> members = getMembers(actor.clanId());
+        int index = (Math.max(1, page) - 1) * 45 + slot;
+        if (index < 0 || index >= members.size()) return;
+        Member target = members.get(index);
+        if (click == ClickType.SHIFT_RIGHT) player.performCommand("clan expulsar " + target.name());
+        else if (click == ClickType.RIGHT) player.performCommand("clan degradar " + target.name());
+        else if (click == ClickType.LEFT) player.performCommand("clan promover " + target.name());
+        else if (click == ClickType.MIDDLE) { player.closeInventory(); msg(player, "&7Correo personal: usa el menú de cartas de MDVSocial para escribir a &e" + target.name() + "&7."); }
+    }
+
+    private void handleInfoClick(Player player, int slot, ClickType click) throws SQLException {
+        if (slot == 10) { player.closeInventory(); player.performCommand(click.isShiftClick() ? "clan estandarte set" : "clan estandarte ver"); }
+        else if (slot == 12) { if (click.isShiftClick()) { pendingBoardEdit.add(player.getUniqueId()); player.closeInventory(); msg(player, "&7Escribe el nuevo tablero. Usa &e| &7para separar líneas. &cCancelar &7para cancelar."); } else player.performCommand("clan tablero ver"); }
+        else if (slot == 14) openMailboxMenu(player, 1);
+        else if (slot == 16) openLogsGui(player, 1);
+        else if (slot == 22) openMainMenu(player);
+    }
+
+    private void handleClanListClick(Player player, int page, int slot, ClickType click) throws SQLException {
+        List<Clan> clans = listClans();
+        int index = (Math.max(1, page) - 1) * 45 + slot;
+        if (index < 0 || index >= clans.size()) return;
+        Clan target = clans.get(index);
+        Optional<Member> own = getMember(player.getUniqueId());
+        player.closeInventory();
+        if (own.isEmpty()) {
+            if (target.open()) player.performCommand("clan unirse " + target.tag());
+            else msg(player, "&cEse clan solo acepta por invitación.");
+            return;
+        }
+        if (click == ClickType.RIGHT) player.performCommand("clan relacion " + target.tag() + " aliado");
+        else if (click == ClickType.SHIFT_RIGHT) player.performCommand("clan relacion " + target.tag() + " enemigo");
+        else if (click == ClickType.SHIFT_LEFT) player.performCommand("clan relacion " + target.tag() + " neutral");
+        else if (click == ClickType.MIDDLE) msg(player, "&7Enviar correo: &e/clan correo clan " + target.tag() + " <mensaje>");
+        else player.performCommand("clan info " + target.tag());
+    }
+
+    private void handleRelationsListClick(Player player, int page, int slot) throws SQLException {
+        Member member = requireMember(player); if (member == null) return;
+        List<ClanRelationView> relations = getVisibleRelations(member.clanId());
+        int index = (Math.max(1, page) - 1) * 45 + slot;
+        if (index < 0 || index >= relations.size()) return;
+        player.closeInventory();
+        player.performCommand("clan info " + relations.get(index).clan().tag());
+    }
+
+    private void handleMailboxClick(Player player, int page, int slot, ClickType click) throws SQLException {
+        Member member = requireMember(player); if (member == null) return;
+        List<ClanMail> mails = getClanMails(member.clanId(), page, 45);
+        int index = slot;
+        if (index < 0 || index >= mails.size()) return;
+        ClanMail mail = mails.get(index);
+        if (click == ClickType.SHIFT_RIGHT) {
+            if (!hasRank(player, member, "mail-delete")) return;
+            deleteClanMail(member.clanId(), mail.id());
+            msg(player, "&aCorreo eliminado.");
+            openMailboxMenu(player, page);
+        } else {
+            Optional<Clan> from = getClan(mail.fromClanId());
+            player.closeInventory();
+            from.ifPresent(c -> msg(player, "&7Responder: &e/clan correo clan " + c.tag() + " <mensaje>"));
+            msg(player, "&fMensaje: &7" + mail.message());
+        }
+    }
+
+    private void handleTopGuiClick(Player player, int slot) throws SQLException {
+        if (slot == 0) openTopGui(player, "fuerza");
+        else if (slot == 1) openTopGui(player, "kills");
+        else if (slot == 2) openTopGui(player, "banco");
+        else if (slot == 49) openRelationsMenu(player);
+    }
+
+    private void openPaged(Player player, String menu, int page) throws SQLException {
+        if (menu.equals("members")) openMembersMenu(player, page);
+        else if (menu.equals("clanlist")) openClanListMenu(player, page);
+        else if (menu.equals("relationslist")) openRelationsListMenu(player, page);
+        else if (menu.equals("mailbox")) openMailboxMenu(player, page);
+        else openMainMenu(player);
+    }
+
+    private ItemStack memberHead(Member member, int clanId, Player viewer) throws SQLException {
+        ItemStack item = new ItemStack(Material.PLAYER_HEAD);
+        SkullMeta meta = (SkullMeta) item.getItemMeta();
+        meta.setOwningPlayer(Bukkit.getOfflinePlayer(member.uuid()));
+        meta.setDisplayName(color("&e" + member.name() + " &8(&b" + getRoleName(clanId, member.role()) + "&8)"));
+        List<String> lore = new ArrayList<>();
+        OfflinePlayer off = Bukkit.getOfflinePlayer(member.uuid());
+        Player online = Bukkit.getPlayer(member.uuid());
+        lore.add(color("&7Rango: &b" + member.role() + " &8- &f" + getRoleName(clanId, member.role())));
+        lore.add(color("&7Estado: " + (online != null ? "&aConectado" : "&cDesconectado")));
+        lore.add(color("&7Última vez: &f" + (online != null ? "Ahora" : date(off.getLastSeen()))));
+        if (online != null && Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            String level = safePapi(online, "%mmocore_level%");
+            String race = safePapi(online, "%mmocore_race%");
+            if (!level.isBlank()) lore.add(color("&7Nivel: &e" + level));
+            if (!race.isBlank()) lore.add(color("&7Raza: &d" + race));
+        } else {
+            lore.add(color("&7Nivel/Raza: &8solo si está online"));
+        }
+        lore.add("");
+        lore.add(color("&eClick izq: promover"));
+        lore.add(color("&eClick der: degradar"));
+        lore.add(color("&cShift der: expulsar"));
+        lore.add(color("&dClick medio: correo personal"));
+        meta.setLore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private String safePapi(Player player, String placeholder) {
+        try {
+            String out = PlaceholderAPI.setPlaceholders(player, placeholder);
+            if (out == null || out.equalsIgnoreCase(placeholder) || out.contains("%")) return "";
+            return out;
+        } catch (Throwable ignored) { return ""; }
+    }
+
+    private List<String> boardItemLore(Clan clan) {
+        List<String> lore = new ArrayList<>();
+        lore.add("");
+        lore.add("&7Mensaje actual:");
+        for (String line : boardLines(clan.boardMessage())) lore.add("&f" + line);
+        lore.add("");
+        lore.add("&eClick: ver en chat");
+        lore.add("&6Shift-click: editar");
+        return lore;
+    }
+
+    private List<String> boardLines(String text) {
+        if (text == null || text.isBlank()) return List.of("&8Sin información todavía.");
+        return Arrays.stream(text.split("\\|", -1)).map(String::trim).filter(x -> !x.isBlank()).limit(8).collect(Collectors.toList());
+    }
+
+    private void fill(Inventory inv) {
+        ItemStack filler = item(Material.BLACK_STAINED_GLASS_PANE, " ", List.of());
+        for (int i = 0; i < inv.getSize(); i++) inv.setItem(i, filler);
+    }
+
+    private void nav(Inventory inv, int page, int total, int pageSize, String menu, int clanId) {
+        if (page > 1) inv.setItem(45, item(Material.ARROW, "&ePágina anterior", List.of("&7Click para volver.")));
+        if (page * pageSize < total) inv.setItem(53, item(Material.ARROW, "&ePágina siguiente", List.of("&7Click para avanzar.")));
+    }
+
+    private ItemStack clanBannerItem(Clan clan, String name, List<String> lore) {
+        ItemStack base = new ItemStack(Material.WHITE_BANNER);
+        if (clan != null && clan.hasBanner()) {
+            try { base = itemFromBase64(clan.banner()); }
+            catch (Exception ignored) { base = new ItemStack(Material.WHITE_BANNER); }
+        }
+        ItemStack item = base.clone();
+        item.setAmount(1);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName(color(name));
+        meta.setLore(lore.stream().map(this::color).collect(Collectors.toList()));
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack item(Material material, String name, List<String> lore) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName(color(name));
+        if (lore != null) meta.setLore(lore.stream().map(this::color).collect(Collectors.toList()));
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private String date(long ms) {
+        if (ms <= 0) return "Nunca";
+        return new SimpleDateFormat("dd/MM/yyyy HH:mm").format(new Date(ms));
+    }
+
     private void saveMenuTemplates() {
         saveResourceIfMissing("Menus/clan.yml");
         saveResourceIfMissing("Menus/clan_gestion.yml");
         saveResourceIfMissing("Menus/clan_rankings.yml");
+        saveResourceIfMissing("Menus/clan_miembros.yml");
+        saveResourceIfMissing("Menus/clan_info.yml");
+        saveResourceIfMissing("Menus/clan_relaciones.yml");
+        saveResourceIfMissing("Menus/clan_lista.yml");
     }
 
     private void saveResourceIfMissing(String resource) {
@@ -1812,6 +2470,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 rs.getDouble("bank_balance"),
                 rs.getString("banner"),
                 rs.getString("storage"),
+                rs.getString("board_message"),
                 rs.getString("base_world"),
                 rs.getDouble("base_x"),
                 rs.getDouble("base_y"),
@@ -1860,7 +2519,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
         if (!(sender instanceof Player)) return Collections.emptyList();
         if (args.length == 1) {
-            return filter(List.of("ayuda", "crear", "info", "lista", "invitar", "aceptar", "unirse", "abierto", "salir", "expulsar", "promover", "degradar", "setrango", "rol", "chat", "c", "setbase", "base", "relacion", "banco", "depositar", "retirar", "almacen", "estandarte", "logs", "top", "bajas", "disolver"), args[0]);
+            return filter(List.of("ayuda", "crear", "info", "lista", "invitar", "aceptar", "unirse", "abierto", "salir", "expulsar", "promover", "degradar", "setrango", "rol", "chat", "c", "setbase", "base", "relacion", "banco", "depositar", "retirar", "almacen", "estandarte", "logs", "top", "bajas", "tablero", "correo", "menu", "disolver"), args[0]);
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         try {
@@ -1912,7 +2571,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     public record Clan(int id, String tag, String name, UUID ownerUuid, boolean open, long createdAt,
-                       double bankBalance, String banner, String storage,
+                       double bankBalance, String banner, String storage, String boardMessage,
                        String baseWorld, double baseX, double baseY, double baseZ, float baseYaw, float basePitch) {
         boolean hasBase() { return baseWorld != null && !baseWorld.isBlank(); }
         boolean hasBanner() { return banner != null && !banner.isBlank(); }
@@ -1922,6 +2581,14 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     public record ClanLog(long time, String actorName, String action, String detail) {}
 
     public record ClanTopEntry(Clan clan, double value) {}
+
+    public record ClanMail(int id, int fromClanId, int toClanId, String senderName, long sentAt, String message) {}
+
+    public record ClanRelationView(Clan clan, String relation) {}
+
+    private record ClanMenuHolder(String menu, int page, int clanId, UUID targetUuid, int mailId) implements InventoryHolder {
+        @Override public Inventory getInventory() { return null; }
+    }
 
     public record Member(int clanId, UUID uuid, String name, int role, long joinedAt, boolean chatToggle) {}
 

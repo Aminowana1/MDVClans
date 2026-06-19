@@ -60,6 +60,9 @@ rank-permissions:
   storage-open: 0
   banner-set: 4
   logs-view: 4
+  board-edit: 4
+  mail-send: 4
+  mail-delete: 4
 
 chat:
   format: '&8[&3Clan&8] &b{player}&7: &f{message}'
@@ -116,3 +119,9 @@ placeholders:
   no-clan: ''
   tag-format: '&8[&b{id}&8]&r'
   lpc-tag-format: '&8[&b{id}&8]&r '
+
+
+gui:
+  native-enabled: true
+  # Los menús nativos se abren con /clan menu.
+  # Los YAML de Menus/ son accesos rápidos para MDVSocial.

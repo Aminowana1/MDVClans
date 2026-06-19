@@ -1,0 +1,28 @@
+# Puente MDVSocial -> GUI nativa de lista de clanes.
+title: '&8&lClanes de MDVCRAFT'
+size: 27
+items:
+  abrir:
+    slot: 13
+    material: BOOK
+    name: '&b&lLista de clanes'
+    lore:
+      - ''
+      - '&7Abre la lista dinámica'
+      - '&7con banners e información.'
+      - ''
+      - '&eClick para abrir.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan menu lista'
+  volver:
+    slot: 22
+    material: ARROW
+    name: '&6&lVolver'
+    action: OPEN_MENU
+    target-menu: clan
+  cerrar:
+    slot: 26
+    material: BARRIER
+    name: '&c&lCerrar'
+    action: CLOSE

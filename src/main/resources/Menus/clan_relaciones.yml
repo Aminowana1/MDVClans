@@ -1,0 +1,28 @@
+# Puente MDVSocial -> GUI nativa de relaciones.
+title: '&8&lRelaciones de clan'
+size: 27
+items:
+  abrir:
+    slot: 13
+    material: RED_BANNER
+    name: '&c&lRelaciones'
+    lore:
+      - ''
+      - '&7Abre relaciones, bajas'
+      - '&7y ranking de clanes.'
+      - ''
+      - '&eClick para abrir.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan menu relaciones'
+  volver:
+    slot: 22
+    material: ARROW
+    name: '&6&lVolver'
+    action: OPEN_MENU
+    target-menu: clan
+  cerrar:
+    slot: 26
+    material: BARRIER
+    name: '&c&lCerrar'
+    action: CLOSE

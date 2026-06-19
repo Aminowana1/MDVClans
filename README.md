@@ -1,4 +1,4 @@
-# MDVClans 1.5.0
+# MDVClans 1.6.0
 
 Sistema de clanes social para MDVCRAFT, pensado para Purpur/Paper 1.21.6.
 
@@ -17,6 +17,10 @@ Sistema de clanes social para MDVCRAFT, pensado para Purpur/Paper 1.21.6.
 - Relaciones básicas: neutral, aliado, enemigo.
 - PlaceholderAPI para LPC.
 - SQLite.
+- Menú nativo dinámico con `/clan menu`.
+- GUIs de miembros, info, relaciones, almacén/banco, lista de clanes, buzón, bajas y ranking.
+- Tablero de clan editable por rangos.
+- Buzón de clan interno con correos entre clanes.
 
 ## Nuevo en V1.5
 
@@ -41,6 +45,7 @@ Sistema de clanes social para MDVCRAFT, pensado para Purpur/Paper 1.21.6.
 
 ```txt
 /clan ayuda
+/clan menu
 /clan crear <ID> <nombre>
 /clan info [ID]
 /clan lista [pagina]
@@ -136,3 +141,20 @@ El proyecto incluye GitHub Actions para compilarlo en la nube.
 ## Compatibilidad MDVSocial
 
 MDVClans V1.5 mantiene `softdepend: MDVSocial`, pero no depende de MDVSocial para funcionar. Los menús se entregan como YAML compatibles para copiarlos manualmente a la carpeta de menús de MDVSocial.
+
+
+## Menús nativos V1.6
+
+Usa `/clan menu` para abrir la interfaz dinámica. Si el jugador no tiene clan, verá lista de clanes y crear clan. Si tiene clan, verá miembros, tablero/info, relaciones, almacén/banco, lista de clanes y base.
+
+## Tablero y correo de clan
+
+```txt
+/clan tablero ver
+/clan tablero set <texto>
+/clan tablero limpiar
+/clan correo clan <ID> <mensaje>
+/clan correo borrar <id>
+```
+
+Los menús YAML generados en `plugins/MDVClans/Menus/` son accesos rápidos para MDVSocial; puedes copiarlos a `plugins/MDVSocial/Menus/`.
