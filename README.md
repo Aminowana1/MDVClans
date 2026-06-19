@@ -1,63 +1,70 @@
-# MDVClans 1.7.1
+# MDVClans 1.7.2
 
-Sistema de clanes social para MDVCRAFT.
+Sistema de clanes para MDVCRAFT.
 
-## Cambio importante de arquitectura
+## Cambios de 1.7.2
 
-MDVClans ahora funciona como **motor de clanes + UIs dinamicas base**.
-MDVSocial puede construir los menus bonitos y llamar a MDVClans con comandos simples.
+- `native-menus.yml` ahora soporta texturas en items `PLAYER_HEAD`, igual que MDVSocial.
+- Soporta claves: `texture`, `custom-head-texture`, `head-texture`, `skull-texture`, `texture-base64`.
+- También soporta `head-owner` y placeholders como `{player}` cuando aplique.
+- Los botones de volver/back de las GUIs nativas son configurables por menú.
+- El back puede abrir otra GUI nativa, abrir un menú de MDVSocial, ejecutar un comando, cerrar o intentar volver al panel anterior.
 
-- MDVClans mantiene datos, permisos, roles, banco, almacen, relaciones, correos, estadisticas y UIs dinamicas.
-- MDVSocial mantiene el hub visual, navegacion e items editables por YAML.
-
-## UIs dinamicas disponibles
-
-```txt
-/clan abrir auto
-/clan abrir gestion
-/clan abrir sinclan
-/clan abrir miembros
-/clan abrir info
-/clan abrir relaciones
-/clan abrir relaciones_lista
-/clan abrir almacen
-/clan abrir lista
-/clan abrir lista_sinclan
-/clan abrir correo
-/clan abrir top
-/clan abrir top_kills
-/clan abrir top_banco
-/clan abrir bajas
-/clan abrir logs
-/clan abrir ajustes
-/clan abrir rangos
-/clan abrir permisos
-/clan abrir solicitudes
-```
-
-Tambien funcionan aliases: `/clan ui <menu>`, `/clan interfaz <menu>` y `/clan menu <menu>`.
-
-## Para MDVSocial
-
-La forma recomendada es que MDVSocial use:
+## Ejemplo de cabeza con textura
 
 ```yaml
-action: MDVCLANS_OPEN
-clans-menu: miembros
+global:
+  back:
+    material: PLAYER_HEAD
+    texture: 'BASE64_DE_MINECRAFT_HEADS'
+    name: '&6&lVolver'
+    lore:
+      - '&7Regresa al menú anterior.'
 ```
 
-O, si usas solo comandos:
+## Ejemplo de back hacia GUI nativa
 
 ```yaml
-action: COMMAND_PLAYER
-commands:
-  - 'clan abrir miembros'
+menus:
+  members:
+    back:
+      slot: 49
+      material: ARROW
+      name: '&6&lVolver'
+      action: NATIVE
+      target: gestion
 ```
 
-## Build
+## Ejemplo de back hacia MDVSocial
+
+```yaml
+menus:
+  management:
+    back:
+      slot: 22
+      material: PLAYER_HEAD
+      texture: 'BASE64_DE_MINECRAFT_HEADS'
+      name: '&6&lVolver al menú social'
+      action: MDVSOCIAL
+      target: clan_con_clan
+```
+
+## Acciones disponibles para back
+
+- `NATIVE`: abre otra GUI nativa de MDVClans usando `target`.
+- `MDVSOCIAL`: ejecuta `/social <target>`.
+- `COMMAND`: ejecuta el comando de `command` como jugador.
+- `CLOSE`: cierra el inventario.
+- `PREVIOUS`: intenta volver al panel nativo anterior.
+
+## Compilar
 
 ```bash
 mvn clean package
 ```
 
-El jar queda en `target/MDVClans-1.7.1.jar`.
+El jar saldrá en:
+
+```text
+target/MDVClans-1.7.2.jar
+```

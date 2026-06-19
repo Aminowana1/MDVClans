@@ -8,11 +8,14 @@ import org.bukkit.Material;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.profile.PlayerProfile;
+import org.bukkit.profile.PlayerTextures;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Entity;
@@ -47,6 +50,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -54,6 +58,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Arrays;
@@ -101,6 +106,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private final Set<UUID> pendingClanTagEdit = ConcurrentHashMap.newKeySet();
     private final Map<UUID, Integer> pendingRoleNameEdit = new ConcurrentHashMap<>();
     private final Map<UUID, String> pendingClanMailReply = new ConcurrentHashMap<>();
+    private final Map<UUID, String> currentNativeMenu = new ConcurrentHashMap<>();
+    private final Map<UUID, String> previousNativeMenu = new ConcurrentHashMap<>();
+    private final Set<UUID> suppressHistoryOnce = ConcurrentHashMap.newKeySet();
     private int nametagTaskId = -1;
 
     @Override
@@ -141,7 +149,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.7.0 habilitado.");
+        getLogger().info("MDVClans 1.7.2 habilitado.");
     }
 
     @Override
@@ -1177,7 +1185,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         ItemStack[] items = deserializeInventory(clan.storage(), size);
         inv.setContents(items);
         openStorageViewers.put(player.getUniqueId(), clan.id());
-        player.openInventory(inv);
+        openNativeInventory(player, inv);
         logAction(clan.id(), player, "ALMACEN", "Abrió el almacén");
     }
 
@@ -1216,7 +1224,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             try {
                 Inventory inv = Bukkit.createInventory(player, 9, color("&8Estandarte " + clan.tag()));
                 inv.setItem(4, itemFromBase64(clan.banner()));
-                player.openInventory(inv);
+                openNativeInventory(player, inv);
             } catch (Exception e) {
                 msg(player, "&cNo se pudo cargar el estandarte guardado.");
             }
@@ -2261,9 +2269,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         inv.setItem(nativeSlot("menus.hub.items.clan-list.slot", 15), nativeItem("menus.hub.items.clan-list", Material.BOOK, "&b&lLista de clanes", List.of("", "&7Mira todos los clanes", "&7de MDVCRAFT.", "", "&eClick para abrir."), ph));
         inv.setItem(nativeSlot("menus.hub.items.leave.slot", 16), nativeItem("menus.hub.items.leave", Material.BARRIER, "&c&lAbandonar clan", List.of("", "&7Ejecuta &f/clan salir&7.", "&8Cuidado, mi broc.", "", "&eClick para salir."), ph));
         inv.setItem(nativeSlot("menus.hub.items.settings.slot", 17), can(viewer, "settings") ? nativeItem("menus.hub.items.settings", Material.COMPARATOR, "&6&lAjustes del clan", List.of("", "&7Nombre, ID, rangos, banner,", "&7permisos y disolver.", "", "&eClick para abrir."), ph) : lockedItem("&7Ajustes del clan", "&cRequiere rango alto."));
-        inv.setItem(nativeSlot("menus.hub.items.back.slot", 22), nativeItem("menus.hub.items.back", Material.ARROW, "&6&lGestión rápida", List.of("&7Volver al menú de gestión."), ph));
+        setBackItem(inv, "hub", nativeSlot("menus.hub.items.back.slot", 22), "&6&lGestión rápida", List.of("&7Volver al menú de gestión."));
         inv.setItem(nativeSlot("menus.hub.items.close.slot", 26), nativeItem("menus.hub.items.close", Material.BARRIER, "&c&lCerrar", List.of("&7Cierra el menú."), ph));
-        player.openInventory(inv);
+        openNativeInventory(player, inv);
     }
 
     private void openNoClanMenu(Player player) throws SQLException {
@@ -2272,7 +2280,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         inv.setItem(nativeSlot("menus.no-clan.items.list.slot", 11), nativeItem("menus.no-clan.items.list", Material.BOOK, "&b&lLista de clanes", List.of("", "&7Mira los clanes creados", "&7en MDVCRAFT.", "", "&eClick para abrir."), Map.of("player", player.getName())));
         inv.setItem(nativeSlot("menus.no-clan.items.create.slot", 15), nativeItem("menus.no-clan.items.create", Material.EMERALD, "&a&lCrear clan", List.of("", "&7Abre el menú de creación", "&7para escribir ID y nombre.", "", "&eClick para empezar."), Map.of("player", player.getName())));
         inv.setItem(nativeSlot("menus.no-clan.items.close.slot", 22), nativeItem("menus.no-clan.items.close", Material.BARRIER, "&c&lCerrar", List.of("&7Cierra el menú."), Map.of("player", player.getName())));
-        player.openInventory(inv);
+        openNativeInventory(player, inv);
     }
 
     private void openCreateClanMenu(Player player) throws SQLException {
@@ -2284,9 +2292,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         fill(inv);
         inv.setItem(nativeSlot("menus.create.items.info.slot", 11), nativeItem("menus.create.items.info", Material.WRITABLE_BOOK, "&e&lFormato", List.of("", "&7Al crear clan escribirás en chat:", "&fID Nombre del clan", "", "&7Ejemplo:", "&bMDV Medieval Craft", "", "&8ID 3-5 caracteres.", "&8Nombre máximo según config."), Map.of("player", player.getName())));
         inv.setItem(nativeSlot("menus.create.items.start.slot", 13), nativeItem("menus.create.items.start", Material.EMERALD, "&a&lEscribir clan", List.of("", "&7Cierra este menú y te pedirá", "&7el ID + nombre por chat.", "", "&eClick para comenzar."), Map.of("player", player.getName())));
-        inv.setItem(nativeSlot("menus.create.items.back.slot", 22), nativeItem("menus.create.items.back", Material.ARROW, "&6&lVolver", List.of("&7Regresa al menú anterior."), Map.of("player", player.getName())));
+        setBackItem(inv, "createclan", nativeSlot("menus.create.items.back.slot", 22), "&6&lVolver", List.of("&7Regresa al menú anterior."));
         inv.setItem(nativeSlot("menus.create.items.close.slot", 26), nativeItem("menus.create.items.close", Material.BARRIER, "&c&lCerrar", List.of("&7Cierra el menú."), Map.of("player", player.getName())));
-        player.openInventory(inv);
+        openNativeInventory(player, inv);
     }
 
     private void openClanManagementMenu(Player player) throws SQLException {
@@ -2302,9 +2310,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         inv.setItem(nativeSlot("menus.management.items.storage.slot", 14), nativeItem("menus.management.items.storage", Material.CHEST, "&a&lAlmacén del clan", List.of("", "&7Abre el inventario compartido", "&7del clan.", "", "&eClick para abrir."), ph));
         inv.setItem(nativeSlot("menus.management.items.banner.slot", 15), clanBannerItem(clan, applyPlaceholders(nativeMenus == null ? "&f&lEstandarte oficial" : nativeMenus.getString("menus.management.items.banner.name", "&f&lEstandarte oficial"), ph), lines("menus.management.items.banner.lore", List.of("", "&7Ver el banner oficial", "&7del clan.", "", "&eClick para ver."), ph)));
         inv.setItem(nativeSlot("menus.management.items.logs.slot", 16), can(member, "logs-view") ? nativeItem("menus.management.items.logs", Material.WRITABLE_BOOK, "&d&lRegistro del clan", List.of("", "&7Muestra acciones recientes:", "&8banco, miembros, base,", "&8relaciones y bajas.", "", "&eClick para ver."), ph) : lockedItem("&7Registro del clan", "&cNo tienes rango para esta función."));
-        inv.setItem(nativeSlot("menus.management.items.back.slot", 22), nativeItem("menus.management.items.back", Material.ARROW, "&6&lVolver", List.of("&7Volver al menú social."), ph));
+        setBackItem(inv, "gestion", nativeSlot("menus.management.items.back.slot", 22), "&6&lVolver", List.of("&7Volver al menú social."));
         inv.setItem(nativeSlot("menus.management.items.close.slot", 26), nativeItem("menus.management.items.close", Material.BARRIER, "&c&lCerrar", List.of("&7Cierra el menú."), ph));
-        player.openInventory(inv);
+        openNativeInventory(player, inv);
     }
 
     private void openMembersMenu(Player player, int page) throws SQLException {
@@ -2320,8 +2328,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             inv.setItem(contentSlot(i - start), memberHead(m, clan.id(), player));
         }
         nav(inv, page, members.size(), pageSize, "members", clan.id());
-        inv.setItem(49, nativeItem("global.back", Material.ARROW, "&6&lVolver", List.of("&7Regresa al menú principal."), Map.of()));
-        player.openInventory(inv);
+        setBackItem(inv, "members", 49, "&6&lVolver", List.of("&7Regresa al menú principal."));
+        openNativeInventory(player, inv);
     }
 
     private void openClanInfoMenu(Player player) throws SQLException {
@@ -2335,8 +2343,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         inv.setItem(14, item(Material.CHEST, "&d&lBuzón del clan", List.of("", "&7Mensajes enviados por otros clanes.", "&7Todos pueden leer.", "&7Rangos altos pueden borrar/responder.", "", "&eClick para abrir.")));
         inv.setItem(16, item(Material.BOOK, "&6&lCreación y registros", List.of("", "&7Creado: &f" + date(clan.createdAt()), "&7Miembros: &e" + countMembers(clan.id()), "&7Banco: &e" + formatNumber(clan.bankBalance()), "", can(member, "logs-view") ? "&eClick para ver logs." : "&8No tienes rango para ver logs.")));
         inv.setItem(20, item(Material.KNOWLEDGE_BOOK, "&b&lPermisos y rangos", List.of("", "&7Mira qué puede hacer", "&7cada rango del clan.", "", "&eClick para abrir.")));
-        inv.setItem(22, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa al menú principal.")));
-        player.openInventory(inv);
+        setBackItem(inv, "info", 22, "&6&lVolver", List.of("&7Regresa al menú principal."));
+        openNativeInventory(player, inv);
     }
 
 
@@ -2347,8 +2355,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         inv.setItem(11, item(Material.BLUE_BANNER, "&9&lRelaciones con clanes", List.of("", "&7Muestra aliados y enemigos.", "&7Los neutrales se omiten.", "", "&eClick para abrir.")));
         inv.setItem(13, item(Material.IRON_SWORD, "&c&lKills y bajas", List.of("", "&7Banners de clanes que han", "&7matado miembros de tu clan.", "", "&eClick para abrir.")));
         inv.setItem(15, item(Material.NETHER_STAR, "&6&lRanking", List.of("", "&7Top por fuerza, kills", "&7y banco.", "", "&eClick para abrir.")));
-        inv.setItem(22, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa al menú principal.")));
-        player.openInventory(inv);
+        setBackItem(inv, "relations", 22, "&6&lVolver", List.of("&7Regresa al menú principal."));
+        openNativeInventory(player, inv);
     }
 
     private void openStorageHubMenu(Player player) throws SQLException {
@@ -2358,8 +2366,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         fill(inv);
         inv.setItem(11, item(Material.CHEST, "&a&lAlmacén del clan", List.of("", "&7Inventario compartido.", "&7Todos pueden usarlo según config.", "", "&eClick para abrir.")));
         inv.setItem(15, item(Material.GOLD_BLOCK, "&e&lBanco del clan", List.of("", "&7Balance: &e" + formatNumber(clan.bankBalance()), "", "&7Comandos:", "&f/clan banco depositar <cantidad>", "&f/clan banco retirar <cantidad>", "", "&eClick para ver balance.")));
-        inv.setItem(22, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa al menú principal.")));
-        player.openInventory(inv);
+        setBackItem(inv, "storagehub", 22, "&6&lVolver", List.of("&7Regresa al menú principal."));
+        openNativeInventory(player, inv);
     }
 
     private void openClanListMenu(Player player, int page) throws SQLException {
@@ -2386,8 +2394,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             inv.setItem(contentSlot(i - start), clanBannerItem(c, "&8[&b" + c.tag() + "&8] &f" + c.name(), lore));
         }
         nav(inv, page, clans.size(), pageSize, "clanlist", -1);
-        inv.setItem(49, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa al menú principal.")));
-        player.openInventory(inv);
+        setBackItem(inv, "clanlist", 49, "&6&lVolver", List.of("&7Regresa al menú principal."));
+        openNativeInventory(player, inv);
     }
 
     private void openRelationsListMenu(Player player, int page) throws SQLException {
@@ -2402,8 +2410,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             inv.setItem(contentSlot(i - start), clanBannerItem(r.clan(), relName + " &8[&b" + r.clan().tag() + "&8]", List.of("&7Clan: &f" + r.clan().name(), "&7Relación: " + relName, "", "&eClick para ver info.")));
         }
         nav(inv, page, relations.size(), pageSize, "relationslist", member.clanId());
-        inv.setItem(49, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa a Relaciones.")));
-        player.openInventory(inv);
+        setBackItem(inv, "relationslist", 49, "&6&lVolver", List.of("&7Regresa a Relaciones."));
+        openNativeInventory(player, inv);
     }
 
     private void openKillStatsGui(Player player) throws SQLException {
@@ -2417,8 +2425,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             ClanTopEntry e = suffered.get(i);
             inv.setItem(contentSlot(i), clanBannerItem(e.clan(), "&c" + e.clan().tag() + " &7nos hizo &c" + (int)e.value() + " &7bajas", List.of("&7Clan: &f" + e.clan().name(), "&7Kills contra nosotros: &c" + (int)e.value())));
         }
-        inv.setItem(49, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa a Relaciones.")));
-        player.openInventory(inv);
+        setBackItem(inv, "bajas", 49, "&6&lVolver", List.of("&7Regresa a Relaciones."));
+        openNativeInventory(player, inv);
     }
 
     private void openTopGui(Player player, String mode) throws SQLException {
@@ -2433,8 +2441,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             ClanTopEntry e = entries.get(i);
             inv.setItem(contentSlot(i), clanBannerItem(e.clan(), "&e#" + (i + 1) + " &8[&b" + e.clan().tag() + "&8]", List.of("&7Clan: &f" + e.clan().name(), "&7Valor: &6" + formatNumber(e.value()), "&7Miembros: &e" + countMembers(e.clan().id()))));
         }
-        inv.setItem(49, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa a Relaciones.")));
-        player.openInventory(inv);
+        setBackItem(inv, "top:fuerza", 49, "&6&lVolver", List.of("&7Regresa a Relaciones."));
+        openNativeInventory(player, inv);
     }
 
     private void openMailboxMenu(Player player, int page) throws SQLException {
@@ -2449,8 +2457,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             inv.setItem(contentSlot(i), icon);
         }
         nav(inv, page, countClanMails(member.clanId()), GUI_PAGE_SIZE, "mailbox", member.clanId());
-        inv.setItem(49, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa a Información.")));
-        player.openInventory(inv);
+        setBackItem(inv, "mailbox", 49, "&6&lVolver", List.of("&7Regresa a Información."));
+        openNativeInventory(player, inv);
     }
 
     private void openLogsGui(Player player, int page) throws SQLException {
@@ -2464,8 +2472,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             inv.setItem(contentSlot(i), item(Material.PAPER, "&e" + log.action(), List.of("&7Actor: &f" + log.actorName(), "&7Fecha: &f" + date(log.time()), "", "&7" + log.detail())));
         }
         nav(inv, page, countLogs(member.clanId(), null), GUI_PAGE_SIZE, "logs", member.clanId());
-        inv.setItem(49, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa a Información.")));
-        player.openInventory(inv);
+        setBackItem(inv, "logs", 49, "&6&lVolver", List.of("&7Regresa a Información."));
+        openNativeInventory(player, inv);
     }
 
 
@@ -2481,8 +2489,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         inv.setItem(14, item(Material.KNOWLEDGE_BOOK, "&b&lVer permisos", List.of("", "&7Muestra qué rango necesita", "&7cada acción del clan.", "", "&eClick para abrir.")));
         inv.setItem(15, can(member, "open") ? item(Material.OAK_DOOR, "&a&lEntrada del clan", List.of("", "&7Estado actual: " + (clan.open() ? "&aAbierto" : "&cSolo invitación"), "", "&eClick para alternar.")) : lockedItem("&7Entrada del clan", "&cRequiere rango alto."));
         inv.setItem(16, can(member, "disband") ? item(Material.TNT, "&4&lDisolver clan", List.of("", "&cAcción peligrosa.", "&7Usa el comando de confirmación.", "", "&eClick para instrucciones.")) : lockedItem("&7Disolver clan", "&cSolo el rango máximo."));
-        inv.setItem(49, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa al menú principal.")));
-        player.openInventory(inv);
+        setBackItem(inv, "settings", 49, "&6&lVolver", List.of("&7Regresa al menú principal."));
+        openNativeInventory(player, inv);
     }
 
     private void openRoleSettingsMenu(Player player) throws SQLException {
@@ -2494,8 +2502,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         for (int role = minRole(); role <= maxRole() && role < slots.length; role++) {
             inv.setItem(slots[role], item(Material.PAPER, "&eRango " + role + " &8- &b" + getRoleName(clan.id(), role), List.of("", "&7Este es el nombre visible", "&7del rango " + role + ".", "", "&eClick para renombrar.")));
         }
-        inv.setItem(22, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa a ajustes.")));
-        player.openInventory(inv);
+        setBackItem(inv, "rolesettings", 22, "&6&lVolver", List.of("&7Regresa a ajustes."));
+        openNativeInventory(player, inv);
     }
 
     private void openPermissionsMenu(Player player) throws SQLException {
@@ -2509,8 +2517,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             int req = getConfig().getInt("rank-permissions." + key, maxRole());
             inv.setItem(contentSlot(slotIndex++), item(Material.PAPER, "&e" + key, List.of("", "&7Rango requerido: &b" + req, "&7Nombre: &f" + getRoleName(clan.id(), Math.max(minRole(), Math.min(maxRole(), req))))));
         }
-        inv.setItem(49, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa a ajustes.")));
-        player.openInventory(inv);
+        setBackItem(inv, "permissions", 49, "&6&lVolver", List.of("&7Regresa a ajustes."));
+        openNativeInventory(player, inv);
     }
 
     private void openJoinRequestsMenu(Player player, int page) throws SQLException {
@@ -2546,8 +2554,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             inv.setItem(contentSlot(i), head);
         }
         nav(inv, page, countJoinRequests(clan.id()), GUI_PAGE_SIZE, "joinrequests", clan.id());
-        inv.setItem(49, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa a Información.")));
-        player.openInventory(inv);
+        setBackItem(inv, "joinrequests", 49, "&6&lVolver", List.of("&7Regresa a Información."));
+        openNativeInventory(player, inv);
     }
 
     private void openMemberActionMenu(Player player, UUID targetUuid) throws SQLException {
@@ -2563,8 +2571,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         inv.setItem(12, canModifyMember(actor, target, "demote") ? item(Material.YELLOW_DYE, "&e&lDegradar", List.of("", "&7Baja un rango al miembro.", "", "&eClick para degradar.")) : lockedItem("&7Degradar", "&cNo tienes rango para esta función."));
         inv.setItem(14, canModifyMember(actor, target, "kick") ? item(Material.RED_DYE, "&c&lExpulsar", List.of("", "&7Expulsa al miembro del clan.", "&cAcción delicada.", "", "&eClick para expulsar.")) : lockedItem("&7Expulsar", "&cNo tienes rango para esta función."));
         inv.setItem(16, item(Material.BOOK, "&b&lVer perfil", List.of("", "&7Información básica del jugador.", "&7Más perfil se puede conectar", "&7con MDVSocial/MMOCore luego.")));
-        inv.setItem(22, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa a miembros.")));
-        player.openInventory(inv);
+        setBackItem(inv, "memberaction", 22, "&6&lVolver", List.of("&7Regresa a miembros."));
+        openNativeInventory(player, inv);
     }
 
     private void openClanActionMenu(Player player, int targetClanId) throws SQLException {
@@ -2587,8 +2595,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             inv.setItem(14, canRel ? item(Material.GRAY_DYE, "&7&lVolver neutral", List.of("", "&7Quita alianza/enemistad.", "", "&eClick para establecer.")) : lockedItem("&7Volver neutral", "&cRequiere rango alto."));
             inv.setItem(15, canMail ? item(Material.WRITABLE_BOOK, "&d&lCorreo de clan", List.of("", "&7Escribe un correo formal", "&7al buzón de este clan.", "", "&eClick para escribir.")) : lockedItem("&7Correo de clan", "&cRequiere rango alto."));
         }
-        inv.setItem(22, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa a la lista.")));
-        player.openInventory(inv);
+        setBackItem(inv, "clanaction", 22, "&6&lVolver", List.of("&7Regresa a la lista."));
+        openNativeInventory(player, inv);
     }
 
     private void openMailActionMenu(Player player, int mailId) throws SQLException {
@@ -2602,13 +2610,163 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         inv.setItem(4, from != null ? clanBannerItem(from, "&dCorreo de &b" + from.tag(), List.of("&7Enviado por: &f" + mail.senderName(), "&7Fecha: &f" + date(mail.sentAt()), "", "&f" + mail.message())) : item(Material.PAPER, "&dCorreo #" + mail.id(), List.of("&f" + mail.message())));
         inv.setItem(11, can(member, "mail-send") && from != null ? item(Material.WRITABLE_BOOK, "&a&lResponder", List.of("", "&7Responder al clan que", "&7envió este correo.", "", "&eClick para escribir.")) : lockedItem("&7Responder", "&cRequiere rango alto."));
         inv.setItem(15, can(member, "mail-delete") ? item(Material.RED_DYE, "&c&lEliminar", List.of("", "&7Borra este correo del buzón.", "", "&eClick para eliminar.")) : lockedItem("&7Eliminar", "&cRequiere rango alto."));
-        inv.setItem(22, item(Material.ARROW, "&6&lVolver", List.of("&7Regresa al buzón.")));
-        player.openInventory(inv);
+        setBackItem(inv, "mailaction", 22, "&6&lVolver", List.of("&7Regresa al buzón."));
+        openNativeInventory(player, inv);
+    }
+
+
+    private boolean handleConfiguredBackClick(Player player, ClanMenuHolder holder, int slot) throws SQLException {
+        int backSlot = configuredBackSlot(holder.menu(), defaultBackSlot(holder.menu()));
+        if (backSlot < 0 || slot != backSlot) return false;
+        executeBackAction(player, holder.menu());
+        return true;
+    }
+
+    private void executeBackAction(Player player, String holderMenu) throws SQLException {
+        String key = menuConfigKey(holderMenu);
+        ConfigurationSection sec = backSection(key);
+        String action = sec == null ? "NATIVE" : sec.getString("action", "NATIVE");
+        action = action == null ? "NATIVE" : action.trim().toUpperCase(Locale.ROOT);
+        String target = sec == null ? "" : sec.getString("target", sec.getString("target-menu", sec.getString("menu", "")));
+        String command = sec == null ? "" : sec.getString("command", "");
+
+        if (action.equals("CLOSE") || action.equals("CERRAR")) {
+            player.closeInventory();
+            return;
+        }
+        if (action.equals("COMMAND") || action.equals("COMANDO")) {
+            player.closeInventory();
+            if (command != null && !command.isBlank()) player.performCommand(stripSlash(command));
+            return;
+        }
+        if (action.equals("MDVSOCIAL") || action.equals("SOCIAL") || action.equals("OPEN_MENU")) {
+            player.closeInventory();
+            if (target != null && !target.isBlank()) player.performCommand("social " + target);
+            else if (command != null && !command.isBlank()) player.performCommand(stripSlash(command));
+            else player.performCommand("social main");
+            return;
+        }
+        if (action.equals("PREVIOUS") || action.equals("ANTERIOR")) {
+            String previous = previousNativeMenu.get(player.getUniqueId());
+            if (previous != null && !previous.isBlank()) {
+                suppressHistoryOnce.add(player.getUniqueId());
+                openDynamicClanUi(player, uiNameFromHolder(previous), 1);
+            } else openDynamicClanUi(player, defaultBackTarget(holderMenu), 1);
+            return;
+        }
+
+        if (target == null || target.isBlank()) target = defaultBackTarget(holderMenu);
+        openDynamicClanUi(player, target, 1);
+    }
+
+    private String stripSlash(String command) {
+        if (command == null) return "";
+        String out = command.trim();
+        return out.startsWith("/") ? out.substring(1) : out;
+    }
+
+    private void setBackItem(Inventory inv, String holderMenu, int defaultSlot, String defName, List<String> defLore) {
+        int slot = configuredBackSlot(holderMenu, defaultSlot);
+        if (slot < 0 || slot >= inv.getSize()) return;
+        inv.setItem(slot, backItem(holderMenu, defName, defLore));
+    }
+
+    private ItemStack backItem(String holderMenu, String defName, List<String> defLore) {
+        String key = menuConfigKey(holderMenu);
+        String path = backSection(key) != null ? "menus." + key + ".back" : "global.back";
+        return nativeItem(path, Material.ARROW, defName, defLore, Map.of());
+    }
+
+    private ConfigurationSection backSection(String menuKey) {
+        if (nativeMenus == null) return null;
+        ConfigurationSection direct = nativeMenus.getConfigurationSection("menus." + menuKey + ".back");
+        if (direct != null) return direct;
+        return nativeMenus.getConfigurationSection("menus." + menuKey + ".navigation.back");
+    }
+
+    private int configuredBackSlot(String holderMenu, int defaultSlot) {
+        String key = menuConfigKey(holderMenu);
+        ConfigurationSection sec = backSection(key);
+        return sec == null ? defaultSlot : sec.getInt("slot", defaultSlot);
+    }
+
+    private int defaultBackSlot(String holderMenu) {
+        return switch (holderMenu) {
+            case "noclan" -> -1;
+            case "createclan", "hub", "gestion", "info", "relations", "storagehub", "memberaction", "clanaction", "mailaction", "rolesettings" -> 22;
+            default -> 49;
+        };
+    }
+
+    private String menuConfigKey(String holderMenu) {
+        if (holderMenu == null) return "auto";
+        if (holderMenu.startsWith("top:")) return "top";
+        return switch (holderMenu) {
+            case "noclan" -> "no-clan";
+            case "createclan" -> "create";
+            case "gestion" -> "management";
+            case "storagehub" -> "storage";
+            case "clanlist" -> "clan-list";
+            case "relationslist" -> "relations-list";
+            case "mailbox" -> "mailbox";
+            case "memberaction" -> "member-action";
+            case "clanaction" -> "clan-action";
+            case "mailaction" -> "mail-action";
+            case "rolesettings" -> "role-settings";
+            case "joinrequests" -> "join-requests";
+            default -> holderMenu;
+        };
+    }
+
+    private String uiNameFromHolder(String holderMenu) {
+        if (holderMenu == null) return "auto";
+        if (holderMenu.startsWith("top:")) return holderMenu.replace("top:", "top_");
+        return switch (holderMenu) {
+            case "noclan" -> "sinclan";
+            case "createclan" -> "crear";
+            case "hub" -> "hub";
+            case "gestion" -> "gestion";
+            case "members" -> "miembros";
+            case "info" -> "info";
+            case "relations" -> "relaciones";
+            case "storagehub" -> "almacen";
+            case "clanlist" -> "lista";
+            case "relationslist" -> "relaciones_lista";
+            case "mailbox" -> "correo";
+            case "bajas" -> "bajas";
+            case "logs" -> "logs";
+            case "settings" -> "ajustes";
+            case "rolesettings" -> "rangos";
+            case "permissions" -> "permisos";
+            case "joinrequests" -> "solicitudes";
+            case "memberaction" -> "miembros";
+            case "clanaction" -> "lista";
+            case "mailaction" -> "correo";
+            default -> holderMenu;
+        };
+    }
+
+    private String defaultBackTarget(String holderMenu) {
+        if (holderMenu == null) return "auto";
+        if (holderMenu.startsWith("top:")) return "relaciones";
+        return switch (holderMenu) {
+            case "createclan" -> "sinclan";
+            case "hub" -> "gestion";
+            case "members", "info", "relations", "storagehub", "settings", "clanlist" -> "gestion";
+            case "relationslist", "bajas" -> "relaciones";
+            case "mailbox", "logs", "joinrequests" -> "info";
+            case "rolesettings", "permissions" -> "ajustes";
+            case "memberaction" -> "miembros";
+            case "clanaction" -> "lista";
+            case "mailaction" -> "correo";
+            default -> "auto";
+        };
     }
 
     private void handleMenuClick(Player player, ClanMenuHolder holder, int slot, ClickType click) throws SQLException {
         String menu = holder.menu();
-        if (slot == 49 && !menu.equals("main")) { openMainMenu(player); return; }
+        if (handleConfiguredBackClick(player, holder, slot)) return;
+        if (slot == 49 && !menu.equals("main")) { executeBackAction(player, menu); return; }
         if (slot == 45 && holder.page() > 1) { openPaged(player, menu, holder.page() - 1); return; }
         if (slot == 53) { openPaged(player, menu, holder.page() + 1); return; }
         switch (menu) {
@@ -2852,6 +3010,21 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         else openMainMenu(player);
     }
 
+    private void openNativeInventory(Player player, Inventory inv) {
+        if (inv != null && inv.getHolder() instanceof ClanMenuHolder holder) {
+            String opened = holder.menu();
+            UUID uuid = player.getUniqueId();
+            if (suppressHistoryOnce.remove(uuid)) {
+                currentNativeMenu.put(uuid, opened);
+            } else {
+                String current = currentNativeMenu.get(uuid);
+                if (current != null && !current.equals(opened)) previousNativeMenu.put(uuid, current);
+                currentNativeMenu.put(uuid, opened);
+            }
+        }
+        player.openInventory(inv);
+    }
+
     private ItemStack memberHead(Member member, int clanId, Player viewer) throws SQLException {
         ItemStack item = new ItemStack(Material.PLAYER_HEAD);
         SkullMeta meta = (SkullMeta) item.getItemMeta();
@@ -2997,11 +3170,85 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private ItemStack nativeItem(String path, Material defMaterial, String defName, List<String> defLore, Map<String, String> placeholders) {
-        Material material = materialFrom(nativeMenus == null ? null : nativeMenus.getString(path + ".material"), defMaterial);
-        String name = nativeMenus == null ? defName : nativeMenus.getString(path + ".name", defName);
-        List<String> lore = nativeMenus == null ? defLore : nativeMenus.getStringList(path + ".lore");
+        ConfigurationSection sec = nativeSection(path);
+        Material material = materialFrom(sec == null ? null : sec.getString("material"), defMaterial);
+        String name = sec == null ? defName : sec.getString("name", defName);
+        List<String> lore = sec == null ? defLore : sec.getStringList("lore");
         if (lore == null || lore.isEmpty()) lore = defLore;
-        return item(material, applyPlaceholders(name, placeholders), lore.stream().map(line -> applyPlaceholders(line, placeholders)).collect(Collectors.toList()));
+
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) return item;
+
+        if (material == Material.PLAYER_HEAD && meta instanceof SkullMeta skull) {
+            String texture = applyPlaceholders(readTexture(sec), placeholders);
+            if (texture != null && !texture.isBlank()) {
+                applySkullTexture(skull, texture);
+            } else if (sec != null) {
+                String owner = sec.getString("head-owner", sec.getString("owner", ""));
+                owner = applyPlaceholders(owner == null ? "" : owner, placeholders);
+                if (owner != null && !owner.isBlank()) skull.setOwningPlayer(Bukkit.getOfflinePlayer(owner));
+            }
+            meta = skull;
+        }
+
+        meta.setDisplayName(color(applyPlaceholders(name, placeholders)));
+        if (lore != null) meta.setLore(lore.stream().map(line -> color(applyPlaceholders(line, placeholders))).collect(Collectors.toList()));
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ConfigurationSection nativeSection(String path) {
+        return nativeMenus == null ? null : nativeMenus.getConfigurationSection(path);
+    }
+
+    private String readTexture(ConfigurationSection sec) {
+        if (sec == null) return "";
+        String texture = sec.getString("custom-head-texture", "");
+        if (texture == null || texture.isBlank()) texture = sec.getString("texture", "");
+        if (texture == null || texture.isBlank()) texture = sec.getString("head-texture", "");
+        if (texture == null || texture.isBlank()) texture = sec.getString("skull-texture", "");
+        if (texture == null || texture.isBlank()) texture = sec.getString("texture-base64", "");
+        return texture == null ? "" : texture.trim();
+    }
+
+    private String extractTextureUrl(String textureValue) {
+        if (textureValue == null) return "";
+        String value = textureValue.trim();
+        if (value.isBlank()) return "";
+        if (value.startsWith("http://") || value.startsWith("https://")) return value;
+        try {
+            String decoded = new String(Base64.getDecoder().decode(value), StandardCharsets.UTF_8);
+            int urlKey = decoded.indexOf("\"url\"");
+            if (urlKey < 0) return "";
+            int colon = decoded.indexOf(':', urlKey);
+            if (colon < 0) return "";
+            int firstQuote = decoded.indexOf('\"', colon);
+            if (firstQuote < 0) return "";
+            int secondQuote = decoded.indexOf('\"', firstQuote + 1);
+            if (secondQuote < 0) return "";
+            return decoded.substring(firstQuote + 1, secondQuote).replace("\\/", "/");
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
+    private void applySkullTexture(SkullMeta skull, String textureValue) {
+        if (skull == null || textureValue == null || textureValue.isBlank()) return;
+        String textureUrl = extractTextureUrl(textureValue.trim());
+        if (textureUrl == null || textureUrl.isBlank()) {
+            getLogger().warning("No se pudo aplicar textura custom de cabeza: textura inválida o Base64 sin URL.");
+            return;
+        }
+        try {
+            PlayerProfile profile = Bukkit.createPlayerProfile(UUID.randomUUID(), "MDVClans");
+            PlayerTextures textures = profile.getTextures();
+            textures.setSkin(new URL(textureUrl));
+            profile.setTextures(textures);
+            skull.setOwnerProfile(profile);
+        } catch (Throwable ex) {
+            getLogger().warning("No se pudo aplicar textura custom de cabeza: " + ex.getClass().getSimpleName() + " - " + ex.getMessage());
+        }
     }
 
     private Material materialFrom(String raw, Material def) {
