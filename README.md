@@ -1,8 +1,8 @@
-# MDVClans 1.0.0
+# MDVClans 1.5.0
 
 Sistema de clanes social para MDVCRAFT, pensado para Purpur/Paper 1.21.6.
 
-## V1 incluido
+## V1 base incluida
 
 - Crear clan con ID + nombre.
 - Costo configurable por Vault, desactivado por defecto.
@@ -17,6 +17,25 @@ Sistema de clanes social para MDVCRAFT, pensado para Purpur/Paper 1.21.6.
 - Relaciones básicas: neutral, aliado, enemigo.
 - PlaceholderAPI para LPC.
 - SQLite.
+
+## Nuevo en V1.5
+
+- Banco de clan con Vault:
+  - todos pueden depositar por defecto.
+  - rangos altos pueden retirar.
+- Almacén compartido de clan.
+- Estandarte oficial del clan.
+- Nametags por relación:
+  - mismo clan verde.
+  - aliados azul.
+  - enemigos rojo.
+  - neutrales gris.
+- Logs básicos por clan.
+- Top simple de clanes por fuerza, kills y banco.
+- Estadísticas de kills entre clanes.
+- Menús YAML compatibles con MDVSocial generados en `plugins/MDVClans/Menus`.
+- Base SQLite guardada en `plugins/MDVClans/Data/clans.db`.
+- Config preparada para futura migración a MySQL.
 
 ## Comandos principales
 
@@ -40,6 +59,18 @@ Sistema de clanes social para MDVCRAFT, pensado para Purpur/Paper 1.21.6.
 /clan setbase
 /clan base
 /clan relacion <ID> <neutral|aliado|enemigo>
+/clan banco
+/clan banco depositar <cantidad>
+/clan banco retirar <cantidad>
+/clan depositar <cantidad>
+/clan retirar <cantidad>
+/clan almacen
+/clan estandarte set
+/clan estandarte ver
+/clan estandarte quitar
+/clan logs [pagina]
+/clan top [fuerza|kills|banco]
+/clan bajas [ID]
 /clan disolver confirmar
 /mdvclans reload
 ```
@@ -56,6 +87,10 @@ Sistema de clanes social para MDVCRAFT, pensado para Purpur/Paper 1.21.6.
 %mdvclans_member_count%
 %mdvclans_is_in_clan%
 %mdvclans_open%
+%mdvclans_bank%
+%mdvclans_kills%
+%mdvclans_deaths%
+%mdvclans_strength%
 ```
 
 Para LPC puedes usar, por ejemplo:
@@ -63,6 +98,24 @@ Para LPC puedes usar, por ejemplo:
 ```txt
 {prefix}%mdvclans_lpc_tag%{name} » {message}
 ```
+
+## Menús MDVSocial
+
+MDVClans genera estos archivos:
+
+```txt
+plugins/MDVClans/Menus/clan.yml
+plugins/MDVClans/Menus/clan_gestion.yml
+plugins/MDVClans/Menus/clan_rankings.yml
+```
+
+Puedes copiarlos a:
+
+```txt
+plugins/MDVSocial/Menus/
+```
+
+Luego recarga MDVSocial para que los lea.
 
 ## Build
 
@@ -75,11 +128,11 @@ mvn clean package
 El jar quedará en:
 
 ```txt
-target/MDVClans-1.0.0.jar
+target/MDVClans-1.5.0.jar
 ```
 
 El proyecto incluye GitHub Actions para compilarlo en la nube.
 
 ## Compatibilidad MDVSocial
 
-MDVClans V1 deja `softdepend: MDVSocial`, pero no depende de MDVSocial todavía. La integración de correos, menús y tablero de clan se puede hacer en V1.5/V2 sin romper esta base.
+MDVClans V1.5 mantiene `softdepend: MDVSocial`, pero no depende de MDVSocial para funcionar. Los menús se entregan como YAML compatibles para copiarlos manualmente a la carpeta de menús de MDVSocial.

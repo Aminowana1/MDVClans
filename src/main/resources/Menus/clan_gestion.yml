@@ -1,0 +1,103 @@
+# Copia este archivo a plugins/MDVSocial/Menus/clan_gestion.yml si quieres usarlo desde MDVSocial.
+title: '&8&lGestión del clan'
+size: 27
+items:
+  base:
+    slot: 10
+    material: ENDER_PEARL
+    name: '&b&lIr a la base'
+    lore:
+      - ''
+      - '&7Teletranspórtate a la base'
+      - '&7definida por el clan.'
+      - ''
+      - '&eClick para viajar.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan base'
+
+  setbase:
+    slot: 11
+    material: COMPASS
+    name: '&6&lFijar base'
+    lore:
+      - ''
+      - '&7Define la base del clan'
+      - '&7en tu ubicación actual.'
+      - ''
+      - '&8Requiere rango configurado.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan setbase'
+
+  banco:
+    slot: 13
+    material: GOLD_NUGGET
+    name: '&e&lBanco del clan'
+    lore:
+      - ''
+      - '&7Consulta el dinero del clan.'
+      - '&7Depositar: &f/clan banco depositar cantidad'
+      - '&7Retirar: &f/clan banco retirar cantidad'
+      - ''
+      - '&eClick para consultar.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan banco'
+
+  almacen:
+    slot: 14
+    material: CHEST
+    name: '&a&lAlmacén del clan'
+    lore:
+      - ''
+      - '&7Abre el inventario compartido'
+      - '&7del clan.'
+      - ''
+      - '&eClick para abrir.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan almacen'
+
+  estandarte:
+    slot: 15
+    material: WHITE_BANNER
+    name: '&f&lEstandarte oficial'
+    lore:
+      - ''
+      - '&7Ver o guardar el banner'
+      - '&7oficial del clan.'
+      - ''
+      - '&7Guardar: &f/clan estandarte set'
+      - '&eClick para ver.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan estandarte ver'
+
+  logs:
+    slot: 16
+    material: WRITABLE_BOOK
+    name: '&d&lRegistro del clan'
+    lore:
+      - ''
+      - '&7Muestra acciones recientes:'
+      - '&8banco, miembros, base,'
+      - '&8relaciones y bajas.'
+      - ''
+      - '&eClick para ver.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan logs'
+
+  volver:
+    slot: 22
+    material: ARROW
+    name: '&6&lVolver'
+    action: OPEN_MENU
+    target-menu: clan
+
+  cerrar:
+    slot: 26
+    material: BARRIER
+    name: '&c&lCerrar'
+    action: CLOSE

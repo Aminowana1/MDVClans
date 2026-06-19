@@ -1,7 +1,16 @@
 prefix: '&8[&6MDVClans&8]&r '
 
 storage:
-  sqlite-file: 'clans.db'
+  # V1.5: carpeta separada para dejar todo más ordenado y facilitar migración futura a MySQL.
+  type: SQLITE
+  sqlite-file: 'Data/clans.db'
+  mysql:
+    enabled: false
+    host: 'localhost'
+    port: 3306
+    database: 'mdvcraft'
+    username: 'root'
+    password: ''
 
 worlds:
   # Si está vacío, permite todos. Recomendado para MDVCRAFT: world, world_nether, world_the_end.
@@ -46,6 +55,11 @@ rank-permissions:
   relation: 4
   open: 4
   disband: 5
+  bank-deposit: 0
+  bank-withdraw: 4
+  storage-open: 0
+  banner-set: 4
+  logs-view: 4
 
 chat:
   format: '&8[&3Clan&8] &b{player}&7: &f{message}'
@@ -65,6 +79,38 @@ friendly-fire:
 relations:
   # Aliado necesita confirmación del otro clan.
   ally-requires-accept: true
+
+bank:
+  enabled: true
+
+storage-chest:
+  enabled: true
+  size: 27
+  title: '&8Almacén de clan {id}'
+
+logs:
+  enabled: true
+
+kills:
+  enabled: true
+  # Anti-farmeo: el mismo atacante no puede sumar puntos contra la misma víctima durante este tiempo.
+  same-victim-cooldown-seconds: 900
+
+top:
+  strength:
+    kill-weight: 10.0
+    bank-divisor: 10.0
+    bank-cap: 500.0
+    member-weight: 5.0
+
+nametags:
+  enabled: true
+  update-interval-ticks: 100
+  formats:
+    same: '&a[{id}] '
+    ally: '&9[{id}] '
+    enemy: '&c[{id}] '
+    neutral: '&7[{id}] '
 
 placeholders:
   no-clan: ''

@@ -1,0 +1,72 @@
+# Copia este archivo a plugins/MDVSocial/Menus/clan_rankings.yml si quieres usarlo desde MDVSocial.
+title: '&8&lRankings de clanes'
+size: 27
+items:
+  fuerza:
+    slot: 11
+    material: NETHER_STAR
+    name: '&6&lTop por fuerza'
+    lore:
+      - ''
+      - '&7Ranking general calculado'
+      - '&7por kills, banco y miembros.'
+      - ''
+      - '&eClick para ver.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan top fuerza'
+
+  kills:
+    slot: 13
+    material: IRON_SWORD
+    name: '&c&lTop por kills'
+    lore:
+      - ''
+      - '&7Ranking por bajas válidas'
+      - '&7entre clanes.'
+      - ''
+      - '&eClick para ver.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan top kills'
+
+  banco:
+    slot: 15
+    material: GOLD_BLOCK
+    name: '&e&lTop por banco'
+    lore:
+      - ''
+      - '&7Ranking por riqueza guardada'
+      - '&7en el banco del clan.'
+      - ''
+      - '&eClick para ver.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan top banco'
+
+  bajas:
+    slot: 22
+    material: SKELETON_SKULL
+    name: '&4&lBajas sufridas'
+    lore:
+      - ''
+      - '&7Muestra qué clanes han matado'
+      - '&7miembros de tu clan.'
+      - ''
+      - '&eClick para ver.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan bajas'
+
+  volver:
+    slot: 18
+    material: ARROW
+    name: '&6&lVolver'
+    action: OPEN_MENU
+    target-menu: clan
+
+  cerrar:
+    slot: 26
+    material: BARRIER
+    name: '&c&lCerrar'
+    action: CLOSE

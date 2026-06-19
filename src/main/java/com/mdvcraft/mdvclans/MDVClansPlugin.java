@@ -3,6 +3,7 @@ package com.mdvcraft.mdvclans;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
@@ -20,14 +21,25 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.projectiles.ProjectileSource;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.Team;
+import org.bukkit.util.io.BukkitObjectInputStream;
+import org.bukkit.util.io.BukkitObjectOutputStream;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -35,8 +47,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -55,6 +69,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private static final String REL_ALLY = "ALLY";
     private static final String REL_ENEMY = "ENEMY";
     private static final String REL_ALLY_REQUEST = "ALLY_REQUEST";
+    private static final String REL_NEUTRAL = "NEUTRAL";
 
     private Connection connection;
     private Economy economy;
@@ -63,10 +78,13 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private final Map<UUID, PendingTeleport> pendingTeleports = new ConcurrentHashMap<>();
     private final Map<UUID, Long> baseCooldowns = new ConcurrentHashMap<>();
     private final Map<UUID, Long> friendlyFireMessageCooldowns = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> openStorageViewers = new ConcurrentHashMap<>();
+    private int nametagTaskId = -1;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        saveMenuTemplates();
         reloadLocalSettings();
         setupEconomy();
 
@@ -91,13 +109,14 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
 
         Bukkit.getPluginManager().registerEvents(this, this);
+        startNametagTask();
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new MDVClansExpansion().register();
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.0.0 habilitado.");
+        getLogger().info("MDVClans 1.5.0 habilitado.");
     }
 
     @Override
@@ -106,6 +125,10 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             Bukkit.getScheduler().cancelTask(pending.taskId());
         }
         pendingTeleports.clear();
+        if (nametagTaskId != -1) {
+            Bukkit.getScheduler().cancelTask(nametagTaskId);
+            nametagTaskId = -1;
+        }
         closeDatabase();
     }
 
@@ -123,7 +146,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private void openDatabase() throws Exception {
         if (!getDataFolder().exists()) getDataFolder().mkdirs();
         Class.forName("org.sqlite.JDBC");
-        File file = new File(getDataFolder(), getConfig().getString("storage.sqlite-file", "clans.db"));
+        File file = new File(getDataFolder(), getConfig().getString("storage.sqlite-file", "Data/clans.db"));
+        File parent = file.getParentFile();
+        if (parent != null && !parent.exists()) parent.mkdirs();
         connection = DriverManager.getConnection("jdbc:sqlite:" + file.getAbsolutePath());
         try (Statement st = connection.createStatement()) {
             st.execute("PRAGMA foreign_keys = ON");
@@ -148,6 +173,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     "owner_uuid TEXT NOT NULL," +
                     "open INTEGER NOT NULL DEFAULT 0," +
                     "created_at INTEGER NOT NULL," +
+                    "bank_balance REAL NOT NULL DEFAULT 0," +
+                    "banner TEXT," +
+                    "storage TEXT," +
                     "base_world TEXT," +
                     "base_x REAL," +
                     "base_y REAL," +
@@ -188,8 +216,46 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     "FOREIGN KEY(clan_id) REFERENCES clans(id) ON DELETE CASCADE," +
                     "FOREIGN KEY(target_clan_id) REFERENCES clans(id) ON DELETE CASCADE" +
                     ")");
+            st.executeUpdate("CREATE TABLE IF NOT EXISTS clan_logs (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "clan_id INTEGER NOT NULL," +
+                    "time INTEGER NOT NULL," +
+                    "actor_uuid TEXT," +
+                    "actor_name TEXT," +
+                    "action TEXT NOT NULL," +
+                    "detail TEXT," +
+                    "FOREIGN KEY(clan_id) REFERENCES clans(id) ON DELETE CASCADE" +
+                    ")");
+            st.executeUpdate("CREATE TABLE IF NOT EXISTS clan_kills (" +
+                    "attacker_clan_id INTEGER NOT NULL," +
+                    "victim_clan_id INTEGER NOT NULL," +
+                    "kills INTEGER NOT NULL DEFAULT 0," +
+                    "last_kill_at INTEGER NOT NULL," +
+                    "PRIMARY KEY(attacker_clan_id, victim_clan_id)," +
+                    "FOREIGN KEY(attacker_clan_id) REFERENCES clans(id) ON DELETE CASCADE," +
+                    "FOREIGN KEY(victim_clan_id) REFERENCES clans(id) ON DELETE CASCADE" +
+                    ")");
+            st.executeUpdate("CREATE TABLE IF NOT EXISTS kill_cooldowns (" +
+                    "attacker_uuid TEXT NOT NULL," +
+                    "victim_uuid TEXT NOT NULL," +
+                    "last_kill_at INTEGER NOT NULL," +
+                    "PRIMARY KEY(attacker_uuid, victim_uuid)" +
+                    ")");
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_members_clan ON members(clan_id)");
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_invites_target ON invites(target_uuid)");
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_logs_clan ON clan_logs(clan_id, time DESC)");
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_kills_victim ON clan_kills(victim_clan_id)");
+        }
+        addColumnIfMissing("clans", "bank_balance", "REAL NOT NULL DEFAULT 0");
+        addColumnIfMissing("clans", "banner", "TEXT");
+        addColumnIfMissing("clans", "storage", "TEXT");
+    }
+
+    private synchronized void addColumnIfMissing(String table, String column, String definition) {
+        try (Statement st = connection.createStatement()) {
+            st.executeUpdate("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+        } catch (SQLException ignored) {
+            // SQLite throws duplicate column name when upgrading an existing database. That is expected.
         }
     }
 
@@ -234,6 +300,14 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 case "setbase" -> handleSetBase(player);
                 case "base", "home" -> handleBase(player);
                 case "relacion", "relation" -> handleRelation(player, args);
+                case "banco" -> handleBank(player, args);
+                case "depositar" -> handleBankShortcut(player, args, true);
+                case "retirar" -> handleBankShortcut(player, args, false);
+                case "almacen", "almacén" -> handleStorage(player);
+                case "estandarte", "banner" -> handleBanner(player, args);
+                case "logs", "registro", "registros" -> handleLogs(player, args);
+                case "top" -> handleTop(player, args);
+                case "bajas", "estadisticas", "estadísticas" -> handleKillStats(player, args);
                 case "disolver", "disband" -> handleDisband(player, args);
                 default -> {
                     msg(player, "&cSubcomando desconocido. Usa &e/clan ayuda&c.");
@@ -255,6 +329,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         if (args.length > 0 && args[0].equalsIgnoreCase("reload")) {
             reloadConfig();
             reloadLocalSettings();
+            if (nametagTaskId != -1) Bukkit.getScheduler().cancelTask(nametagTaskId);
+            nametagTaskId = -1;
+            startNametagTask();
             sender.sendMessage(color("&aMDVClans recargado."));
             return true;
         }
@@ -275,6 +352,12 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         player.sendMessage(color("&e/clan setbase &7/ &e/clan base &7- Base del clan."));
         player.sendMessage(color("&e/clan relacion <ID> <neutral|aliado|enemigo>"));
         player.sendMessage(color("&e/clan rol <0-5> <nombre> &7- Nombra un rango."));
+        player.sendMessage(color("&e/clan banco &7- Banco del clan."));
+        player.sendMessage(color("&e/clan almacen &7- Almacén compartido."));
+        player.sendMessage(color("&e/clan estandarte set/ver &7- Banner oficial."));
+        player.sendMessage(color("&e/clan top [fuerza|kills|banco] &7- Ranking."));
+        player.sendMessage(color("&e/clan bajas &7- Estadísticas de kills."));
+        player.sendMessage(color("&e/clan logs &7- Registro básico."));
     }
 
     private void handleCreate(Player player, String[] args) throws SQLException {
@@ -342,6 +425,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             addMemberUnsafe(clanId, player.getUniqueId(), player.getName(), maxRole(), now, 0);
             seedDefaultRoleNames(clanId);
         }
+        logAction(clanId, player, "CREAR", "Clan creado: " + tag + " / " + name);
         msg(player, "&aClan creado: &8[&b" + tag + "&8] &f" + name);
     }
 
@@ -360,6 +444,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         player.sendMessage(color("&7Miembros: &e" + members.size() + "&7/&e" + getConfig().getInt("limits.max-members", 20)));
         player.sendMessage(color("&7Entrada: " + (clan.open() ? "&aAbierta" : "&cCon invitación")));
         player.sendMessage(color("&7Base: " + (clan.hasBase() ? "&aDefinida" : "&cNo definida")));
+        player.sendMessage(color("&7Banco: &e" + formatNumber(clan.bankBalance()) + " &7| Fuerza: &e" + formatNumber(calculateStrength(clan))));
+        player.sendMessage(color("&7Kills de clan: &e" + getTotalKillsByClan(clan.id()) + " &7| Bajas sufridas: &c" + getTotalDeathsByClan(clan.id())));
+        player.sendMessage(color("&7Estandarte: " + (clan.hasBanner() ? "&aDefinido" : "&cNo definido")));
         player.sendMessage(color("&7Relación contigo: " + relationText(getRelationBetween(getOwnClanId(player.getUniqueId()), clan.id()))));
         StringJoiner sj = new StringJoiner("&7, ");
         for (Member m : members) {
@@ -383,7 +470,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         for (int i = start; i < Math.min(start + pageSize, clans.size()); i++) {
             Clan c = clans.get(i);
             int count = countMembers(c.id());
-            player.sendMessage(color("&8[&b" + c.tag() + "&8] &f" + c.name() + " &7- &e" + count + " &7miembros"));
+            player.sendMessage(color("&8[&b" + c.tag() + "&8] &f" + c.name() + " &7- &e" + count + " &7miembros &8| &6Fuerza &e" + formatNumber(calculateStrength(c))));
         }
         if (clans.isEmpty()) player.sendMessage(color("&7No hay clanes creados todavía."));
     }
@@ -477,6 +564,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
         msg(player, successMessage);
         broadcastToClan(clan.id(), "&e" + player.getName() + " &ase unió al clan.");
+        logAction(clan.id(), player, "UNIRSE", player.getName() + " se unió al clan.");
     }
 
     private void handleOpen(Player player, String[] args) throws SQLException {
@@ -490,6 +578,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         boolean open = parseBoolean(args[1]);
         setClanOpen(member.clanId(), open);
         broadcastToClan(member.clanId(), "&7Entrada del clan: " + (open ? "&aabierta" : "&ccon invitación") + "&7.");
+        logAction(member.clanId(), player, "ABIERTO", "Entrada " + (open ? "abierta" : "cerrada"));
     }
 
     private void handleLeave(Player player) throws SQLException {
@@ -505,6 +594,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             msg(player, "&cDisolviste tu clan al salir.");
             return;
         }
+        logAction(clan.id(), player, "SALIR", player.getName() + " salió del clan.");
         removeMember(player.getUniqueId());
         msg(player, "&aSaliste del clan.");
         broadcastToClan(clan.id(), "&e" + player.getName() + " &7salió del clan.");
@@ -532,6 +622,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             msg(player, "&cNo puedes expulsar a alguien de rango igual o mayor.");
             return;
         }
+        logAction(actor.clanId(), player, "EXPULSAR", "Expulsó a " + target.name());
         removeMember(target.uuid());
         msg(player, "&aExpulsaste a &e" + target.name() + "&a.");
         Player online = Bukkit.getPlayer(target.uuid());
@@ -567,6 +658,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
         int newRole = Math.max(minRole(), Math.min(maxRole() - 1, target.role() + step));
         setMemberRole(target.uuid(), newRole);
+        logAction(actor.clanId(), player, step > 0 ? "PROMOVER" : "DEGRADAR", target.name() + " a rango " + newRole);
         broadcastToClan(actor.clanId(), "&e" + target.name() + " &7ahora es &b" + getRoleName(actor.clanId(), newRole) + "&7.");
     }
 
@@ -598,6 +690,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             return;
         }
         setMemberRole(target.uuid(), role);
+        logAction(actor.clanId(), player, "SETRANGO", target.name() + " a rango " + role);
         broadcastToClan(actor.clanId(), "&e" + target.name() + " &7ahora es &b" + getRoleName(actor.clanId(), role) + "&7.");
     }
 
@@ -624,6 +717,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             return;
         }
         setRoleName(member.clanId(), role, name);
+        logAction(member.clanId(), player, "ROL", "Rango " + role + " = " + name);
         broadcastToClan(member.clanId(), "&7El rango &e" + role + " &7ahora se llama &b" + name + "&7.");
     }
 
@@ -648,6 +742,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             return;
         }
         setClanBase(member.clanId(), player.getLocation());
+        logAction(member.clanId(), player, "SETBASE", "Base actualizada en " + player.getWorld().getName());
         broadcastToClan(member.clanId(), "&aLa base del clan fue actualizada por &e" + player.getName() + "&a.");
     }
 
@@ -720,6 +815,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         if (equalsAny(mode, "neutral", "neutro")) {
             removeRelation(own.id(), target.id());
             removeRelation(target.id(), own.id());
+            logAction(own.id(), player, "RELACION", "Neutral con " + target.tag());
             msg(player, "&7Relación con &e" + target.tag() + " &7establecida como neutral.");
             notifyClan(target.id(), "&7El clan &e" + own.tag() + " &7estableció relación neutral con ustedes.");
             return;
@@ -728,6 +824,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             setRelation(own.id(), target.id(), REL_ENEMY);
             removeRelation(target.id(), own.id(), REL_ALLY);
             removeRelation(target.id(), own.id(), REL_ALLY_REQUEST);
+            logAction(own.id(), player, "RELACION", "Enemigo: " + target.tag());
             broadcastToClan(own.id(), "&cTu clan declaró enemigo a &e" + target.tag() + "&c.");
             notifyClan(target.id(), "&cEl clan &e" + own.tag() + " &clos declaró enemigos.");
             return;
@@ -737,16 +834,232 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             if (!needsAccept || getRelation(target.id(), own.id()).equals(REL_ALLY_REQUEST)) {
                 setRelation(own.id(), target.id(), REL_ALLY);
                 setRelation(target.id(), own.id(), REL_ALLY);
+                logAction(own.id(), player, "RELACION", "Alianza aceptada con " + target.tag());
                 broadcastToClan(own.id(), "&9Ahora son aliados del clan &e" + target.tag() + "&9.");
                 notifyClan(target.id(), "&9Ahora son aliados del clan &e" + own.tag() + "&9.");
             } else {
                 setRelation(own.id(), target.id(), REL_ALLY_REQUEST);
+                logAction(own.id(), player, "RELACION", "Solicitud de alianza a " + target.tag());
                 msg(player, "&aSolicitud de alianza enviada a &e" + target.tag() + "&a.");
                 notifyClan(target.id(), "&9El clan &e" + own.tag() + " &9quiere una alianza. Usa &e/clan relacion " + own.tag() + " aliado &9para aceptar.");
             }
             return;
         }
         msg(player, "&cRelación inválida: usa neutral, aliado o enemigo.");
+    }
+
+
+
+    private void handleBankShortcut(Player player, String[] args, boolean deposit) throws SQLException {
+        if (args.length < 2) {
+            msg(player, "&cUso: &e/clan " + (deposit ? "depositar" : "retirar") + " <cantidad>");
+            return;
+        }
+        handleBank(player, new String[]{"banco", deposit ? "depositar" : "retirar", args[1]});
+    }
+
+    private void handleBank(Player player, String[] args) throws SQLException {
+        if (!getConfig().getBoolean("bank.enabled", true)) {
+            msg(player, "&cEl banco de clan está desactivado.");
+            return;
+        }
+        Member member = requireMember(player);
+        if (member == null) return;
+        Clan clan = getClan(member.clanId()).orElseThrow();
+        if (args.length == 1) {
+            msg(player, "&6Banco del clan &8[&b" + clan.tag() + "&8]&7: &e" + formatNumber(clan.bankBalance()) + " &7monedas.");
+            player.sendMessage(color("&7Usa &e/clan banco depositar <cantidad> &7o &e/clan banco retirar <cantidad>&7."));
+            return;
+        }
+        String action = args[1].toLowerCase(Locale.ROOT);
+        if (equalsAny(action, "log", "logs", "registro")) {
+            showLogs(player, member.clanId(), 1, "BANCO");
+            return;
+        }
+        if (!equalsAny(action, "depositar", "retirar")) {
+            msg(player, "&cUso: &e/clan banco <depositar|retirar|log> [cantidad]");
+            return;
+        }
+        if (economy == null) {
+            msg(player, "&cNo hay economía Vault disponible.");
+            return;
+        }
+        if (args.length < 3) {
+            msg(player, "&cDebes indicar una cantidad.");
+            return;
+        }
+        double amount;
+        try { amount = Double.parseDouble(args[2].replace(",", ".")); } catch (NumberFormatException e) {
+            msg(player, "&cCantidad inválida.");
+            return;
+        }
+        if (amount <= 0) {
+            msg(player, "&cLa cantidad debe ser mayor a 0.");
+            return;
+        }
+        if (equalsAny(action, "depositar")) {
+            if (!hasRank(player, member, "bank-deposit")) return;
+            if (!economy.has(player, amount)) {
+                msg(player, "&cNo tienes suficiente dinero.");
+                return;
+            }
+            economy.withdrawPlayer(player, amount);
+            addBankBalance(member.clanId(), amount);
+            logAction(member.clanId(), player, "BANCO", "Depositó " + formatNumber(amount));
+            broadcastToClan(member.clanId(), "&e" + player.getName() + " &adepositó &e" + formatNumber(amount) + " &aen el banco del clan.");
+            return;
+        }
+        if (!hasRank(player, member, "bank-withdraw")) return;
+        clan = getClan(member.clanId()).orElseThrow();
+        if (clan.bankBalance() < amount) {
+            msg(player, "&cEl banco del clan no tiene suficiente dinero.");
+            return;
+        }
+        addBankBalance(member.clanId(), -amount);
+        economy.depositPlayer(player, amount);
+        logAction(member.clanId(), player, "BANCO", "Retiró " + formatNumber(amount));
+        broadcastToClan(member.clanId(), "&e" + player.getName() + " &cretiró &e" + formatNumber(amount) + " &cdel banco del clan.");
+    }
+
+    private void handleStorage(Player player) throws SQLException {
+        if (!getConfig().getBoolean("storage-chest.enabled", true)) {
+            msg(player, "&cEl almacén de clan está desactivado.");
+            return;
+        }
+        Member member = requireMember(player);
+        if (member == null) return;
+        if (!hasRank(player, member, "storage-open")) return;
+        Clan clan = getClan(member.clanId()).orElseThrow();
+        int size = Math.max(9, Math.min(54, getConfig().getInt("storage-chest.size", 27)));
+        size = ((size + 8) / 9) * 9;
+        String title = color(getConfig().getString("storage-chest.title", "&8Almacén de clan {id}").replace("{id}", clan.tag()).replace("{name}", clan.name()));
+        Inventory inv = Bukkit.createInventory(player, size, title);
+        ItemStack[] items = deserializeInventory(clan.storage(), size);
+        inv.setContents(items);
+        openStorageViewers.put(player.getUniqueId(), clan.id());
+        player.openInventory(inv);
+        logAction(clan.id(), player, "ALMACEN", "Abrió el almacén");
+    }
+
+    private void handleBanner(Player player, String[] args) throws SQLException {
+        Member member = requireMember(player);
+        if (member == null) return;
+        if (args.length < 2) {
+            msg(player, "&cUso: &e/clan estandarte <set|ver|quitar>");
+            return;
+        }
+        Clan clan = getClan(member.clanId()).orElseThrow();
+        String action = args[1].toLowerCase(Locale.ROOT);
+        if (equalsAny(action, "set", "poner", "guardar")) {
+            if (!hasRank(player, member, "banner-set")) return;
+            ItemStack item = player.getInventory().getItemInMainHand();
+            if (item == null || item.getType() == Material.AIR || !item.getType().name().endsWith("BANNER")) {
+                msg(player, "&cDebes tener un banner/estandarte en la mano.");
+                return;
+            }
+            ItemStack copy = item.clone();
+            copy.setAmount(1);
+            try {
+                setClanBanner(member.clanId(), itemToBase64(copy));
+                logAction(member.clanId(), player, "ESTANDARTE", "Estandarte oficial actualizado");
+                broadcastToClan(member.clanId(), "&aEl estandarte oficial del clan fue actualizado por &e" + player.getName() + "&a.");
+            } catch (IOException e) {
+                msg(player, "&cNo se pudo guardar el estandarte.");
+            }
+            return;
+        }
+        if (equalsAny(action, "ver", "view")) {
+            if (!clan.hasBanner()) {
+                msg(player, "&cTu clan no tiene estandarte oficial.");
+                return;
+            }
+            try {
+                Inventory inv = Bukkit.createInventory(player, 9, color("&8Estandarte " + clan.tag()));
+                inv.setItem(4, itemFromBase64(clan.banner()));
+                player.openInventory(inv);
+            } catch (Exception e) {
+                msg(player, "&cNo se pudo cargar el estandarte guardado.");
+            }
+            return;
+        }
+        if (equalsAny(action, "quitar", "remove")) {
+            if (!hasRank(player, member, "banner-set")) return;
+            setClanBanner(member.clanId(), null);
+            logAction(member.clanId(), player, "ESTANDARTE", "Estandarte oficial eliminado");
+            broadcastToClan(member.clanId(), "&7El estandarte oficial del clan fue eliminado.");
+            return;
+        }
+        msg(player, "&cUso: &e/clan estandarte <set|ver|quitar>");
+    }
+
+    private void handleLogs(Player player, String[] args) throws SQLException {
+        Member member = requireMember(player);
+        if (member == null) return;
+        if (!hasRank(player, member, "logs-view")) return;
+        int page = 1;
+        if (args.length >= 2) {
+            try { page = Math.max(1, Integer.parseInt(args[1])); } catch (NumberFormatException ignored) {}
+        }
+        showLogs(player, member.clanId(), page, null);
+    }
+
+    private void showLogs(Player player, int clanId, int page, String actionFilter) throws SQLException {
+        int pageSize = 8;
+        List<ClanLog> logs = getLogs(clanId, actionFilter, page, pageSize);
+        player.sendMessage(color("&8&m-----&r &6Registro de clan &7(" + page + ") &8&m-----"));
+        if (logs.isEmpty()) {
+            player.sendMessage(color("&7No hay registros para mostrar."));
+            return;
+        }
+        for (ClanLog log : logs) {
+            player.sendMessage(color("&8- &e" + log.action() + " &7| &f" + log.actorName() + " &8» &7" + log.detail()));
+        }
+    }
+
+    private void handleTop(Player player, String[] args) throws SQLException {
+        String mode = args.length >= 2 ? args[1].toLowerCase(Locale.ROOT) : "fuerza";
+        if (!equalsAny(mode, "fuerza", "kills", "banco")) mode = "fuerza";
+        List<ClanTopEntry> entries = new ArrayList<>();
+        for (Clan clan : listClans()) {
+            double value = switch (mode) {
+                case "kills" -> getTotalKillsByClan(clan.id());
+                case "banco" -> clan.bankBalance();
+                default -> calculateStrength(clan);
+            };
+            entries.add(new ClanTopEntry(clan, value));
+        }
+        entries.sort(Comparator.comparingDouble(ClanTopEntry::value).reversed());
+        player.sendMessage(color("&8&m-----&r &6Top de clanes &7(" + mode + ") &8&m-----"));
+        int max = Math.min(10, entries.size());
+        if (max == 0) {
+            player.sendMessage(color("&7No hay clanes creados todavía."));
+            return;
+        }
+        for (int i = 0; i < max; i++) {
+            ClanTopEntry e = entries.get(i);
+            player.sendMessage(color("&e#" + (i + 1) + " &8[&b" + e.clan().tag() + "&8] &f" + e.clan().name() + " &7- &6" + formatNumber(e.value())));
+        }
+    }
+
+    private void handleKillStats(Player player, String[] args) throws SQLException {
+        Optional<Clan> clanOpt = args.length >= 2 ? getClanByTag(args[1]) : getPlayerClan(player.getUniqueId());
+        if (clanOpt.isEmpty()) {
+            msg(player, "&cClan no encontrado.");
+            return;
+        }
+        Clan clan = clanOpt.get();
+        player.sendMessage(color("&8&m-----&r &6Bajas de &8[&b" + clan.tag() + "&8] &8&m-----"));
+        player.sendMessage(color("&7Kills contra clanes: &a" + getTotalKillsByClan(clan.id())));
+        player.sendMessage(color("&7Bajas sufridas: &c" + getTotalDeathsByClan(clan.id())));
+        List<ClanTopEntry> suffered = getTopKillersAgainst(clan.id(), 8);
+        if (suffered.isEmpty()) {
+            player.sendMessage(color("&7Ningún clan ha registrado bajas contra este clan."));
+            return;
+        }
+        player.sendMessage(color("&7Clanes que más bajas le hicieron:"));
+        for (ClanTopEntry e : suffered) {
+            player.sendMessage(color("&8- &8[&c" + e.clan().tag() + "&8] &f" + e.clan().name() + " &7» &c" + (int) e.value() + " bajas"));
+        }
     }
 
     private void handleDisband(Player player, String[] args) throws SQLException {
@@ -758,6 +1071,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             return;
         }
         Clan clan = getClan(member.clanId()).orElseThrow();
+        logAction(clan.id(), player, "DISOLVER", "Clan disuelto");
         disbandClan(clan.id());
         msg(player, "&cClan &e" + clan.tag() + " &cdisuelto.");
     }
@@ -782,6 +1096,44 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             }
         } catch (SQLException e) {
             getLogger().warning("Error revisando friendly fire: " + e.getMessage());
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onPlayerDeath(PlayerDeathEvent event) {
+        if (!getConfig().getBoolean("kills.enabled", true)) return;
+        Player victim = event.getEntity();
+        Player killer = victim.getKiller();
+        if (killer == null || killer.equals(victim)) return;
+        try {
+            Optional<Member> killerMember = getMember(killer.getUniqueId());
+            Optional<Member> victimMember = getMember(victim.getUniqueId());
+            if (killerMember.isEmpty() || victimMember.isEmpty()) return;
+            if (killerMember.get().clanId() == victimMember.get().clanId()) return;
+            long cooldownMs = getConfig().getLong("kills.same-victim-cooldown-seconds", 900) * 1000L;
+            if (isKillOnCooldown(killer.getUniqueId(), victim.getUniqueId(), cooldownMs)) return;
+            setKillCooldown(killer.getUniqueId(), victim.getUniqueId());
+            incrementClanKill(killerMember.get().clanId(), victimMember.get().clanId());
+            Clan killerClan = getClan(killerMember.get().clanId()).orElseThrow();
+            Clan victimClan = getClan(victimMember.get().clanId()).orElseThrow();
+            logAction(killerClan.id(), killer, "KILL", "Baja contra " + victimClan.tag());
+            logAction(victimClan.id(), victim, "MUERTE", "Baja sufrida por " + killerClan.tag());
+        } catch (SQLException e) {
+            getLogger().warning("Error registrando kill de clan: " + e.getMessage());
+        }
+    }
+
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) return;
+        Integer clanId = openStorageViewers.remove(player.getUniqueId());
+        if (clanId == null) return;
+        try {
+            saveClanStorage(clanId, event.getInventory().getContents());
+            logAction(clanId, player, "ALMACEN", "Cerró y guardó el almacén");
+        } catch (Exception e) {
+            getLogger().warning("No se pudo guardar almacén de clan " + clanId + ": " + e.getMessage());
+            msg(player, "&cNo se pudo guardar el almacén del clan. Avisa a un admin.");
         }
     }
 
@@ -1207,6 +1559,248 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
     }
 
+
+
+    private synchronized void addBankBalance(int clanId, double amount) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("UPDATE clans SET bank_balance = bank_balance + ? WHERE id=?")) {
+            ps.setDouble(1, amount);
+            ps.setInt(2, clanId);
+            ps.executeUpdate();
+        }
+    }
+
+    private synchronized void setClanBanner(int clanId, String data) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("UPDATE clans SET banner=? WHERE id=?")) {
+            ps.setString(1, data);
+            ps.setInt(2, clanId);
+            ps.executeUpdate();
+        }
+    }
+
+    private synchronized void saveClanStorage(int clanId, ItemStack[] contents) throws SQLException, IOException {
+        String data = inventoryToBase64(contents);
+        try (PreparedStatement ps = connection.prepareStatement("UPDATE clans SET storage=? WHERE id=?")) {
+            ps.setString(1, data);
+            ps.setInt(2, clanId);
+            ps.executeUpdate();
+        }
+    }
+
+    private synchronized void logAction(int clanId, Player actor, String action, String detail) throws SQLException {
+        logAction(clanId, actor == null ? null : actor.getUniqueId(), actor == null ? "Sistema" : actor.getName(), action, detail);
+    }
+
+    private synchronized void logAction(int clanId, UUID actorUuid, String actorName, String action, String detail) throws SQLException {
+        if (!getConfig().getBoolean("logs.enabled", true)) return;
+        try (PreparedStatement ps = connection.prepareStatement("INSERT INTO clan_logs(clan_id,time,actor_uuid,actor_name,action,detail) VALUES(?,?,?,?,?,?)")) {
+            ps.setInt(1, clanId);
+            ps.setLong(2, System.currentTimeMillis());
+            ps.setString(3, actorUuid == null ? null : actorUuid.toString());
+            ps.setString(4, actorName == null ? "Sistema" : actorName);
+            ps.setString(5, action);
+            ps.setString(6, detail == null ? "" : detail);
+            ps.executeUpdate();
+        }
+    }
+
+    private synchronized List<ClanLog> getLogs(int clanId, String actionFilter, int page, int pageSize) throws SQLException {
+        List<ClanLog> list = new ArrayList<>();
+        int offset = Math.max(0, page - 1) * pageSize;
+        String sql = actionFilter == null ?
+                "SELECT * FROM clan_logs WHERE clan_id=? ORDER BY time DESC LIMIT ? OFFSET ?" :
+                "SELECT * FROM clan_logs WHERE clan_id=? AND action=? ORDER BY time DESC LIMIT ? OFFSET ?";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setInt(1, clanId);
+            if (actionFilter == null) {
+                ps.setInt(2, pageSize);
+                ps.setInt(3, offset);
+            } else {
+                ps.setString(2, actionFilter);
+                ps.setInt(3, pageSize);
+                ps.setInt(4, offset);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) list.add(new ClanLog(rs.getLong("time"), rs.getString("actor_name"), rs.getString("action"), rs.getString("detail")));
+            }
+        }
+        return list;
+    }
+
+    private synchronized boolean isKillOnCooldown(UUID attacker, UUID victim, long cooldownMs) throws SQLException {
+        if (cooldownMs <= 0) return false;
+        try (PreparedStatement ps = connection.prepareStatement("SELECT last_kill_at FROM kill_cooldowns WHERE attacker_uuid=? AND victim_uuid=?")) {
+            ps.setString(1, attacker.toString());
+            ps.setString(2, victim.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && System.currentTimeMillis() - rs.getLong("last_kill_at") < cooldownMs;
+            }
+        }
+    }
+
+    private synchronized void setKillCooldown(UUID attacker, UUID victim) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("INSERT OR REPLACE INTO kill_cooldowns(attacker_uuid,victim_uuid,last_kill_at) VALUES(?,?,?)")) {
+            ps.setString(1, attacker.toString());
+            ps.setString(2, victim.toString());
+            ps.setLong(3, System.currentTimeMillis());
+            ps.executeUpdate();
+        }
+    }
+
+    private synchronized void incrementClanKill(int attackerClanId, int victimClanId) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("INSERT INTO clan_kills(attacker_clan_id,victim_clan_id,kills,last_kill_at) VALUES(?,?,1,?) " +
+                "ON CONFLICT(attacker_clan_id,victim_clan_id) DO UPDATE SET kills=kills+1,last_kill_at=excluded.last_kill_at")) {
+            ps.setInt(1, attackerClanId);
+            ps.setInt(2, victimClanId);
+            ps.setLong(3, System.currentTimeMillis());
+            ps.executeUpdate();
+        }
+    }
+
+    private synchronized int getTotalKillsByClan(int clanId) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("SELECT COALESCE(SUM(kills),0) FROM clan_kills WHERE attacker_clan_id=?")) {
+            ps.setInt(1, clanId);
+            try (ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getInt(1) : 0; }
+        }
+    }
+
+    private synchronized int getTotalDeathsByClan(int clanId) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("SELECT COALESCE(SUM(kills),0) FROM clan_kills WHERE victim_clan_id=?")) {
+            ps.setInt(1, clanId);
+            try (ResultSet rs = ps.executeQuery()) { return rs.next() ? rs.getInt(1) : 0; }
+        }
+    }
+
+    private synchronized List<ClanTopEntry> getTopKillersAgainst(int victimClanId, int limit) throws SQLException {
+        List<ClanTopEntry> list = new ArrayList<>();
+        try (PreparedStatement ps = connection.prepareStatement("SELECT attacker_clan_id,kills FROM clan_kills WHERE victim_clan_id=? ORDER BY kills DESC LIMIT ?")) {
+            ps.setInt(1, victimClanId);
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    int kills = rs.getInt("kills");
+                    Optional<Clan> c = getClan(rs.getInt("attacker_clan_id"));
+                    if (c.isPresent()) list.add(new ClanTopEntry(c.get(), kills));
+                }
+            }
+        }
+        return list;
+    }
+
+    private double calculateStrength(Clan clan) throws SQLException {
+        double killWeight = getConfig().getDouble("top.strength.kill-weight", 10.0);
+        double bankDivisor = Math.max(1.0, getConfig().getDouble("top.strength.bank-divisor", 10.0));
+        double bankCap = getConfig().getDouble("top.strength.bank-cap", 500.0);
+        double memberWeight = getConfig().getDouble("top.strength.member-weight", 5.0);
+        return getTotalKillsByClan(clan.id()) * killWeight
+                + Math.min(clan.bankBalance() / bankDivisor, bankCap)
+                + countMembers(clan.id()) * memberWeight;
+    }
+
+    private String formatNumber(double value) {
+        if (Math.abs(value - Math.rint(value)) < 0.0001) return String.valueOf((long) Math.rint(value));
+        return String.format(Locale.US, "%.2f", value);
+    }
+
+    private String inventoryToBase64(ItemStack[] items) throws IOException {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        try (BukkitObjectOutputStream dataOutput = new BukkitObjectOutputStream(outputStream)) {
+            dataOutput.writeInt(items.length);
+            for (ItemStack item : items) dataOutput.writeObject(item);
+        }
+        return Base64.getEncoder().encodeToString(outputStream.toByteArray());
+    }
+
+    private ItemStack[] deserializeInventory(String data, int size) {
+        ItemStack[] items = new ItemStack[size];
+        if (data == null || data.isBlank()) return items;
+        try (BukkitObjectInputStream dataInput = new BukkitObjectInputStream(new ByteArrayInputStream(Base64.getDecoder().decode(data)))) {
+            int length = dataInput.readInt();
+            for (int i = 0; i < length && i < size; i++) items[i] = (ItemStack) dataInput.readObject();
+        } catch (Exception e) {
+            getLogger().warning("No se pudo leer inventario de clan: " + e.getMessage());
+        }
+        return items;
+    }
+
+    private String itemToBase64(ItemStack item) throws IOException {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        try (BukkitObjectOutputStream dataOutput = new BukkitObjectOutputStream(outputStream)) {
+            dataOutput.writeObject(item);
+        }
+        return Base64.getEncoder().encodeToString(outputStream.toByteArray());
+    }
+
+    private ItemStack itemFromBase64(String data) throws IOException, ClassNotFoundException {
+        try (BukkitObjectInputStream dataInput = new BukkitObjectInputStream(new ByteArrayInputStream(Base64.getDecoder().decode(data)))) {
+            return (ItemStack) dataInput.readObject();
+        }
+    }
+
+    private void saveMenuTemplates() {
+        saveResourceIfMissing("Menus/clan.yml");
+        saveResourceIfMissing("Menus/clan_gestion.yml");
+        saveResourceIfMissing("Menus/clan_rankings.yml");
+    }
+
+    private void saveResourceIfMissing(String resource) {
+        File file = new File(getDataFolder(), resource);
+        if (!file.exists()) saveResource(resource, false);
+    }
+
+    private void startNametagTask() {
+        if (!getConfig().getBoolean("nametags.enabled", true)) return;
+        long interval = Math.max(20L, getConfig().getLong("nametags.update-interval-ticks", 100L));
+        nametagTaskId = Bukkit.getScheduler().runTaskTimer(this, this::syncNametags, 40L, interval).getTaskId();
+    }
+
+    private void syncNametags() {
+        List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
+        for (Player viewer : players) {
+            try {
+                Scoreboard board = viewer.getScoreboard();
+                for (Player target : players) {
+                    updateNametagFor(viewer, target, board);
+                }
+            } catch (Exception e) {
+                getLogger().warning("Error actualizando nametags: " + e.getMessage());
+            }
+        }
+    }
+
+    private void updateNametagFor(Player viewer, Player target, Scoreboard board) throws SQLException {
+        String entry = target.getName();
+        removeFromMDVTeams(board, entry);
+        Optional<Member> targetMember = getMember(target.getUniqueId());
+        if (targetMember.isEmpty()) return;
+        Optional<Clan> targetClanOpt = getClan(targetMember.get().clanId());
+        if (targetClanOpt.isEmpty()) return;
+        Clan targetClan = targetClanOpt.get();
+        int viewerClanId = getOwnClanId(viewer.getUniqueId());
+        String relation = getRelationBetween(viewerClanId, targetClan.id());
+        String formatKey = switch (relation) {
+            case "SAME" -> "same";
+            case REL_ALLY -> "ally";
+            case REL_ENEMY -> "enemy";
+            default -> "neutral";
+        };
+        String prefix = color(getConfig().getString("nametags.formats." + formatKey, "&7[{id}] ").replace("{id}", targetClan.tag()).replace("{name}", targetClan.name()));
+        String teamName = "mdvc" + Integer.toHexString((formatKey + targetClan.tag()).hashCode()).replace("-", "n");
+        if (teamName.length() > 16) teamName = teamName.substring(0, 16);
+        Team team = board.getTeam(teamName);
+        if (team == null) team = board.registerNewTeam(teamName);
+        team.setPrefix(prefix);
+        team.setSuffix("");
+        team.addEntry(entry);
+    }
+
+    private void removeFromMDVTeams(Scoreboard board, String entry) {
+        for (Team team : board.getTeams()) {
+            if (team.getName().startsWith("mdvc") && team.hasEntry(entry)) {
+                team.removeEntry(entry);
+            }
+        }
+    }
+
     private Clan readClan(ResultSet rs) throws SQLException {
         return new Clan(
                 rs.getInt("id"),
@@ -1215,6 +1809,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 UUID.fromString(rs.getString("owner_uuid")),
                 rs.getInt("open") == 1,
                 rs.getLong("created_at"),
+                rs.getDouble("bank_balance"),
+                rs.getString("banner"),
+                rs.getString("storage"),
                 rs.getString("base_world"),
                 rs.getDouble("base_x"),
                 rs.getDouble("base_y"),
@@ -1263,7 +1860,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
         if (!(sender instanceof Player)) return Collections.emptyList();
         if (args.length == 1) {
-            return filter(List.of("ayuda", "crear", "info", "lista", "invitar", "aceptar", "unirse", "abierto", "salir", "expulsar", "promover", "degradar", "setrango", "rol", "chat", "c", "setbase", "base", "relacion", "disolver"), args[0]);
+            return filter(List.of("ayuda", "crear", "info", "lista", "invitar", "aceptar", "unirse", "abierto", "salir", "expulsar", "promover", "degradar", "setrango", "rol", "chat", "c", "setbase", "base", "relacion", "banco", "depositar", "retirar", "almacen", "estandarte", "logs", "top", "bajas", "disolver"), args[0]);
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         try {
@@ -1274,6 +1871,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 if (equalsAny(sub, "abierto")) return filter(List.of("on", "off"), args[1]);
                 if (equalsAny(sub, "expulsar", "promover", "degradar", "setrango")) return filter(memberNamesOfSenderClan((Player) sender), args[1]);
                 if (equalsAny(sub, "rol")) return filter(List.of("0", "1", "2", "3", "4", "5"), args[1]);
+                if (equalsAny(sub, "banco")) return filter(List.of("depositar", "retirar", "log"), args[1]);
+                if (equalsAny(sub, "estandarte", "banner")) return filter(List.of("set", "ver", "quitar"), args[1]);
+                if (equalsAny(sub, "top")) return filter(List.of("fuerza", "kills", "banco"), args[1]);
                 if (equalsAny(sub, "disolver")) return filter(List.of("confirmar"), args[1]);
             }
             if (args.length == 3 && equalsAny(sub, "relacion")) return filter(List.of("neutral", "aliado", "enemigo"), args[2]);
@@ -1312,9 +1912,16 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     public record Clan(int id, String tag, String name, UUID ownerUuid, boolean open, long createdAt,
+                       double bankBalance, String banner, String storage,
                        String baseWorld, double baseX, double baseY, double baseZ, float baseYaw, float basePitch) {
         boolean hasBase() { return baseWorld != null && !baseWorld.isBlank(); }
+        boolean hasBanner() { return banner != null && !banner.isBlank(); }
+        boolean hasStorage() { return storage != null && !storage.isBlank(); }
     }
+
+    public record ClanLog(long time, String actorName, String action, String detail) {}
+
+    public record ClanTopEntry(Clan clan, double value) {}
 
     public record Member(int clanId, UUID uuid, String name, int role, long joinedAt, boolean chatToggle) {}
 
@@ -1349,7 +1956,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 String noClan = getConfig().getString("placeholders.no-clan", "");
                 if (memberOpt.isEmpty()) {
                     return switch (params.toLowerCase(Locale.ROOT)) {
-                        case "id", "name", "tag", "lpc_tag", "role", "role_number", "member_count", "is_in_clan" -> params.equalsIgnoreCase("is_in_clan") ? "false" : noClan;
+                        case "id", "name", "tag", "lpc_tag", "role", "role_number", "member_count", "bank", "kills", "deaths", "strength", "is_in_clan" -> params.equalsIgnoreCase("is_in_clan") ? "false" : noClan;
                         default -> noClan;
                     };
                 }
@@ -1365,6 +1972,10 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     case "role" -> getRoleName(clan.id(), member.role());
                     case "role_number" -> String.valueOf(member.role());
                     case "member_count" -> String.valueOf(countMembers(clan.id()));
+                    case "bank" -> formatNumber(clan.bankBalance());
+                    case "kills" -> String.valueOf(getTotalKillsByClan(clan.id()));
+                    case "deaths" -> String.valueOf(getTotalDeathsByClan(clan.id()));
+                    case "strength" -> formatNumber(calculateStrength(clan));
                     case "is_in_clan" -> "true";
                     case "open" -> clan.open() ? "true" : "false";
                     default -> noClan;
