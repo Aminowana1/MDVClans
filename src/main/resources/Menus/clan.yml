@@ -1,32 +1,30 @@
-# MDVSocial bridge recomendado.
-# Mejor opción: desde tu menú principal de MDVSocial usa directamente COMMAND_PLAYER: clan menu.
-# Si aun quieres abrir un menú intermedio, este botón ejecuta /clan menu y MDVClans decide:
-# - con clan: abre Gestión del clan
-# - sin clan: abre Lista/Crear clan
-title: '&8&lClanes'
+title: '&8Clan'
 size: 27
 items:
-  abrir:
+  detectar:
     slot: 13
     material: SHIELD
-    name: '&6&lClanes de MDVCRAFT'
+    name: '&a&lClanes'
     lore:
       - ''
-      - '&7Con clan: abre gestión.'
-      - '&7Sin clan: lista y creación.'
+      - '&7Este menu puente detecta'
+      - '&7si tienes clan o no.'
       - ''
-      - '&eClick para abrir.'
-    action: COMMAND_PLAYER
-    commands:
-      - 'clan menu'
+      - '&eClick para continuar.'
+    action: OPEN_CONDITIONAL_MENU
+    condition-placeholder: '%mdvclans_is_in_clan%'
+    condition-equals: 'true'
+    true-menu: clan_con_clan
+    false-menu: clan_sin_clan
+
   volver:
     slot: 22
     material: ARROW
-    name: '&6&lVolver'
-    action: OPEN_MENU
-    target-menu: menuamigos
+    name: '&eVolver'
+    action: BACK
+
   cerrar:
     slot: 26
     material: BARRIER
-    name: '&c&lCerrar'
+    name: '&cCerrar'
     action: CLOSE

@@ -138,7 +138,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.6.2 habilitado.");
+        getLogger().info("MDVClans 1.7.0 habilitado.");
     }
 
     @Override
@@ -344,7 +344,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         try {
             switch (sub) {
                 case "crear", "create" -> handleCreate(player, args);
-                case "menu", "gui", "menú" -> handleClanMenuCommand(player, args);
+                case "menu", "gui", "menú", "abrir", "ui", "interfaz" -> handleClanMenuCommand(player, args);
                 case "info" -> handleInfo(player, args);
                 case "lista", "list" -> handleList(player, args);
                 case "invitar", "invite" -> handleInvite(player, args);
@@ -427,7 +427,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         player.sendMessage(color("&e/clan top [fuerza|kills|banco] &7- Ranking."));
         player.sendMessage(color("&e/clan bajas &7- Estadísticas de kills."));
         player.sendMessage(color("&e/clan logs &7- Registro básico."));
-        player.sendMessage(color("&e/clan menu &7- Abre la interfaz principal."));
+        player.sendMessage(color("&e/clan abrir <ui> &7- Abre una UI dinámica para MDVSocial."));
+        player.sendMessage(color("&8UIs: auto, gestion, sinclan, miembros, info, relaciones, almacen, lista, correo, top, bajas, logs, ajustes, solicitudes."));
         player.sendMessage(color("&e/clan tablero set <texto> &7- Edita el tablero."));
         player.sendMessage(color("&e/clan correo clan <ID> <mensaje> &7- Envía correo a otro clan."));
     }
@@ -932,21 +933,52 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             openMainMenu(player);
             return;
         }
-        String sub = args[1].toLowerCase(Locale.ROOT);
-        switch (sub) {
-            case "principal", "completo", "panel" -> openFullClanHub(player);
-            case "gestion", "gestión" -> openClanManagementMenu(player);
-            case "miembros" -> openMembersMenu(player, 1);
-            case "info" -> openClanInfoMenu(player);
-            case "relaciones" -> openRelationsMenu(player);
-            case "almacen", "almacén" -> openStorageHubMenu(player);
-            case "lista", "clanes" -> openClanListMenu(player, 1);
-            case "correo", "buzon", "buzón" -> openMailboxMenu(player, 1);
-            case "top", "ranking" -> openTopGui(player, "fuerza");
-            case "bajas" -> openKillStatsGui(player);
-            case "logs" -> openLogsGui(player, 1);
-            case "ajustes" -> openSettingsMenu(player);
-            case "solicitudes" -> openJoinRequestsMenu(player, 1);
+        String sub = normalizeUiName(args[1]);
+        int page = 1;
+        if (args.length >= 3) {
+            try { page = Math.max(1, Integer.parseInt(args[2])); } catch (NumberFormatException ignored) { }
+        }
+        openDynamicClanUi(player, sub, page);
+    }
+
+    private String normalizeUiName(String raw) {
+        if (raw == null || raw.isBlank()) return "auto";
+        return raw.toLowerCase(Locale.ROOT)
+                .replace('á', 'a')
+                .replace('é', 'e')
+                .replace('í', 'i')
+                .replace('ó', 'o')
+                .replace('ú', 'u')
+                .replace('ñ', 'n')
+                .replace('-', '_')
+                .replace(' ', '_');
+    }
+
+    private void openDynamicClanUi(Player player, String ui, int page) throws SQLException {
+        if (ui == null || ui.isBlank() || ui.equals("auto")) {
+            openMainMenu(player);
+            return;
+        }
+        switch (ui) {
+            case "principal", "completo", "panel", "hub" -> openFullClanHub(player);
+            case "gestion", "conclan", "con_clan", "clan_con_clan" -> openClanManagementMenu(player);
+            case "sinclan", "sin_clan", "clan_sin_clan" -> openNoClanMenu(player);
+            case "miembros", "miembro", "members" -> openMembersMenu(player, page);
+            case "info", "tablero", "informacion", "informacion_clan" -> openClanInfoMenu(player);
+            case "relaciones", "relation", "relations" -> openRelationsMenu(player);
+            case "relaciones_lista", "lista_relaciones", "aliados_enemigos" -> openRelationsListMenu(player, page);
+            case "almacen", "almacen_banco", "banco_almacen", "recursos" -> openStorageHubMenu(player);
+            case "lista", "clanes", "lista_clanes", "lista_con_clan", "lista_sinclan", "lista_sin_clan" -> openClanListMenu(player, page);
+            case "correo", "correos", "buzon", "buzon_clan" -> openMailboxMenu(player, page);
+            case "top", "ranking", "fuerza" -> openTopGui(player, "fuerza");
+            case "top_kills", "ranking_kills" -> openTopGui(player, "kills");
+            case "top_banco", "ranking_banco" -> openTopGui(player, "banco");
+            case "bajas", "kills", "estadisticas" -> openKillStatsGui(player);
+            case "logs", "registro", "registros" -> openLogsGui(player, page);
+            case "ajustes", "settings", "configuracion" -> openSettingsMenu(player);
+            case "rangos", "roles" -> openRoleSettingsMenu(player);
+            case "permisos", "permissions" -> openPermissionsMenu(player);
+            case "solicitudes", "requests", "join_requests" -> openJoinRequestsMenu(player, page);
             default -> openMainMenu(player);
         }
     }
@@ -2875,6 +2907,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     private void saveMenuTemplates() {
         saveResourceIfMissing("Menus/clan.yml");
+        saveResourceIfMissing("Menus/clan_con_clan.yml");
+        saveResourceIfMissing("Menus/clan_sin_clan.yml");
         saveResourceIfMissing("Menus/clan_gestion.yml");
         saveResourceIfMissing("Menus/clan_rankings.yml");
         saveResourceIfMissing("Menus/clan_miembros.yml");
@@ -3118,7 +3152,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
         if (!(sender instanceof Player)) return Collections.emptyList();
         if (args.length == 1) {
-            return filter(List.of("ayuda", "crear", "info", "lista", "invitar", "aceptar", "unirse", "abierto", "salir", "expulsar", "promover", "degradar", "setrango", "rol", "chat", "c", "setbase", "base", "relacion", "banco", "depositar", "retirar", "almacen", "estandarte", "logs", "top", "bajas", "tablero", "correo", "editar", "solicitudes", "menu", "disolver"), args[0]);
+            return filter(List.of("ayuda", "crear", "info", "lista", "invitar", "aceptar", "unirse", "abierto", "salir", "expulsar", "promover", "degradar", "setrango", "rol", "chat", "c", "setbase", "base", "relacion", "banco", "depositar", "retirar", "almacen", "estandarte", "logs", "top", "bajas", "tablero", "correo", "editar", "solicitudes", "menu", "abrir", "ui", "interfaz", "disolver"), args[0]);
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         try {
@@ -3134,6 +3168,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 if (equalsAny(sub, "top")) return filter(List.of("fuerza", "kills", "banco"), args[1]);
                 if (equalsAny(sub, "editar")) return filter(List.of("nombre", "id"), args[1]);
                 if (equalsAny(sub, "solicitudes")) return filter(List.of("ver", "aceptar", "borrar"), args[1]);
+                if (equalsAny(sub, "menu", "abrir", "ui", "interfaz")) return filter(List.of("auto", "gestion", "sinclan", "miembros", "info", "relaciones", "relaciones_lista", "almacen", "lista", "lista_sinclan", "correo", "top", "top_kills", "top_banco", "bajas", "logs", "ajustes", "rangos", "permisos", "solicitudes", "principal"), args[1]);
                 if (equalsAny(sub, "disolver")) return filter(List.of("confirmar"), args[1]);
             }
             if (args.length == 3 && equalsAny(sub, "relacion")) return filter(List.of("neutral", "aliado", "enemigo"), args[2]);

@@ -1,4 +1,4 @@
-# MDVClans 1.6.2 - Mensajes editables
+# MDVClans 1.7.0 - Mensajes editables
 # Nota: esta versión centraliza el prefijo y deja preparada la estructura para ir moviendo
 # todos los textos del plugin a este archivo sin romper compatibilidad.
 prefix: '&8[&6MDVClans&8]&r '
