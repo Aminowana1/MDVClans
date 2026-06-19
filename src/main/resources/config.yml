@@ -127,5 +127,6 @@ placeholders:
 
 gui:
   native-enabled: true
-  # Los menús nativos se abren con /clan menu.
-  # Los YAML de Menus/ son accesos rápidos para MDVSocial.
+  # Los menús nativos se abren con /clan abrir <ui>.
+  # Edita títulos/items/lore en native-menus.yml.
+  # MDVSocial debe crear sus propios puentes y ejecutar /clan abrir <ui>.

@@ -1,4 +1,4 @@
-# MDVClans 1.7.0
+# MDVClans 1.7.1
 
 Sistema de clanes social para MDVCRAFT.
 
@@ -60,4 +60,4 @@ commands:
 mvn clean package
 ```
 
-El jar queda en `target/MDVClans-1.7.0.jar`.
+El jar queda en `target/MDVClans-1.7.1.jar`.

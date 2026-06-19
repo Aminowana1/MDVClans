@@ -1,0 +1,329 @@
+# ==========================================================
+# MDVClans 1.7.1 - Configuración de GUIs NATIVAS
+# ==========================================================
+# Este archivo NO es para MDVSocial.
+# MDVClans usa este archivo para cambiar títulos, materiales, nombres,
+# lore y algunos slots de sus GUIs nativas dinámicas.
+#
+# MDVSocial solo debe crear puentes que ejecuten comandos como:
+#   /clan abrir miembros
+#   /clan abrir lista
+#   /clan abrir crear
+#
+# Placeholders generales según menú:
+# {id}, {clan_id}, {name}, {clan_name}, {members}, {max_members}, {bank}, {strength}, {open}, {created}
+# En miembros: {player}, {role_number}, {role_name}, {status}, {last_seen}, {joined}, {level}, {race}
+# ==========================================================
+
+global:
+  filler:
+    material: BLACK_STAINED_GLASS_PANE
+    name: ' '
+    lore: []
+  back:
+    material: ARROW
+    name: '&6&lVolver'
+    lore:
+      - '&7Regresa al menú anterior.'
+  previous-page:
+    material: ARROW
+    name: '&ePágina anterior'
+    lore:
+      - '&7Click para volver.'
+  next-page:
+    material: SPECTRAL_ARROW
+    name: '&ePágina siguiente'
+    lore:
+      - '&7Click para avanzar.'
+  locked:
+    material: GRAY_DYE
+    name: '&7Función bloqueada'
+    lore:
+      - ''
+      - '{reason}'
+      - '&8No puedes usar esta función.'
+
+menus:
+  # Menú que se abre si NO estás en clan.
+  # Este menú solo puede abrir Lista de clanes o Crear clan.
+  no-clan:
+    title: '&8&lClanes'
+    items:
+      list:
+        slot: 11
+        material: BOOK
+        name: '&b&lLista de clanes'
+        lore:
+          - ''
+          - '&7Mira los clanes creados'
+          - '&7en MDVCRAFT.'
+          - ''
+          - '&eClick para abrir.'
+      create:
+        slot: 15
+        material: EMERALD
+        name: '&a&lCrear clan'
+        lore:
+          - ''
+          - '&7Abre el menú de creación.'
+          - '&7Luego escribirás ID y nombre.'
+          - ''
+          - '&eClick para empezar.'
+      close:
+        slot: 22
+        material: BARRIER
+        name: '&c&lCerrar'
+        lore:
+          - '&7Cierra el menú.'
+
+  # Menú nativo para crear clan.
+  create:
+    title: '&8&lCrear clan'
+    items:
+      info:
+        slot: 11
+        material: WRITABLE_BOOK
+        name: '&e&lFormato'
+        lore:
+          - ''
+          - '&7Al crear clan escribirás en chat:'
+          - '&fID Nombre del clan'
+          - ''
+          - '&7Ejemplo:'
+          - '&bMDV Medieval Craft'
+          - ''
+          - '&8ID 3-5 caracteres.'
+          - '&8Nombre máximo según config.'
+      start:
+        slot: 13
+        material: EMERALD
+        name: '&a&lEscribir clan'
+        lore:
+          - ''
+          - '&7Cierra este menú y te pedirá'
+          - '&7el ID + nombre por chat.'
+          - ''
+          - '&eClick para comenzar.'
+      back:
+        slot: 22
+        material: ARROW
+        name: '&6&lVolver'
+        lore:
+          - '&7Regresa al menú anterior.'
+      close:
+        slot: 26
+        material: BARRIER
+        name: '&c&lCerrar'
+        lore:
+          - '&7Cierra el menú.'
+
+  # Gestión rápida del clan.
+  # Normalmente abrirás esto desde MDVSocial con /clan abrir gestion.
+  management:
+    title: '&8&lGestión del clan'
+    items:
+      summary:
+        slot: 4
+        name: '&6&l{name}'
+        lore:
+          - '&7ID: &b{id}'
+          - '&7Miembros: &e{members}&7/&e{max_members}'
+          - '&7Banco: &e{bank}'
+          - '&7Fuerza: &6{strength}'
+          - ''
+          - '&eClick para abrir el panel completo.'
+      base:
+        slot: 10
+        material: ENDER_PEARL
+        name: '&b&lIr a la base'
+        lore:
+          - ''
+          - '&7Teletranspórtate a la base'
+          - '&7definida por el clan.'
+          - ''
+          - '&eClick para viajar.'
+      setbase:
+        slot: 11
+        material: COMPASS
+        name: '&6&lFijar base'
+        lore:
+          - ''
+          - '&7Define la base del clan'
+          - '&7en tu ubicación actual.'
+          - ''
+          - '&8Requiere rango configurado.'
+      bank:
+        slot: 13
+        material: GOLD_NUGGET
+        name: '&e&lBanco del clan'
+        lore:
+          - ''
+          - '&7Balance: &e{bank}'
+          - '&7Depositar: &f/clan banco depositar cantidad'
+          - '&7Retirar: &f/clan banco retirar cantidad'
+          - ''
+          - '&eClick para consultar.'
+      storage:
+        slot: 14
+        material: CHEST
+        name: '&a&lAlmacén del clan'
+        lore:
+          - ''
+          - '&7Abre el inventario compartido'
+          - '&7del clan.'
+          - ''
+          - '&eClick para abrir.'
+      banner:
+        slot: 15
+        name: '&f&lEstandarte oficial'
+        lore:
+          - ''
+          - '&7Ver el banner oficial'
+          - '&7del clan.'
+          - ''
+          - '&eClick para ver.'
+      logs:
+        slot: 16
+        material: WRITABLE_BOOK
+        name: '&d&lRegistro del clan'
+        lore:
+          - ''
+          - '&7Muestra acciones recientes:'
+          - '&8banco, miembros, base,'
+          - '&8relaciones y bajas.'
+          - ''
+          - '&eClick para ver.'
+      back:
+        slot: 22
+        material: ARROW
+        name: '&6&lVolver'
+        lore:
+          - '&7Volver al menú social.'
+      close:
+        slot: 26
+        material: BARRIER
+        name: '&c&lCerrar'
+        lore:
+          - '&7Cierra el menú.'
+
+  # Panel completo nativo de MDVClans.
+  hub:
+    title: '&8&lClan &b{id}'
+    items:
+      summary:
+        slot: 4
+        name: '&6&l{name}'
+        lore:
+          - '&7ID: &b{id}'
+          - '&7Miembros: &e{members}&7/&e{max_members}'
+          - '&7Banco: &e{bank}'
+          - '&7Fuerza: &6{strength}'
+      members:
+        slot: 10
+        material: PLAYER_HEAD
+        name: '&a&lMiembros'
+        lore:
+          - ''
+          - '&7Cabezas de jugadores, roles'
+          - '&7y acciones de cada miembro.'
+          - ''
+          - '&eClick para abrir.'
+      info:
+        slot: 11
+        material: WRITABLE_BOOK
+        name: '&e&lTablero e información'
+        lore:
+          - ''
+          - '&7Banner, tablero, buzón,'
+          - '&7solicitudes y registros.'
+          - ''
+          - '&eClick para abrir.'
+      relations:
+        slot: 12
+        material: RED_BANNER
+        name: '&c&lRelaciones'
+        lore:
+          - ''
+          - '&7Aliados, enemigos, bajas'
+          - '&7y ranking de clanes.'
+          - ''
+          - '&eClick para abrir.'
+      storage:
+        slot: 13
+        material: CHEST
+        name: '&6&lAlmacén y banco'
+        lore:
+          - ''
+          - '&7Acceso al almacén'
+          - '&7y banco del clan.'
+          - ''
+          - '&eClick para abrir.'
+      base:
+        slot: 14
+        material: ENDER_PEARL
+        name: '&b&lIr a la base'
+        lore:
+          - ''
+          - '&7Ejecuta &f/clan base&7.'
+          - ''
+          - '&eClick para viajar.'
+      clan-list:
+        slot: 15
+        material: BOOK
+        name: '&b&lLista de clanes'
+        lore:
+          - ''
+          - '&7Mira todos los clanes'
+          - '&7de MDVCRAFT.'
+          - ''
+          - '&eClick para abrir.'
+      leave:
+        slot: 16
+        material: BARRIER
+        name: '&c&lAbandonar clan'
+        lore:
+          - ''
+          - '&7Ejecuta &f/clan salir&7.'
+          - '&8Cuidado, mi broc.'
+          - ''
+          - '&eClick para salir.'
+      settings:
+        slot: 17
+        material: COMPARATOR
+        name: '&6&lAjustes del clan'
+        lore:
+          - ''
+          - '&7Nombre, ID, rangos, banner,'
+          - '&7permisos y disolver.'
+          - ''
+          - '&eClick para abrir.'
+      back:
+        slot: 22
+        material: ARROW
+        name: '&6&lGestión rápida'
+        lore:
+          - '&7Volver al menú de gestión.'
+      close:
+        slot: 26
+        material: BARRIER
+        name: '&c&lCerrar'
+        lore:
+          - '&7Cierra el menú.'
+
+  members:
+    title: '&8Miembros &b{id}'
+    member-head:
+      name: '&e{player} &8(&b{role_name}&8)'
+      lore:
+        - '&7Rango: &b{role_number} &8- &f{role_name}'
+        - '&7Estado: {status}'
+        - '&7Última vez: &f{last_seen}'
+        - '&7Ingreso: &f{joined}'
+        - '&7Nivel: &e{level}'
+        - '&7Raza: &d{race}'
+        - ''
+        - '&eClick para abrir opciones.'
+
+  # Las demás GUIs nativas ya existen en Java y se pueden seguir ampliando aquí.
+  # Si necesitas que una sección específica sea editable, se añade en este archivo
+  # y se conecta al método nativo correspondiente.

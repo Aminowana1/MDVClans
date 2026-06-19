@@ -1,4 +1,4 @@
-# MDVClans 1.7.0 - Mensajes editables
+# MDVClans 1.7.1 - Mensajes editables
 # Nota: esta versión centraliza el prefijo y deja preparada la estructura para ir moviendo
 # todos los textos del plugin a este archivo sin romper compatibilidad.
 prefix: '&8[&6MDVClans&8]&r '
@@ -29,5 +29,6 @@ edit:
   duplicate-name: '&cYa existe un clan con ese nombre.'
 
 menu:
+  requires-clan: '&cNo perteneces a ningún clan. Solo puedes abrir la lista de clanes o crear uno.'
   no-rank: '&cNo tienes rango para esta función.'
   locked-line: '&8No puedes usar esta función.'
