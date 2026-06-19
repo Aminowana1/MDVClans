@@ -1,4 +1,4 @@
-# MDVClans 1.6.0
+# MDVClans 1.6.1
 
 Sistema de clanes social para MDVCRAFT, pensado para Purpur/Paper 1.21.6.
 
@@ -40,6 +40,29 @@ Sistema de clanes social para MDVCRAFT, pensado para Purpur/Paper 1.21.6.
 - Menús YAML compatibles con MDVSocial generados en `plugins/MDVClans/Menus`.
 - Base SQLite guardada en `plugins/MDVClans/Data/clans.db`.
 - Config preparada para futura migración a MySQL.
+
+
+## Nuevo en V1.6.1
+
+- Botón de **Ajustes del clan** en el menú principal.
+- Menú de ajustes para rangos altos:
+  - cambiar nombre del clan.
+  - cambiar ID/tag del clan.
+  - cambiar nombres de rangos.
+  - cambiar/quitar banner.
+  - ver permisos por rango.
+  - alternar clan abierto/invitación.
+  - instrucciones para disolver.
+- Solicitudes pendientes de ingreso:
+  - si un clan está cerrado, `/clan unirse <ID>` crea solicitud.
+  - el menú muestra cabezas con nombre, estado, nivel y raza si PlaceholderAPI/MMOCore responde.
+  - click izquierdo acepta; click derecho borra.
+  - si el jugador entra a otro clan, su solicitud se limpia.
+- Click en miembro ahora abre submenú de acciones.
+- Click en clan de la lista ahora abre submenú de acciones.
+- Click en correo ahora abre submenú para responder o eliminar.
+- Acciones bloqueadas aparecen como `GRAY_DYE` si no tienes rango.
+- Menús puente nuevos: `clan_ajustes.yml` y `clan_solicitudes.yml`.
 
 ## Comandos principales
 
@@ -112,6 +135,8 @@ MDVClans genera estos archivos:
 plugins/MDVClans/Menus/clan.yml
 plugins/MDVClans/Menus/clan_gestion.yml
 plugins/MDVClans/Menus/clan_rankings.yml
+plugins/MDVClans/Menus/clan_ajustes.yml
+plugins/MDVClans/Menus/clan_solicitudes.yml
 ```
 
 Puedes copiarlos a:
@@ -133,14 +158,14 @@ mvn clean package
 El jar quedará en:
 
 ```txt
-target/MDVClans-1.5.0.jar
+target/MDVClans-1.6.1.jar
 ```
 
 El proyecto incluye GitHub Actions para compilarlo en la nube.
 
 ## Compatibilidad MDVSocial
 
-MDVClans V1.5 mantiene `softdepend: MDVSocial`, pero no depende de MDVSocial para funcionar. Los menús se entregan como YAML compatibles para copiarlos manualmente a la carpeta de menús de MDVSocial.
+MDVClans V1.6.1 mantiene `softdepend: MDVSocial`, pero no depende de MDVSocial para funcionar. Los menús se entregan como YAML compatibles para copiarlos manualmente a la carpeta de menús de MDVSocial.
 
 
 ## Menús nativos V1.6

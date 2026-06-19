@@ -63,6 +63,10 @@ rank-permissions:
   board-edit: 4
   mail-send: 4
   mail-delete: 4
+  settings: 4
+  rename-tag: 5
+  rename-clan: 5
+  join-requests: 3
 
 chat:
   format: '&8[&3Clan&8] &b{player}&7: &f{message}'
