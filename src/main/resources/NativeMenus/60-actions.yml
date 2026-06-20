@@ -1,0 +1,185 @@
+menus:
+  member-action:
+    title: '&8Miembro &b{player}'
+    items:
+      member:
+        slot: 4
+      mail:
+        slot: 10
+        material: MAP
+        name: '&d&lCorreo personal'
+        lore:
+          - ''
+          - '&7Escribe una carta privada'
+          - '&7a este jugador desde el chat.'
+          - ''
+          - '&eClick para escribir.'
+      promote:
+        slot: 11
+        material: LIME_DYE
+        name: '&a&lPromover'
+        lore:
+          - ''
+          - '&7Sube un rango al miembro.'
+          - ''
+          - '&eClick para promover.'
+      demote:
+        slot: 12
+        material: YELLOW_DYE
+        name: '&e&lDegradar'
+        lore:
+          - ''
+          - '&7Baja un rango al miembro.'
+          - ''
+          - '&eClick para degradar.'
+      kick:
+        slot: 14
+        material: RED_DYE
+        name: '&c&lExpulsar'
+        lore:
+          - ''
+          - '&7Expulsa al miembro del clan.'
+          - '&cAcción delicada.'
+          - ''
+          - '&eClick para expulsar.'
+      profile:
+        slot: 16
+        material: BOOK
+        name: '&b&lVer perfil'
+        lore:
+          - ''
+          - '&7Información básica del jugador.'
+          - '&7Más perfil se puede conectar'
+          - '&7con MDVSocial/MMOCore luego.'
+    back:
+      slot: 22
+      action: NATIVE
+      target: miembros
+      material: PLAYER_HEAD
+      texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
+      name: '&6&lVolver'
+      lore:
+        - '&7Regresa a la lista de miembros.'
+
+  clan-action:
+    title: '&8Clan &b{id}'
+    items:
+      summary:
+        slot: 4
+        name: '&8[&b{id}&8] &f{name}'
+        lore:
+          - '&7Miembros: &e{members}'
+          - '&7Entrada: {entry}'
+          - '&7Fuerza: &6{strength}'
+      join:
+        slot: 13
+        material: LIME_DYE
+        name: '&a&lUnirse'
+        lore:
+          - ''
+          - '&7Este clan está abierto.'
+          - ''
+          - '&eClick para unirte.'
+      request:
+        slot: 13
+        material: PAPER
+        name: '&e&lEnviar solicitud'
+        lore:
+          - ''
+          - '&7Este clan es por invitación.'
+          - '&7Enviarás una solicitud de ingreso.'
+          - ''
+          - '&eClick para solicitar.'
+      info:
+        slot: 10
+        material: BOOK
+        name: '&b&lVer info'
+        lore:
+          - ''
+          - '&eClick para ver información.'
+      ally:
+        slot: 11
+        material: BLUE_DYE
+        name: '&9&lProponer alianza'
+        lore:
+          - ''
+          - '&7Envía/acepta relación aliada.'
+          - ''
+          - '&eClick para establecer.'
+      enemy:
+        slot: 12
+        material: RED_DYE
+        name: '&c&lDeclarar enemigo'
+        lore:
+          - ''
+          - '&7Marca este clan como enemigo.'
+          - ''
+          - '&eClick para establecer.'
+      neutral:
+        slot: 14
+        material: GRAY_DYE
+        name: '&7&lVolver neutral'
+        lore:
+          - ''
+          - '&7Quita alianza/enemistad.'
+          - ''
+          - '&eClick para establecer.'
+      mail:
+        slot: 15
+        material: WRITABLE_BOOK
+        name: '&d&lCorreo de clan'
+        lore:
+          - ''
+          - '&7Escribe un correo formal'
+          - '&7al buzón de este clan.'
+          - ''
+          - '&eClick para escribir.'
+    back:
+      slot: 22
+      action: NATIVE
+      target: lista
+      material: PLAYER_HEAD
+      texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
+      name: '&6&lVolver'
+      lore:
+        - '&7Regresa a la lista de clanes.'
+
+  mail-action:
+    title: '&8Correo #{mail_id}'
+    items:
+      message:
+        slot: 4
+        name: '&dCorreo de &b{from_id}'
+        lore:
+          - '&7Enviado por: &f{sender}'
+          - '&7Fecha: &f{date}'
+          - ''
+          - '&f{message}'
+      reply:
+        slot: 11
+        material: WRITABLE_BOOK
+        name: '&a&lResponder'
+        lore:
+          - ''
+          - '&7Responder al clan que'
+          - '&7envió este correo.'
+          - ''
+          - '&eClick para escribir.'
+      delete:
+        slot: 15
+        material: RED_DYE
+        name: '&c&lEliminar'
+        lore:
+          - ''
+          - '&7Borra este correo del buzón.'
+          - ''
+          - '&eClick para eliminar.'
+    back:
+      slot: 22
+      action: NATIVE
+      target: correo
+      material: PLAYER_HEAD
+      texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
+      name: '&6&lVolver'
+      lore:
+        - '&7Regresa al buzón.'

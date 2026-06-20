@@ -6,87 +6,96 @@ menus:
         slot: 4
         name: '&f&lEstandarte oficial'
         lore:
-        - ''
-        - '&7Muestra el estandarte'
-        - '&7oficial del clan.'
-        - ''
-        - '&8Para cambiarlo usa Ajustes.'
-        - '&8Sin banner: WHITE_BANNER.'
-        - ''
-        - '&eClick para ver.'
+          - ''
+          - '&7Muestra el estandarte'
+          - '&7oficial del clan.'
+          - ''
+          - '&8Para cambiarlo usa Ajustes.'
+          - '&8Sin banner: WHITE_BANNER.'
+          - ''
+          - '&eClick para ver.'
       board:
         slot: 11
         material: WRITABLE_BOOK
         name: '&e&lTablero de información'
         lore:
-        - ''
-        - '&7Mensaje del clan:'
-        - '&f{board}'
-        - ''
-        - '&eClick: ver mensaje.'
-        - '{board_edit_hint}'
+          - ''
+          - '&7Mensaje del clan:'
+          - '&f{board_line_1}'
+          - '&f{board_line_2}'
+          - '&f{board_line_3}'
+          - '&f{board_line_4}'
+          - '&f{board_line_5}'
+          - '&f{board_line_6}'
+          - '&f{board_line_7}'
+          - '&f{board_line_8}'
+          - '&f{board_line_9}'
+          - '&f{board_line_10}'
+          - ''
+          - '&eClick: ver mensaje.'
+          - '{board_edit_hint}'
       requests:
         slot: 9
         material: PLAYER_HEAD
         name: '&a&lSolicitudes pendientes'
         lore:
-        - ''
-        - '&7Jugadores que quieren entrar'
-        - '&7cuando el clan está restringido.'
-        - ''
-        - '&7Pendientes: &e{join_requests}'
-        - ''
-        - '&eClick para abrir.'
+          - ''
+          - '&7Jugadores que quieren entrar'
+          - '&7cuando el clan está restringido.'
+          - ''
+          - '&7Pendientes: &e{join_requests}'
+          - ''
+          - '&eClick para abrir.'
       mailbox:
         slot: 13
         material: CHEST
         name: '&d&lBuzón del clan'
         lore:
-        - ''
-        - '&7Mensajes enviados por'
-        - '&7otros clanes.'
-        - ''
-        - '&7Todos pueden leer.'
-        - '&7Rangos altos pueden'
-        - '&7responder o eliminar.'
-        - ''
-        - '&eClick para abrir.'
+          - ''
+          - '&7Mensajes enviados por'
+          - '&7otros clanes.'
+          - ''
+          - '&7Todos pueden leer.'
+          - '&7Rangos altos pueden'
+          - '&7responder o eliminar.'
+          - ''
+          - '&eClick para abrir.'
       logs:
         slot: 15
         material: BOOK
         name: '&6&lRegistros del clan'
         lore:
-        - ''
-        - '&7Muestra acciones recientes:'
-        - '&8miembros, banco, base,'
-        - '&8relaciones y bajas.'
-        - ''
-        - '{can_logs}'
-        - ''
-        - '&eClick para abrir.'
+          - ''
+          - '&7Muestra acciones recientes:'
+          - '&8miembros, banco, base,'
+          - '&8relaciones y bajas.'
+          - ''
+          - '{can_logs}'
+          - ''
+          - '&eClick para abrir.'
       permissions:
         slot: 17
         material: KNOWLEDGE_BOOK
         name: '&b&lPermisos y rangos'
         lore:
-        - ''
-        - '&7Mira qué puede hacer'
-        - '&7cada rango del clan.'
-        - ''
-        - '&eClick para abrir.'
+          - ''
+          - '&7Mira qué puede hacer'
+          - '&7cada rango del clan.'
+          - ''
+          - '&eClick para abrir.'
       summary:
         slot: 16
         material: MAP
         name: '&f&lResumen del clan'
         lore:
-        - ''
-        - '&7Clan: &f{name}'
-        - '&7ID: &b{id}'
-        - '&7Creado: &f{created}'
-        - '&7Miembros: &e{members}'
-        - '&7Banco: &e{bank}'
-        - ''
-        - '&8Información general.'
+          - ''
+          - '&7Clan: &f{name}'
+          - '&7ID: &b{id}'
+          - '&7Creado: &f{created}'
+          - '&7Miembros: &e{members}'
+          - '&7Banco: &e{bank}'
+          - ''
+          - '&8Información general.'
     back:
       slot: 22
       action: MDVSOCIAL
@@ -95,18 +104,19 @@ menus:
       texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
       name: '&6&lVolver'
       lore:
-      - '&7Regresa al menú de clanes.'
+        - '&7Regresa al menú de clanes.'
+
   mailbox:
     title: '&8Buzón del clan'
     mail-item:
       name: '&dCorreo #{mail_id} &7de &b{from_id}'
       lore:
-      - '&7Enviado por: &f{sender}'
-      - '&7Fecha: &f{date}'
-      - ''
-      - '&f{message}'
-      - ''
-      - '&eClick: abrir opciones'
+        - '&7Enviado por: &f{sender}'
+        - '&7Fecha: &f{date}'
+        - ''
+        - '&f{message}'
+        - ''
+        - '&eClick: abrir opciones'
     back:
       slot: 49
       action: NATIVE
@@ -115,17 +125,18 @@ menus:
       texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
       name: '&6&lVolver'
       lore:
-      - '&7Regresa al tablero de información.'
+        - '&7Regresa al tablero de información.'
+
   logs:
     title: '&8Registros del clan'
     log-item:
       material: PAPER
       name: '&e{action}'
       lore:
-      - '&7Actor: &f{actor}'
-      - '&7Fecha: &f{date}'
-      - ''
-      - '&7{detail}'
+        - '&7Actor: &f{actor}'
+        - '&7Fecha: &f{date}'
+        - ''
+        - '&7{detail}'
     back:
       slot: 49
       action: NATIVE
@@ -134,31 +145,19 @@ menus:
       texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
       name: '&6&lVolver'
       lore:
-      - '&7Regresa al tablero de información.'
-  permissions:
-    title: '&8Permisos del clan'
-    permission-item:
-      name: '{permission_name}'
-    back:
-      slot: 49
-      action: NATIVE
-      target: info
-      material: PLAYER_HEAD
-      texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
-      name: '&6&lVolver'
-      lore:
-      - '&7Regresa al tablero de información.'
+        - '&7Regresa al tablero de información.'
+
   join-requests:
     title: '&8Solicitudes &b{id}'
     request-head:
       name: '&e{player}'
       lore:
-      - '&7Estado: {status}'
-      - '&7Solicitud: &f{requested}'
-      - '&7Nivel: &e{level}'
-      - '&7Raza: &d{race}'
-      - ''
-      - '{manage_hint}'
+        - '&7Estado: {status}'
+        - '&7Solicitud: &f{requested}'
+        - '&7Nivel: &e{level}'
+        - '&7Raza: &d{race}'
+        - ''
+        - '{manage_hint}'
     back:
       slot: 49
       action: NATIVE
@@ -167,137 +166,57 @@ menus:
       texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
       name: '&6&lVolver'
       lore:
-      - '&7Regresa al tablero de información.'
-permission-labels:
-  invite:
-    material: YELLOW_WOOL
-    name: '&aInvitar miembros'
-    description:
-    - '&7Permite invitar jugadores'
-    - '&7a entrar al clan.'
-  kick:
-    material: RED_WOOL
-    name: '&cExpulsar miembros'
-    description:
-    - '&7Permite expulsar miembros'
-    - '&7de menor jerarquía.'
-  promote:
-    material: LIME_WOOL
-    name: '&aPromover miembros'
-    description:
-    - '&7Permite subir el rango'
-    - '&7de otros miembros.'
-  demote:
-    material: YELLOW_WOOL
-    name: '&eDegradar miembros'
-    description:
-    - '&7Permite bajar el rango'
-    - '&7de otros miembros.'
-  set-rank:
-    material: PURPLE_WOOL
-    name: '&dAsignar rango'
-    description:
-    - '&7Permite asignar un rango'
-    - '&7numérico exacto.'
-  rename-role:
-    material: MAGENTA_WOOL
-    name: '&dRenombrar rangos'
-    description:
-    - '&7Permite cambiar el nombre'
-    - '&7visible de los rangos.'
-  setbase:
-    material: LIGHT_BLUE_WOOL
-    name: '&bFijar base'
-    description:
-    - '&7Permite definir la base'
-    - '&7de teletransporte del clan.'
-  relation:
-    material: BLUE_WOOL
-    name: '&9Gestionar relaciones'
-    description:
-    - '&7Permite declarar aliados,'
-    - '&7enemigos o neutralidad.'
-  open:
-    material: GREEN_WOOL
-    name: '&aAbrir/cerrar clan'
-    description:
-    - '&7Permite cambiar si el clan'
-    - '&7es abierto o por solicitud.'
-  bank-deposit:
-    material: LIME_WOOL
-    name: '&eDepositar banco'
-    description:
-    - '&7Permite depositar monedas'
-    - '&7en el banco del clan.'
-  bank-withdraw:
-    material: ORANGE_WOOL
-    name: '&6Retirar banco'
-    description:
-    - '&7Permite retirar monedas'
-    - '&7del banco del clan.'
-  storage-open:
-    material: GREEN_WOOL
-    name: '&aAbrir almacén'
-    description:
-    - '&7Permite abrir el almacén'
-    - '&7compartido del clan.'
-  banner-set:
-    material: WHITE_WOOL
-    name: '&fCambiar estandarte'
-    description:
-    - '&7Permite guardar o quitar'
-    - '&7el estandarte oficial.'
-  logs-view:
-    material: BROWN_WOOL
-    name: '&6Ver registros'
-    description:
-    - '&7Permite ver registros'
-    - '&7internos del clan.'
-  board-edit:
-    material: YELLOW_WOOL
-    name: '&eEditar tablero'
-    description:
-    - '&7Permite editar el tablero'
-    - '&7de información del clan.'
-  mail-send:
-    material: PINK_WOOL
-    name: '&dEnviar correos de clan'
-    description:
-    - '&7Permite enviar y responder'
-    - '&7correos entre clanes.'
-  mail-delete:
-    material: RED_WOOL
-    name: '&cBorrar correos de clan'
-    description:
-    - '&7Permite eliminar correos'
-    - '&7del buzón del clan.'
-  join-requests:
-    material: LIME_WOOL
-    name: '&aGestionar solicitudes'
-    description:
-    - '&7Permite aceptar o rechazar'
-    - '&7solicitudes de ingreso.'
-  rename-clan:
-    material: YELLOW_WOOL
-    name: '&eCambiar nombre del clan'
-    description:
-    - '&7Permite cambiar el nombre'
-    - '&7formal del clan.'
-  rename-tag:
-    material: LIGHT_BLUE_WOOL
-    name: '&bCambiar ID del clan'
-    description:
-    - '&7Permite cambiar el ID/tag'
-    - '&7visible del clan.'
-  settings:
-    material: ORANGE_WOOL
-    name: '&6Abrir ajustes'
-    description:
-    - '&7Permite acceder al panel'
-    - '&7de ajustes del clan.'
-  disband:
-    material: BLACK_WOOL
-    name: '&4Disolver clan'
-    description:
-    - '&7Permite disolver el clan.'
-    - '&cAcción peligrosa.'
+        - '&7Regresa al tablero de información.'
+
+  permissions:
+    title: '&8Permisos &7({page}/{max_page})'
+    table:
+      rows-per-page: 4
+      role-header-slots: [3, 4, 5, 6, 7, 8]
+      permission-row-start-slots: [9, 18, 27, 36]
+    role-header:
+      material: GRAY_BANNER
+      name: '&bRango {role_number}'
+      lore:
+        - '&f{role_name}'
+        - ''
+        - '&7Columna de permisos'
+        - '&7para este rango.'
+    permission-item:
+      material: BOOK
+      name: '&e#{permission_index} {permission_name}'
+      lore:
+        - ''
+        - '&7Descripción:'
+        - '{permission_description}'
+        - ''
+        - '&7Rango requerido: &b{required_rank}'
+        - '&7Nombre del rango: &f{required_role}'
+        - ''
+        - '&8Las lanas de la derecha indican'
+        - '&8si cada rango tiene el permiso.'
+    allowed-item:
+      material: LIME_WOOL
+      name: '&a✔ Permitido'
+      lore:
+        - '&7Rango: &b{role_number} &8- &f{role_name}'
+        - '&7Permiso: {permission_name}'
+        - ''
+        - '&aEste rango puede usarlo.'
+    denied-item:
+      material: RED_WOOL
+      name: '&c✖ Bloqueado'
+      lore:
+        - '&7Rango: &b{role_number} &8- &f{role_name}'
+        - '&7Permiso: {permission_name}'
+        - ''
+        - '&cEste rango no puede usarlo.'
+    back:
+      slot: 49
+      action: NATIVE
+      target: info
+      material: PLAYER_HEAD
+      texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
+      name: '&6&lVolver'
+      lore:
+        - '&7Regresa al tablero de información.'

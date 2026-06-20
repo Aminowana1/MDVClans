@@ -153,7 +153,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.7.4 habilitado.");
+        getLogger().info("MDVClans 1.7.5 habilitado.");
     }
 
     @Override
@@ -1071,7 +1071,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "logs", "registro", "registros" -> openLogsGui(player, page);
             case "ajustes", "settings", "configuracion" -> openSettingsMenu(player);
             case "rangos", "roles" -> openRoleSettingsMenu(player);
-            case "permisos", "permissions" -> openPermissionsMenu(player);
+            case "permisos", "permissions" -> openPermissionsMenu(player, page);
             case "solicitudes", "requests", "join_requests" -> openJoinRequestsMenu(player, page);
             default -> openMainMenu(player);
         }
@@ -2685,29 +2685,55 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
 
-    private void openPermissionsMenu(Player player) throws SQLException {
+    private void openPermissionsMenu(Player player, int page) throws SQLException {
         Member member = requireMember(player); if (member == null) return;
         Clan clan = getClan(member.clanId()).orElseThrow();
-        Inventory inv = Bukkit.createInventory(new ClanMenuHolder("permissions", 1, clan.id(), null, -1), 54, nativeTitle("permissions", "&8Permisos del clan", clanPlaceholders(clan)));
+        List<String> keys = permissionKeys();
+        int rowsPerPage = Math.max(1, Math.min(5, nativeMenus == null ? 4 : nativeMenus.getInt("menus.permissions.table.rows-per-page", 4)));
+        int[] headerSlots = nativeIntArray("menus.permissions.table.role-header-slots", new int[]{3,4,5,6,7,8});
+        int[] rowStarts = nativeIntArray("menus.permissions.table.permission-row-start-slots", new int[]{9,18,27,36});
+        rowsPerPage = Math.min(rowsPerPage, Math.max(1, rowStarts.length));
+        int start = Math.max(0, page - 1) * rowsPerPage;
+        Map<String, String> basePh = clanPlaceholders(clan);
+        basePh.put("page", String.valueOf(page));
+        basePh.put("max_page", String.valueOf(Math.max(1, (int) Math.ceil(keys.size() / (double) rowsPerPage))));
+        Inventory inv = Bukkit.createInventory(new ClanMenuHolder("permissions", Math.max(1, page), clan.id(), null, -1), 54, nativeTitle("permissions", "&8Permisos del clan", basePh));
         fill(inv);
-        List<String> keys = List.of("invite", "kick", "promote", "demote", "set-rank", "rename-role", "setbase", "relation", "open", "bank-deposit", "bank-withdraw", "storage-open", "banner-set", "logs-view", "board-edit", "mail-send", "mail-delete", "join-requests", "rename-clan", "rename-tag", "settings", "disband");
-        int slotIndex = 0;
-        for (String key : keys) {
+        for (int role = minRole(); role <= maxRole() && role - minRole() < headerSlots.length; role++) {
+            Map<String, String> ph = new HashMap<>(basePh);
+            ph.put("role_number", String.valueOf(role));
+            ph.put("role_name", getRoleName(clan.id(), role));
+            inv.setItem(headerSlots[role - minRole()], nativeItem("menus.permissions.role-header", Material.GRAY_BANNER, "&bRango {role_number}", List.of("&f{role_name}", "", "&7Columna de permisos", "&7para este rango."), ph));
+        }
+
+        for (int row = 0; row < rowsPerPage && start + row < keys.size() && row < rowStarts.length; row++) {
+            String key = keys.get(start + row);
             int req = getConfig().getInt("rank-permissions." + key, maxRole());
-            Map<String, String> ph = clanPlaceholders(clan);
+            Map<String, String> ph = new HashMap<>(basePh);
             ph.put("permission", key);
             ph.put("permission_key", key);
             ph.put("permission_name", permissionName(key));
+            ph.put("permission_index", String.valueOf(start + row + 1));
             ph.put("required_rank", String.valueOf(req));
             ph.put("required_role", getRoleName(clan.id(), Math.max(minRole(), Math.min(maxRole(), req))));
-            List<String> defaultLore = new ArrayList<>();
-            defaultLore.add("");
-            defaultLore.addAll(permissionDescription(key));
-            defaultLore.add("");
-            defaultLore.add("&7Rango requerido: &b{required_rank}");
-            defaultLore.add("&7Nombre del rango: &f{required_role}");
-            inv.setItem(contentSlot(slotIndex++), nativeItem("menus.permissions.permission-item", permissionMaterial(key, req), "{permission_name}", defaultLore, ph));
+            ph.put("permission_description", String.join("|", permissionDescription(key)));
+
+            int rowStart = rowStarts[row];
+            inv.setItem(rowStart, nativeItem("menus.permissions.permission-item", permissionMaterial(key, req), "&e#{permission_index} {permission_name}", permissionTableLore(key), ph));
+
+            for (int role = minRole(); role <= maxRole() && role - minRole() < headerSlots.length; role++) {
+                boolean allowed = role >= req;
+                Map<String, String> statusPh = new HashMap<>(ph);
+                statusPh.put("role_number", String.valueOf(role));
+                statusPh.put("role_name", getRoleName(clan.id(), role));
+                statusPh.put("permission_status", allowed ? "&aPermitido" : "&cBloqueado");
+                statusPh.put("permission_status_plain", allowed ? "Permitido" : "Bloqueado");
+                int slot = rowStart + 3 + (role - minRole());
+                inv.setItem(slot, nativeItem(allowed ? "menus.permissions.allowed-item" : "menus.permissions.denied-item", allowed ? Material.LIME_WOOL : Material.RED_WOOL, allowed ? "&a✔ Permitido" : "&c✖ Bloqueado", List.of("&7Rango: &b{role_number} &8- &f{role_name}", "&7Permiso: {permission_name}", "", "{permission_status}"), statusPh));
+            }
         }
+
+        nav(inv, page, keys.size(), rowsPerPage, "permissions", clan.id());
         setBackItem(inv, "permissions", 49, "&6&lVolver", List.of("&7Regresa al tablero de información."));
         openNativeInventory(player, inv);
     }
@@ -3088,7 +3114,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         else if (slot == nativeSlot("menus.info.items.requests.slot", 13)) openJoinRequestsMenu(player, 1);
         else if (slot == nativeSlot("menus.info.items.mailbox.slot", 14)) openMailboxMenu(player, 1);
         else if (slot == nativeSlot("menus.info.items.logs.slot", 16)) openLogsGui(player, 1);
-        else if (slot == nativeSlot("menus.info.items.permissions.slot", 20)) openPermissionsMenu(player);
+        else if (slot == nativeSlot("menus.info.items.permissions.slot", 20)) openPermissionsMenu(player, 1);
     }
 
 
@@ -3140,7 +3166,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             msg(player, "&7Escribe el nuevo &eID &7del clan. Escribe &ccancelar &7para cancelar.");
         } else if (slot == nativeSlot("menus.settings.items.roles.slot", 12)) openRoleSettingsMenu(player);
         else if (slot == nativeSlot("menus.settings.items.banner.slot", 13)) { player.closeInventory(); player.performCommand(click == ClickType.RIGHT ? "clan estandarte quitar" : "clan estandarte set"); }
-        else if (slot == nativeSlot("menus.settings.items.permissions.slot", 14)) openPermissionsMenu(player);
+        else if (slot == nativeSlot("menus.settings.items.permissions.slot", 14)) openPermissionsMenu(player, 1);
         else if (slot == nativeSlot("menus.settings.items.open.slot", 15)) { player.closeInventory(); Clan clan = getPlayerClan(player.getUniqueId()).orElseThrow(); player.performCommand("clan abierto " + (clan.open() ? "off" : "on")); }
         else if (slot == nativeSlot("menus.settings.items.disband.slot", 16)) { player.closeInventory(); msg(player, "&cPara disolver usa: &e/clan disolver confirmar"); }
     }
@@ -3248,6 +3274,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         else if (menu.equals("relationslist")) openRelationsListMenu(player, page);
         else if (menu.equals("mailbox")) openMailboxMenu(player, page);
         else if (menu.equals("joinrequests")) openJoinRequestsMenu(player, page);
+        else if (menu.equals("permissions")) openPermissionsMenu(player, page);
         else openMainMenu(player);
     }
 
@@ -3360,6 +3387,67 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         };
     }
 
+    private List<String> permissionKeys() {
+        return List.of("invite", "kick", "promote", "demote", "set-rank", "rename-role", "setbase", "relation", "open", "bank-deposit", "bank-withdraw", "storage-open", "banner-set", "logs-view", "board-edit", "mail-send", "mail-delete", "join-requests", "rename-clan", "rename-tag", "settings", "disband");
+    }
+
+    private List<String> permissionTableLore(String key) {
+        List<String> configured = nativeMenus == null ? Collections.emptyList() : nativeMenus.getStringList("menus.permissions.permission-item.lore");
+        if (configured != null && !configured.isEmpty()) return configured;
+        List<String> lore = new ArrayList<>();
+        lore.add("");
+        lore.add("&7Descripción:");
+        lore.addAll(permissionDescription(key));
+        lore.add("");
+        lore.add("&7Rango requerido: &b{required_rank}");
+        lore.add("&7Nombre del rango: &f{required_role}");
+        lore.add("");
+        lore.add("&8A la derecha se marca qué rangos");
+        lore.add("&8tienen este permiso habilitado.");
+        return lore;
+    }
+
+    private int[] nativeIntArray(String path, int[] defaults) {
+        if (nativeMenus == null) return defaults;
+        List<Integer> values = nativeMenus.getIntegerList(path);
+        if (values == null || values.isEmpty()) return defaults;
+        int[] out = new int[values.size()];
+        for (int i = 0; i < values.size(); i++) out[i] = values.get(i);
+        return out;
+    }
+
+    private List<String> expandLore(List<String> lore, Map<String, String> placeholders) {
+        List<String> out = new ArrayList<>();
+        if (lore == null) return out;
+        for (String rawLine : lore) {
+            String line = rawLine == null ? "" : rawLine;
+            if (line.contains("{permission_description}")) {
+                String replacement = placeholders == null ? "" : placeholders.getOrDefault("permission_description", "");
+                if (replacement == null || replacement.isBlank()) {
+                    out.add(applyPlaceholders(line, placeholders));
+                } else {
+                    String prefix = line.replace("{permission_description}", "");
+                    for (String part : replacement.split("\\|", -1)) {
+                        if (!part.isBlank()) out.add(applyPlaceholders(prefix + part, placeholders));
+                    }
+                }
+            } else if (line.contains("{board_lines}")) {
+                String replacement = placeholders == null ? "" : placeholders.getOrDefault("board_lines", "");
+                if (replacement == null || replacement.isBlank()) {
+                    out.add(applyPlaceholders(line, placeholders));
+                } else {
+                    String prefix = line.replace("{board_lines}", "");
+                    for (String part : replacement.split("\\|", -1)) {
+                        if (!part.isBlank()) out.add(applyPlaceholders(prefix + part, placeholders));
+                    }
+                }
+            } else {
+                out.add(applyPlaceholders(line, placeholders));
+            }
+        }
+        return out;
+    }
+
     private List<String> papiPlaceholderList(String path, List<String> defaults) {
         List<String> configured = getConfig().getStringList(path);
         return configured == null || configured.isEmpty() ? defaults : configured;
@@ -3422,7 +3510,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     private List<String> boardLines(String text) {
         if (text == null || text.isBlank()) return List.of("&8Sin información todavía.");
-        return Arrays.stream(text.split("\\|", -1)).map(String::trim).filter(x -> !x.isBlank()).limit(8).collect(Collectors.toList());
+        return Arrays.stream(text.split("\\|", -1)).map(String::trim).filter(x -> !x.isBlank()).limit(10).collect(Collectors.toList());
     }
 
     private String boardLine(String text, int index) {
@@ -3551,7 +3639,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
 
         meta.setDisplayName(color(applyPlaceholders(name, placeholders)));
-        if (lore != null) meta.setLore(lore.stream().map(line -> color(applyPlaceholders(line, placeholders))).collect(Collectors.toList()));
+        if (lore != null) meta.setLore(expandLore(lore, placeholders).stream().map(this::color).collect(Collectors.toList()));
         if (material.name().endsWith("_BANNER")) hideBannerTooltip(meta);
         item.setItemMeta(meta);
         return item;
@@ -3638,6 +3726,10 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             map.put("strength", formatNumber(calculateStrength(clan)));
             map.put("open", clan.open() ? "Abierto" : "Invitación");
             map.put("created", date(clan.createdAt()));
+            List<String> boardLines = boardLines(clan.boardMessage());
+            map.put("board", String.join(" | ", boardLines));
+            map.put("board_lines", String.join("|", boardLines));
+            for (int i = 1; i <= 10; i++) map.put("board_line_" + i, boardLine(clan.boardMessage(), i - 1));
         }
         return map;
     }
@@ -3663,7 +3755,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 "NativeMenus/20-info.yml",
                 "NativeMenus/30-members.yml",
                 "NativeMenus/40-relations.yml",
-                "NativeMenus/50-settings.yml"
+                "NativeMenus/50-settings.yml",
+                "NativeMenus/60-actions.yml",
+                "NativeMenus/70-permission-labels.yml"
         };
         for (String resource : resources) saveResourceIfMissing(resource);
     }
@@ -4038,7 +4132,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 String noClan = getConfig().getString("placeholders.no-clan", "");
                 if (memberOpt.isEmpty()) {
                     return switch (params.toLowerCase(Locale.ROOT)) {
-                        case "id", "name", "tag", "lpc_tag", "role", "role_number", "member_count", "bank", "kills", "deaths", "strength", "board", "board_plain", "board_line_1", "board_line_2", "board_line_3", "is_in_clan" -> params.equalsIgnoreCase("is_in_clan") ? "false" : noClan;
+                        case "id", "name", "tag", "lpc_tag", "role", "role_number", "member_count", "bank", "kills", "deaths", "strength", "board", "board_plain", "board_line_1", "board_line_2", "board_line_3", "board_line_4", "board_line_5", "board_line_6", "board_line_7", "board_line_8", "board_line_9", "board_line_10", "is_in_clan" -> params.equalsIgnoreCase("is_in_clan") ? "false" : noClan;
                         default -> noClan;
                     };
                 }
@@ -4063,6 +4157,13 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     case "board_line_1" -> color(boardLine(clan.boardMessage(), 0));
                     case "board_line_2" -> color(boardLine(clan.boardMessage(), 1));
                     case "board_line_3" -> color(boardLine(clan.boardMessage(), 2));
+                    case "board_line_4" -> color(boardLine(clan.boardMessage(), 3));
+                    case "board_line_5" -> color(boardLine(clan.boardMessage(), 4));
+                    case "board_line_6" -> color(boardLine(clan.boardMessage(), 5));
+                    case "board_line_7" -> color(boardLine(clan.boardMessage(), 6));
+                    case "board_line_8" -> color(boardLine(clan.boardMessage(), 7));
+                    case "board_line_9" -> color(boardLine(clan.boardMessage(), 8));
+                    case "board_line_10" -> color(boardLine(clan.boardMessage(), 9));
                     case "is_in_clan" -> "true";
                     case "open" -> clan.open() ? "true" : "false";
                     default -> noClan;

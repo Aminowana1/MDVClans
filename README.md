@@ -1,4 +1,4 @@
-# MDVClans 1.7.4
+# MDVClans 1.7.5
 
 Actualización de pulido técnico para MDVCRAFT.
 
@@ -33,7 +33,7 @@ mvn clean package
 ```
 
 
-## Cambios 1.7.4
+## Cambios 1.7.5
 
 - Creación de clan guiada por chat: primero nombre, luego ID/tag.
 - Menús nativos separados en `plugins/MDVClans/NativeMenus/`.
@@ -42,3 +42,36 @@ mvn clean package
 - `%mdvclans_board%`, `%mdvclans_board_line_1%`, `%mdvclans_board_line_2%`, `%mdvclans_board_line_3%` para menús de MDVSocial.
 - Correo personal desde el menú de miembro: pide el texto por chat y lo envía con MDVSocial.
 - Edición de tablero y logs quedan restringidos por rango.
+
+## MDVClans 1.7.5
+
+Cambios principales:
+
+- El tablero de información soporta hasta 10 líneas.
+- Placeholders PAPI añadidos: `%mdvclans_board_line_1%` hasta `%mdvclans_board_line_10%`.
+- Los menús nativos usan `{board_line_1}` hasta `{board_line_10}`.
+- La GUI de permisos se rediseñó como tabla visual por rangos, con columnas de rango y lanas verdes/rojas indicando si cada rango tiene el permiso.
+- Se agregaron `NativeMenus/60-actions.yml` y `NativeMenus/70-permission-labels.yml` para que también sean configurables los menús de acción y las etiquetas/descripciones de permisos.
+- Se actualizó `native-menus.yml` combinado para compatibilidad, aunque se recomienda usar `NativeMenus/*.yml`.
+
+Para separar líneas del tablero usa `|`:
+
+```bash
+/clan tablero set Bienvenidos|Farmeo hoy a las 20:00|No sacar del almacén sin avisar
+```
+
+Ejemplo en menú nativo:
+
+```yaml
+lore:
+  - '&f{board_line_1}'
+  - '&f{board_line_2}'
+  - '&f{board_line_3}'
+  - '&f{board_line_4}'
+  - '&f{board_line_5}'
+  - '&f{board_line_6}'
+  - '&f{board_line_7}'
+  - '&f{board_line_8}'
+  - '&f{board_line_9}'
+  - '&f{board_line_10}'
+```

@@ -1,0 +1,89 @@
+permission-labels:
+  invite:
+    name: '&aInvitar miembros'
+    material: LIME_WOOL
+    description: ['&7Permite invitar jugadores', '&7a entrar al clan.']
+  kick:
+    name: '&cExpulsar miembros'
+    material: RED_WOOL
+    description: ['&7Permite expulsar miembros', '&7de menor jerarquía.']
+  promote:
+    name: '&aPromover miembros'
+    material: LIME_WOOL
+    description: ['&7Permite subir el rango', '&7de otros miembros.']
+  demote:
+    name: '&eDegradar miembros'
+    material: YELLOW_WOOL
+    description: ['&7Permite bajar el rango', '&7de otros miembros.']
+  set-rank:
+    name: '&dAsignar rango exacto'
+    material: MAGENTA_WOOL
+    description: ['&7Permite asignar un rango', '&7numérico específico.']
+  rename-role:
+    name: '&dRenombrar rangos'
+    material: PURPLE_WOOL
+    description: ['&7Permite cambiar el nombre', '&7visible de los rangos.']
+  setbase:
+    name: '&bFijar base'
+    material: LIGHT_BLUE_WOOL
+    description: ['&7Permite definir la base', '&7de teletransporte del clan.']
+  relation:
+    name: '&9Gestionar relaciones'
+    material: BLUE_WOOL
+    description: ['&7Permite declarar aliados,', '&7enemigos o neutralidad.']
+  open:
+    name: '&aAbrir/cerrar clan'
+    material: GREEN_WOOL
+    description: ['&7Permite cambiar si el clan', '&7es abierto o por solicitud.']
+  bank-deposit:
+    name: '&eDepositar banco'
+    material: YELLOW_WOOL
+    description: ['&7Permite depositar monedas', '&7en el banco del clan.']
+  bank-withdraw:
+    name: '&6Retirar banco'
+    material: ORANGE_WOOL
+    description: ['&7Permite retirar monedas', '&7del banco del clan.']
+  storage-open:
+    name: '&aAbrir almacén'
+    material: GREEN_WOOL
+    description: ['&7Permite abrir el almacén', '&7compartido del clan.']
+  banner-set:
+    name: '&fCambiar estandarte'
+    material: WHITE_WOOL
+    description: ['&7Permite guardar o quitar', '&7el estandarte oficial.']
+  logs-view:
+    name: '&6Ver registros'
+    material: ORANGE_WOOL
+    description: ['&7Permite ver registros', '&7internos del clan.']
+  board-edit:
+    name: '&eEditar tablero'
+    material: YELLOW_WOOL
+    description: ['&7Permite editar el tablero', '&7de información del clan.']
+  mail-send:
+    name: '&dEnviar correos de clan'
+    material: MAGENTA_WOOL
+    description: ['&7Permite enviar y responder', '&7correos entre clanes.']
+  mail-delete:
+    name: '&cBorrar correos de clan'
+    material: RED_WOOL
+    description: ['&7Permite eliminar correos', '&7del buzón del clan.']
+  join-requests:
+    name: '&aGestionar solicitudes'
+    material: LIME_WOOL
+    description: ['&7Permite aceptar o rechazar', '&7solicitudes de ingreso.']
+  rename-clan:
+    name: '&eCambiar nombre del clan'
+    material: YELLOW_WOOL
+    description: ['&7Permite cambiar el nombre', '&7formal del clan.']
+  rename-tag:
+    name: '&bCambiar ID del clan'
+    material: LIGHT_BLUE_WOOL
+    description: ['&7Permite cambiar el ID/tag', '&7visible del clan.']
+  settings:
+    name: '&6Abrir ajustes'
+    material: ORANGE_WOOL
+    description: ['&7Permite acceder al panel', '&7de ajustes del clan.']
+  disband:
+    name: '&4Disolver clan'
+    material: RED_WOOL
+    description: ['&7Permite disolver el clan.', '&cAcción peligrosa.']
