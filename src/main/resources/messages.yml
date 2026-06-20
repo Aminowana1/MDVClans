@@ -1,4 +1,4 @@
-# MDVClans 1.7.1 - Mensajes editables
+# MDVClans 1.7.4 - Mensajes editables
 # Nota: esta versión centraliza el prefijo y deja preparada la estructura para ir moviendo
 # todos los textos del plugin a este archivo sin romper compatibilidad.
 prefix: '&8[&6MDVClans&8]&r '
@@ -14,13 +14,14 @@ common:
   cancel-word: 'cancelar'
 
 creation:
-  usage: '&cUso: &e/clan crear <ID> <nombre del clan>'
+  usage: '&cUso: &e/clan crear &7(inicia creación guiada por chat)'
   already-in-clan: '&cYa perteneces a un clan.'
   max-clans: '&cEl servidor alcanzó el máximo de clanes.'
   duplicate-id: '&cYa existe un clan con ese ID.'
   duplicate-name: '&cYa existe un clan con ese nombre.'
   created: '&aClan creado: &8[&b{id}&8] &f{name}'
-  chat-prompt: '&7Escribe en el chat: &eID Nombre del clan&7. Ejemplo: &fMDV Medieval Craft&7. Escribe &ccancelar &7para cancelar.'
+  chat-name-prompt: '&7Escribe el &enombre completo &7del clan. Ejemplo: &fMedieval Craft&7. Escribe &ccancelar &7para cancelar.'
+  chat-id-prompt: '&7Ahora escribe el &eID/tag &7del clan. Ejemplo: &bMDV&7. Escribe &ccancelar &7para cancelar.'
 
 edit:
   name-prompt: '&7Escribe el nuevo &enombre &7del clan. Escribe &ccancelar &7para cancelar.'

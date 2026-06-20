@@ -103,12 +103,13 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private final Map<UUID, Long> baseCooldowns = new ConcurrentHashMap<>();
     private final Map<UUID, Long> friendlyFireMessageCooldowns = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> openStorageViewers = new ConcurrentHashMap<>();
-    private final Set<UUID> pendingClanCreate = ConcurrentHashMap.newKeySet();
+    private final Map<UUID, String> pendingClanCreateName = new ConcurrentHashMap<>();
     private final Set<UUID> pendingBoardEdit = ConcurrentHashMap.newKeySet();
     private final Set<UUID> pendingClanNameEdit = ConcurrentHashMap.newKeySet();
     private final Set<UUID> pendingClanTagEdit = ConcurrentHashMap.newKeySet();
     private final Map<UUID, Integer> pendingRoleNameEdit = new ConcurrentHashMap<>();
     private final Map<UUID, String> pendingClanMailReply = new ConcurrentHashMap<>();
+    private final Map<UUID, String> pendingPersonalMail = new ConcurrentHashMap<>();
     private final Map<UUID, String> currentNativeMenu = new ConcurrentHashMap<>();
     private final Map<UUID, String> previousNativeMenu = new ConcurrentHashMap<>();
     private final Set<UUID> suppressHistoryOnce = ConcurrentHashMap.newKeySet();
@@ -118,7 +119,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     public void onEnable() {
         saveDefaultConfig();
         saveResourceIfMissing("messages.yml");
-        saveResourceIfMissing("native-menus.yml");
+        saveNativeMenuResources();
         loadMessages();
         loadNativeMenus();
         reloadLocalSettings();
@@ -152,7 +153,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.7.3 habilitado.");
+        getLogger().info("MDVClans 1.7.4 habilitado.");
     }
 
     @Override
@@ -174,8 +175,34 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void loadNativeMenus() {
-        nativeMenusFile = new File(getDataFolder(), "native-menus.yml");
-        nativeMenus = YamlConfiguration.loadConfiguration(nativeMenusFile);
+        nativeMenusFile = new File(getDataFolder(), "NativeMenus");
+        nativeMenus = new YamlConfiguration();
+
+        File folder = nativeMenusFile;
+        boolean loadedFolder = false;
+        if (folder.exists() && folder.isDirectory()) {
+            File[] files = folder.listFiles((dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".yml") || name.toLowerCase(Locale.ROOT).endsWith(".yaml"));
+            if (files != null && files.length > 0) {
+                Arrays.sort(files, Comparator.comparing(File::getName));
+                for (File file : files) {
+                    mergeYaml(nativeMenus, YamlConfiguration.loadConfiguration(file));
+                }
+                loadedFolder = true;
+            }
+        }
+
+        // Compatibilidad: solo usa el native-menus.yml viejo si no hay carpeta NativeMenus/*.yml.
+        File legacy = new File(getDataFolder(), "native-menus.yml");
+        if (!loadedFolder && legacy.exists()) {
+            mergeYaml(nativeMenus, YamlConfiguration.loadConfiguration(legacy));
+        }
+    }
+
+    private void mergeYaml(FileConfiguration target, FileConfiguration source) {
+        for (String key : source.getKeys(true)) {
+            if (source.isConfigurationSection(key)) continue;
+            target.set(key, source.get(key));
+        }
     }
 
     private String msgConfig(String path, String def) {
@@ -448,7 +475,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     private void sendHelp(Player player) {
         msg(player, "&6MDVClans &7comandos:");
-        player.sendMessage(color("&e/clan crear <ID> <nombre> &7- Crea un clan."));
+        player.sendMessage(color("&e/clan crear &7- Inicia creación guiada por chat."));
         player.sendMessage(color("&e/clan info [ID] &7- Muestra información."));
         player.sendMessage(color("&e/clan lista &7- Lista los clanes."));
         player.sendMessage(color("&e/clan invitar <jugador> &7- Invita a alguien."));
@@ -473,13 +500,31 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         player.sendMessage(color("&e/clan correo clan <ID> <mensaje> &7- Envía correo a otro clan."));
     }
 
+    private void startClanCreateNamePrompt(Player player) throws SQLException {
+        if (!getConfig().getBoolean("creation.enabled", true)) {
+            msg(player, "&cLa creación de clanes está desactivada.");
+            return;
+        }
+        if (getMember(player.getUniqueId()).isPresent()) {
+            msg(player, "&cYa perteneces a un clan.");
+            return;
+        }
+        if (countClans() >= getConfig().getInt("limits.max-clans", 60)) {
+            msg(player, "&cEl servidor alcanzó el máximo de clanes.");
+            return;
+        }
+        pendingClanCreateName.put(player.getUniqueId(), "");
+        player.closeInventory();
+        msg(player, msgConfig("creation.chat-name-prompt", "&7Escribe el &enombre completo &7del clan en el chat. Ejemplo: &fMedieval Craft&7. Escribe &ccancelar &7para cancelar."));
+    }
+
     private void handleCreate(Player player, String[] args) throws SQLException {
         if (!getConfig().getBoolean("creation.enabled", true)) {
             msg(player, "&cLa creación de clanes está desactivada.");
             return;
         }
         if (args.length < 3) {
-            msg(player, "&cUso: &e/clan crear <ID> <nombre del clan>");
+            startClanCreateNamePrompt(player);
             return;
         }
         if (getMember(player.getUniqueId()).isPresent()) {
@@ -1495,20 +1540,45 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     @EventHandler(priority = EventPriority.NORMAL)
     public void onChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
-        if (pendingClanCreate.remove(player.getUniqueId())) {
+        if (pendingClanCreateName.containsKey(player.getUniqueId())) {
             event.setCancelled(true);
             String text = event.getMessage().trim();
+            String storedName = pendingClanCreateName.get(player.getUniqueId());
             if (text.equalsIgnoreCase("cancelar")) {
+                pendingClanCreateName.remove(player.getUniqueId());
                 msg(player, "&7Creación de clan cancelada.");
                 return;
             }
-            String[] split = text.split(" ", 2);
-            if (split.length < 2) {
-                msg(player, "&cFormato inválido. Escribe: &eID Nombre del clan");
+
+            if (storedName == null || storedName.isBlank()) {
+                String name = text.trim();
+                int min = getConfig().getInt("creation.name-min", 3), max = getConfig().getInt("creation.name-max", 19);
+                if (name.length() < min || name.length() > max) {
+                    msg(player, "&cEl nombre debe tener entre &e" + min + " &cy &e" + max + " &ccaracteres. Escribe otro nombre o &4cancelar&c.");
+                    return;
+                }
+                Bukkit.getScheduler().runTask(this, () -> {
+                    try {
+                        if (getClanByName(name).isPresent()) {
+                            msg(player, "&cYa existe un clan con ese nombre. Escribe otro nombre o &4cancelar&c.");
+                            return;
+                        }
+                        pendingClanCreateName.put(player.getUniqueId(), name);
+                        msg(player, "&aNombre guardado: &f" + name);
+                        msg(player, msgConfig("creation.chat-id-prompt", "&7Ahora escribe el &eID/tag &7del clan. Ejemplo: &bMDV&7. Escribe &ccancelar &7para cancelar."));
+                    } catch (SQLException e) {
+                        pendingClanCreateName.remove(player.getUniqueId());
+                        getLogger().warning("Error validando nombre de clan desde chat: " + e.getMessage());
+                        msg(player, "&cNo se pudo validar el nombre del clan.");
+                    }
+                });
                 return;
             }
+
+            String tag = text.trim();
+            pendingClanCreateName.remove(player.getUniqueId());
             Bukkit.getScheduler().runTask(this, () -> {
-                try { handleCreate(player, new String[]{"crear", split[0], split[1]}); }
+                try { handleCreate(player, new String[]{"crear", tag, storedName}); }
                 catch (SQLException e) { getLogger().warning("Error creando clan desde chat: " + e.getMessage()); }
             });
             return;
@@ -1566,6 +1636,14 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 try { handleClanMail(player, new String[]{"correo", "clan", replyTarget, text}); }
                 catch (SQLException e) { getLogger().warning("Error enviando correo desde chat: " + e.getMessage()); }
             });
+            return;
+        }
+        String personalMailTarget = pendingPersonalMail.remove(player.getUniqueId());
+        if (personalMailTarget != null) {
+            event.setCancelled(true);
+            String text = event.getMessage().trim();
+            if (text.equalsIgnoreCase("cancelar")) { msg(player, "&7Correo personal cancelado."); return; }
+            Bukkit.getScheduler().runTask(this, () -> player.performCommand("correo enviar " + personalMailTarget + " " + text));
             return;
         }
         try {
@@ -2319,7 +2397,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         Inventory inv = Bukkit.createInventory(new ClanMenuHolder("noclan", 1, -1, null, -1), 27, nativeTitle("no-clan", "&8&lClanes", Map.of("player", player.getName())));
         fill(inv);
         inv.setItem(nativeSlot("menus.no-clan.items.list.slot", 11), nativeItem("menus.no-clan.items.list", Material.BOOK, "&b&lLista de clanes", List.of("", "&7Mira los clanes creados", "&7en MDVCRAFT.", "", "&eClick para abrir."), Map.of("player", player.getName())));
-        inv.setItem(nativeSlot("menus.no-clan.items.create.slot", 15), nativeItem("menus.no-clan.items.create", Material.EMERALD, "&a&lCrear clan", List.of("", "&7Abre el menú de creación", "&7para escribir ID y nombre.", "", "&eClick para empezar."), Map.of("player", player.getName())));
+        inv.setItem(nativeSlot("menus.no-clan.items.create.slot", 15), nativeItem("menus.no-clan.items.create", Material.EMERALD, "&a&lCrear clan", List.of("", "&7Abre el menú de creación", "&7para escribir nombre e ID.", "", "&eClick para empezar."), Map.of("player", player.getName())));
         inv.setItem(nativeSlot("menus.no-clan.items.close.slot", 22), nativeItem("menus.no-clan.items.close", Material.BARRIER, "&c&lCerrar", List.of("&7Cierra el menú."), Map.of("player", player.getName())));
         openNativeInventory(player, inv);
     }
@@ -2331,8 +2409,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
         Inventory inv = Bukkit.createInventory(new ClanMenuHolder("createclan", 1, -1, null, -1), 27, nativeTitle("create", "&8&lCrear clan", Map.of("player", player.getName())));
         fill(inv);
-        inv.setItem(nativeSlot("menus.create.items.info.slot", 11), nativeItem("menus.create.items.info", Material.WRITABLE_BOOK, "&e&lFormato", List.of("", "&7Al crear clan escribirás en chat:", "&fID Nombre del clan", "", "&7Ejemplo:", "&bMDV Medieval Craft", "", "&8ID 3-5 caracteres.", "&8Nombre máximo según config."), Map.of("player", player.getName())));
-        inv.setItem(nativeSlot("menus.create.items.start.slot", 13), nativeItem("menus.create.items.start", Material.EMERALD, "&a&lEscribir clan", List.of("", "&7Cierra este menú y te pedirá", "&7el ID + nombre por chat.", "", "&eClick para comenzar."), Map.of("player", player.getName())));
+        inv.setItem(nativeSlot("menus.create.items.info.slot", 11), nativeItem("menus.create.items.info", Material.WRITABLE_BOOK, "&e&lFormato", List.of("", "&7La creación será guiada por chat:", "&f1) Nombre del clan", "", "&7Ejemplo:", "&f2) ID/tag: &bMDV", "", "&8ID 3-5 caracteres.", "&8Nombre máximo según config."), Map.of("player", player.getName())));
+        inv.setItem(nativeSlot("menus.create.items.start.slot", 13), nativeItem("menus.create.items.start", Material.EMERALD, "&a&lEscribir clan", List.of("", "&7Cierra este menú y te pedirá", "&7el nombre y luego el ID por chat.", "", "&eClick para comenzar."), Map.of("player", player.getName())));
         setBackItem(inv, "createclan", nativeSlot("menus.create.items.back.slot", 22), "&6&lVolver", List.of("&7Regresa al menú anterior."));
         inv.setItem(nativeSlot("menus.create.items.close.slot", 26), nativeItem("menus.create.items.close", Material.BARRIER, "&c&lCerrar", List.of("&7Cierra el menú."), Map.of("player", player.getName())));
         openNativeInventory(player, inv);
@@ -2380,6 +2458,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         ph.put("join_requests", String.valueOf(countJoinRequests(clan.id())));
         ph.put("created", date(clan.createdAt()));
         ph.put("board", String.join(" | ", boardLines(clan.boardMessage())).replace("&", "§"));
+        ph.put("board_edit_hint", can(member, "board-edit") ? "&6Shift-click: editar." : "&8Solo rangos altos pueden editar.");
         ph.put("can_logs", can(member, "logs-view") ? "&eClick para ver logs." : "&8No tienes rango para ver logs.");
         Inventory inv = Bukkit.createInventory(new ClanMenuHolder("info", 1, clan.id(), null, -1), 27, nativeTitle("info", "&8Info &b{id}", ph));
         fill(inv);
@@ -2389,7 +2468,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         inv.setItem(nativeSlot("menus.info.items.board.slot", 12), nativeItem("menus.info.items.board", Material.WRITABLE_BOOK, "&e&lTablero de información", boardItemLore(clan), ph));
         inv.setItem(nativeSlot("menus.info.items.requests.slot", 13), nativeItem("menus.info.items.requests", Material.PLAYER_HEAD, "&a&lSolicitudes pendientes", List.of("", "&7Jugadores que quieren entrar", "&7cuando el clan está restringido.", "", "&7Pendientes: &e{join_requests}", "", "&eClick para abrir."), ph));
         inv.setItem(nativeSlot("menus.info.items.mailbox.slot", 14), nativeItem("menus.info.items.mailbox", Material.CHEST, "&d&lBuzón del clan", List.of("", "&7Mensajes enviados por otros clanes.", "&7Todos pueden leer.", "&7Rangos altos pueden borrar/responder.", "", "&eClick para abrir."), ph));
-        inv.setItem(nativeSlot("menus.info.items.logs.slot", 16), nativeItem("menus.info.items.logs", Material.BOOK, "&6&lCreación y registros", List.of("", "&7Creado: &f{created}", "&7Miembros: &e{members}", "&7Banco: &e{bank}", "", "{can_logs}"), ph));
+        inv.setItem(nativeSlot("menus.info.items.logs.slot", 16), can(member, "logs-view") ? nativeItem("menus.info.items.logs", Material.BOOK, "&6&lCreación y registros", List.of("", "&7Creado: &f{created}", "&7Miembros: &e{members}", "&7Banco: &e{bank}", "", "{can_logs}"), ph) : lockedItem("&7Registros del clan", "&cNo tienes rango para ver logs."));
         inv.setItem(nativeSlot("menus.info.items.permissions.slot", 20), nativeItem("menus.info.items.permissions", Material.KNOWLEDGE_BOOK, "&b&lPermisos y rangos", List.of("", "&7Mira qué puede hacer", "&7cada rango del clan.", "", "&eClick para abrir."), ph));
         setBackItem(inv, "info", 22, "&6&lVolver", List.of("&7Regresa al menú principal."));
         openNativeInventory(player, inv);
@@ -2617,11 +2696,19 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             int req = getConfig().getInt("rank-permissions." + key, maxRole());
             Map<String, String> ph = clanPlaceholders(clan);
             ph.put("permission", key);
+            ph.put("permission_key", key);
+            ph.put("permission_name", permissionName(key));
             ph.put("required_rank", String.valueOf(req));
             ph.put("required_role", getRoleName(clan.id(), Math.max(minRole(), Math.min(maxRole(), req))));
-            inv.setItem(contentSlot(slotIndex++), nativeItem("menus.permissions.permission-item", Material.PAPER, "&e{permission}", List.of("", "&7Rango requerido: &b{required_rank}", "&7Nombre: &f{required_role}"), ph));
+            List<String> defaultLore = new ArrayList<>();
+            defaultLore.add("");
+            defaultLore.addAll(permissionDescription(key));
+            defaultLore.add("");
+            defaultLore.add("&7Rango requerido: &b{required_rank}");
+            defaultLore.add("&7Nombre del rango: &f{required_role}");
+            inv.setItem(contentSlot(slotIndex++), nativeItem("menus.permissions.permission-item", permissionMaterial(key, req), "{permission_name}", defaultLore, ph));
         }
-        setBackItem(inv, "permissions", 49, "&6&lVolver", List.of("&7Regresa a ajustes."));
+        setBackItem(inv, "permissions", 49, "&6&lVolver", List.of("&7Regresa al tablero de información."));
         openNativeInventory(player, inv);
     }
 
@@ -2938,9 +3025,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 player.closeInventory();
                 return;
             }
-            pendingClanCreate.add(player.getUniqueId());
             player.closeInventory();
-            msg(player, msgConfig("creation.chat-prompt", "&7Escribe en el chat: &eID Nombre del clan&7. Ejemplo: &fMDV Medieval Craft&7. Escribe &ccancelar &7para cancelar."));
+            startClanCreateNamePrompt(player);
         } else if (slot == nativeSlot("menus.create.items.back.slot", 22)) openNoClanMenu(player);
         else if (slot == nativeSlot("menus.create.items.close.slot", 26)) player.closeInventory();
     }
@@ -2991,6 +3077,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         if (slot == nativeSlot("menus.info.items.banner.slot", 10)) { player.closeInventory(); player.performCommand("clan estandarte ver"); }
         else if (slot == nativeSlot("menus.info.items.board.slot", 12)) {
             if (click.isShiftClick()) {
+                Member member = requireMember(player);
+                if (member == null) return;
+                if (!hasRank(player, member, "board-edit")) return;
                 pendingBoardEdit.add(player.getUniqueId());
                 player.closeInventory();
                 msg(player, "&7Escribe el nuevo tablero. Usa &e| &7para separar líneas. &cCancelar &7para cancelar.");
@@ -3094,7 +3183,11 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         Optional<Member> targetOpt = getMember(targetUuid);
         if (targetOpt.isEmpty() || targetOpt.get().clanId() != actor.clanId()) { msg(player, "&cEse miembro ya no está en tu clan."); return; }
         Member target = targetOpt.get();
-        if (slot == nativeSlot("menus.member-action.items.mail.slot", 10)) { player.closeInventory(); msg(player, "&7Correo personal: usa el buzón de MDVSocial para escribir a &e" + target.name() + "&7."); }
+        if (slot == nativeSlot("menus.member-action.items.mail.slot", 10)) {
+            player.closeInventory();
+            pendingPersonalMail.put(player.getUniqueId(), target.name());
+            msg(player, "&7Escribe el correo personal para &e" + target.name() + "&7. Escribe &ccancelar &7para cancelar.");
+        }
         else if (slot == nativeSlot("menus.member-action.items.promote.slot", 11)) { player.closeInventory(); player.performCommand("clan promover " + target.name()); }
         else if (slot == nativeSlot("menus.member-action.items.demote.slot", 12)) { player.closeInventory(); player.performCommand("clan degradar " + target.name()); }
         else if (slot == nativeSlot("menus.member-action.items.kick.slot", 14)) { player.closeInventory(); player.performCommand("clan expulsar " + target.name()); }
@@ -3194,6 +3287,93 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         return item;
     }
 
+    private String permissionName(String key) {
+        String configured = configString("permission-labels." + key + ".name", "");
+        if (configured != null && !configured.isBlank()) return configured;
+        return switch (key) {
+            case "invite" -> "&aInvitar miembros";
+            case "kick" -> "&cExpulsar miembros";
+            case "promote" -> "&aPromover miembros";
+            case "demote" -> "&eDegradar miembros";
+            case "set-rank" -> "&dAsignar rango";
+            case "rename-role" -> "&dRenombrar rangos";
+            case "setbase" -> "&bFijar base";
+            case "relation" -> "&9Gestionar relaciones";
+            case "open" -> "&aAbrir/cerrar clan";
+            case "bank-deposit" -> "&eDepositar banco";
+            case "bank-withdraw" -> "&6Retirar banco";
+            case "storage-open" -> "&aAbrir almacén";
+            case "banner-set" -> "&fCambiar estandarte";
+            case "logs-view" -> "&6Ver registros";
+            case "board-edit" -> "&eEditar tablero";
+            case "mail-send" -> "&dEnviar correos de clan";
+            case "mail-delete" -> "&cBorrar correos de clan";
+            case "join-requests" -> "&aGestionar solicitudes";
+            case "rename-clan" -> "&eCambiar nombre del clan";
+            case "rename-tag" -> "&bCambiar ID del clan";
+            case "settings" -> "&6Abrir ajustes";
+            case "disband" -> "&4Disolver clan";
+            default -> "&e" + key;
+        };
+    }
+
+    private List<String> permissionDescription(String key) {
+        List<String> configured = nativeMenus == null ? Collections.emptyList() : nativeMenus.getStringList("permission-labels." + key + ".description");
+        if (configured != null && !configured.isEmpty()) return configured;
+        return switch (key) {
+            case "invite" -> List.of("&7Permite invitar jugadores", "&7a entrar al clan.");
+            case "kick" -> List.of("&7Permite expulsar miembros", "&7de menor jerarquía.");
+            case "promote" -> List.of("&7Permite subir el rango", "&7de otros miembros.");
+            case "demote" -> List.of("&7Permite bajar el rango", "&7de otros miembros.");
+            case "set-rank" -> List.of("&7Permite asignar un rango", "&7numérico exacto.");
+            case "rename-role" -> List.of("&7Permite cambiar el nombre", "&7visible de los rangos.");
+            case "setbase" -> List.of("&7Permite definir la base", "&7de teletransporte del clan.");
+            case "relation" -> List.of("&7Permite declarar aliados,", "&7enemigos o neutralidad.");
+            case "open" -> List.of("&7Permite cambiar si el clan", "&7es abierto o por solicitud.");
+            case "bank-deposit" -> List.of("&7Permite depositar monedas", "&7en el banco del clan.");
+            case "bank-withdraw" -> List.of("&7Permite retirar monedas", "&7del banco del clan.");
+            case "storage-open" -> List.of("&7Permite abrir el almacén", "&7compartido del clan.");
+            case "banner-set" -> List.of("&7Permite guardar o quitar", "&7el estandarte oficial.");
+            case "logs-view" -> List.of("&7Permite ver registros", "&7internos del clan.");
+            case "board-edit" -> List.of("&7Permite editar el tablero", "&7de información del clan.");
+            case "mail-send" -> List.of("&7Permite enviar y responder", "&7correos entre clanes.");
+            case "mail-delete" -> List.of("&7Permite eliminar correos", "&7del buzón del clan.");
+            case "join-requests" -> List.of("&7Permite aceptar o rechazar", "&7solicitudes de ingreso.");
+            case "rename-clan" -> List.of("&7Permite cambiar el nombre", "&7formal del clan.");
+            case "rename-tag" -> List.of("&7Permite cambiar el ID/tag", "&7visible del clan.");
+            case "settings" -> List.of("&7Permite acceder al panel", "&7de ajustes del clan.");
+            case "disband" -> List.of("&7Permite disolver el clan.", "&cAcción peligrosa.");
+            default -> List.of("&7Permiso interno del clan.");
+        };
+    }
+
+    private Material permissionMaterial(String key, int requiredRank) {
+        Material configured = materialFrom(nativeMenus == null ? null : nativeMenus.getString("permission-labels." + key + ".material"), null);
+        if (configured != null) return configured;
+        return switch (Math.max(minRole(), Math.min(maxRole(), requiredRank))) {
+            case 0 -> Material.LIME_WOOL;
+            case 1 -> Material.GREEN_WOOL;
+            case 2 -> Material.LIGHT_BLUE_WOOL;
+            case 3 -> Material.YELLOW_WOOL;
+            case 4 -> Material.ORANGE_WOOL;
+            default -> Material.RED_WOOL;
+        };
+    }
+
+    private List<String> papiPlaceholderList(String path, List<String> defaults) {
+        List<String> configured = getConfig().getStringList(path);
+        return configured == null || configured.isEmpty() ? defaults : configured;
+    }
+
+    private String firstPapi(Player player, List<String> placeholders) {
+        if (player == null || Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) return "";
+        for (String placeholder : placeholders) {
+            String value = safePapi(player, placeholder);
+            if (!value.isBlank()) return value;
+        }
+        return "";
+    }
+
     private Map<String, String> memberPlaceholders(Member member, int clanId, Player viewer) throws SQLException {
         Map<String, String> ph = new HashMap<>();
         OfflinePlayer off = Bukkit.getOfflinePlayer(member.uuid());
@@ -3206,9 +3386,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         ph.put("joined", date(member.joinedAt()));
         String level = "solo si está online";
         String race = "solo si está online";
-        if (online != null && Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
-            String papiLevel = safePapi(online, "%mmocore_level%");
-            String papiRace = safePapi(online, "%mmocore_race%");
+        if (online != null) {
+            String papiLevel = firstPapi(online, papiPlaceholderList("integrations.mmocore.level-placeholders", List.of("%mmocore_level%")));
+            String papiRace = firstPapi(online, papiPlaceholderList("integrations.mmocore.race-placeholders", List.of("%mmocore_race%", "%mmocore_class%", "%mmocore_class_name%", "%mmocore_player_class%", "%mmocore_profession%")));
             if (!papiLevel.isBlank()) level = papiLevel;
             if (!papiRace.isBlank()) race = papiRace;
         }
@@ -3221,6 +3401,10 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         try {
             String out = PlaceholderAPI.setPlaceholders(player, placeholder);
             if (out == null || out.equalsIgnoreCase(placeholder) || out.contains("%")) return "";
+            String clean = ChatColor.stripColor(color(out)).trim();
+            if (clean.isBlank()) return "";
+            String lower = clean.toLowerCase(Locale.ROOT);
+            if (lower.equals("nomatch") || lower.equals("no match") || lower.equals("none") || lower.equals("null") || lower.equals("n/a") || lower.equals("na") || lower.equals("-") || lower.equals("sin raza")) return "";
             return out;
         } catch (Throwable ignored) { return ""; }
     }
@@ -3232,13 +3416,19 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         for (String line : boardLines(clan.boardMessage())) lore.add("&f" + line);
         lore.add("");
         lore.add("&eClick: ver en chat");
-        lore.add("&6Shift-click: editar");
+        lore.add("{board_edit_hint}");
         return lore;
     }
 
     private List<String> boardLines(String text) {
         if (text == null || text.isBlank()) return List.of("&8Sin información todavía.");
         return Arrays.stream(text.split("\\|", -1)).map(String::trim).filter(x -> !x.isBlank()).limit(8).collect(Collectors.toList());
+    }
+
+    private String boardLine(String text, int index) {
+        List<String> lines = boardLines(text);
+        if (index < 0 || index >= lines.size()) return "";
+        return lines.get(index);
     }
 
     private int pageIndexFromSlot(int page, int slot) {
@@ -3309,11 +3499,12 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         lore.add(color("&7Estado: " + (online != null ? "&aConectado" : "&cDesconectado")));
         lore.add(color("&7Última vez: &f" + (online != null ? "Ahora" : date(off.getLastSeen()))));
         lore.add(color("&7Ingreso: &f" + date(member.joinedAt())));
-        if (online != null && Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
-            String level = safePapi(online, "%mmocore_level%");
-            String race = safePapi(online, "%mmocore_race%");
+        if (online != null) {
+            String level = firstPapi(online, papiPlaceholderList("integrations.mmocore.level-placeholders", List.of("%mmocore_level%")));
+            String race = firstPapi(online, papiPlaceholderList("integrations.mmocore.race-placeholders", List.of("%mmocore_race%", "%mmocore_class%", "%mmocore_class_name%", "%mmocore_player_class%", "%mmocore_profession%")));
             if (!level.isBlank()) lore.add(color("&7Nivel: &e" + level));
             if (!race.isBlank()) lore.add(color("&7Raza: &d" + race));
+            if (level.isBlank() && race.isBlank()) lore.add(color("&7Nivel/Raza: &8sin datos"));
         } else {
             lore.add(color("&7Nivel/Raza: &8solo si está online"));
         }
@@ -3463,6 +3654,18 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private String date(long ms) {
         if (ms <= 0) return "Nunca";
         return new SimpleDateFormat("dd/MM/yyyy HH:mm").format(new Date(ms));
+    }
+
+    private void saveNativeMenuResources() {
+        String[] resources = {
+                "NativeMenus/00-global.yml",
+                "NativeMenus/10-main.yml",
+                "NativeMenus/20-info.yml",
+                "NativeMenus/30-members.yml",
+                "NativeMenus/40-relations.yml",
+                "NativeMenus/50-settings.yml"
+        };
+        for (String resource : resources) saveResourceIfMissing(resource);
     }
 
     private void saveResourceIfMissing(String resource) {
@@ -3835,7 +4038,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 String noClan = getConfig().getString("placeholders.no-clan", "");
                 if (memberOpt.isEmpty()) {
                     return switch (params.toLowerCase(Locale.ROOT)) {
-                        case "id", "name", "tag", "lpc_tag", "role", "role_number", "member_count", "bank", "kills", "deaths", "strength", "is_in_clan" -> params.equalsIgnoreCase("is_in_clan") ? "false" : noClan;
+                        case "id", "name", "tag", "lpc_tag", "role", "role_number", "member_count", "bank", "kills", "deaths", "strength", "board", "board_plain", "board_line_1", "board_line_2", "board_line_3", "is_in_clan" -> params.equalsIgnoreCase("is_in_clan") ? "false" : noClan;
                         default -> noClan;
                     };
                 }
@@ -3855,6 +4058,11 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     case "kills" -> String.valueOf(getTotalKillsByClan(clan.id()));
                     case "deaths" -> String.valueOf(getTotalDeathsByClan(clan.id()));
                     case "strength" -> formatNumber(calculateStrength(clan));
+                    case "board" -> color(String.join(" &8| &f", boardLines(clan.boardMessage())));
+                    case "board_plain" -> ChatColor.stripColor(color(String.join(" | ", boardLines(clan.boardMessage()))));
+                    case "board_line_1" -> color(boardLine(clan.boardMessage(), 0));
+                    case "board_line_2" -> color(boardLine(clan.boardMessage(), 1));
+                    case "board_line_3" -> color(boardLine(clan.boardMessage(), 2));
                     case "is_in_clan" -> "true";
                     case "open" -> clan.open() ? "true" : "false";
                     default -> noClan;

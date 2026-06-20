@@ -1,0 +1,295 @@
+menus:
+  no-clan:
+    title: '&8&lClanes'
+    items:
+      list:
+        slot: 11
+        material: BOOK
+        name: '&b&lLista de clanes'
+        lore:
+        - ''
+        - '&7Mira los clanes creados'
+        - '&7en MDVCRAFT.'
+        - ''
+        - '&eClick para abrir.'
+      create:
+        slot: 15
+        material: EMERALD
+        name: '&a&lCrear clan'
+        lore:
+        - ''
+        - '&7Abre el menú de creación.'
+        - '&7Luego escribirás ID y nombre.'
+        - ''
+        - '&eClick para empezar.'
+      close:
+        slot: 22
+        material: BARRIER
+        name: '&c&lCerrar'
+        lore:
+        - '&7Cierra el menú.'
+  create:
+    title: '&8&lCrear clan'
+    items:
+      info:
+        slot: 11
+        material: WRITABLE_BOOK
+        name: '&e&lFormato'
+        lore:
+        - ''
+        - '&7La creación será guiada por chat:'
+        - '&f1) Nombre del clan'
+        - '&f2) ID/tag del clan'
+        - ''
+        - '&7Ejemplo:'
+        - '&fMedieval Craft'
+        - '&bMDV'
+        - ''
+        - '&8ID 3-5 caracteres.'
+      start:
+        slot: 13
+        material: EMERALD
+        name: '&a&lEscribir clan'
+        lore:
+        - ''
+        - '&7Cierra este menú y te pedirá'
+        - '&7primero el nombre del clan.'
+        - '&7Luego escribirás el ID/tag.'
+        - ''
+        - '&eClick para comenzar.'
+      close:
+        slot: 26
+        material: BARRIER
+        name: '&c&lCerrar'
+        lore:
+        - '&7Cierra el menú.'
+    back:
+      slot: 22
+      action: NATIVE
+      target: sinclan
+      material: PLAYER_HEAD
+      texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
+      name: '&6&lVolver'
+      lore:
+      - '&7Regresa al menú de clanes.'
+  management:
+    title: '&8&lGestión del clan'
+    items:
+      summary:
+        slot: 4
+        name: '&6&l{name}'
+        lore:
+        - '&7ID: &b{id}'
+        - '&7Miembros: &e{members}&7/&e{max_members}'
+        - '&7Banco: &e{bank}'
+        - '&7Fuerza: &6{strength}'
+        - ''
+        - '&eClick para abrir el panel completo.'
+      base:
+        slot: 10
+        material: ENDER_PEARL
+        name: '&b&lIr a la base'
+        lore:
+        - ''
+        - '&7Teletranspórtate a la base'
+        - '&7definida por el clan.'
+        - ''
+        - '&eClick para viajar.'
+      setbase:
+        slot: 11
+        material: COMPASS
+        name: '&6&lFijar base'
+        lore:
+        - ''
+        - '&7Define la base del clan'
+        - '&7en tu ubicación actual.'
+        - ''
+        - '&8Requiere rango configurado.'
+      bank:
+        slot: 13
+        material: GOLD_NUGGET
+        name: '&e&lBanco del clan'
+        lore:
+        - ''
+        - '&7Balance: &e{bank}'
+        - '&7Depositar: &f/clan banco depositar cantidad'
+        - '&7Retirar: &f/clan banco retirar cantidad'
+        - ''
+        - '&eClick para consultar.'
+      storage:
+        slot: 14
+        material: CHEST
+        name: '&a&lAlmacén del clan'
+        lore:
+        - ''
+        - '&7Abre el inventario compartido'
+        - '&7del clan.'
+        - ''
+        - '&eClick para abrir.'
+      banner:
+        slot: 15
+        name: '&f&lEstandarte oficial'
+        lore:
+        - ''
+        - '&7Ver el banner oficial'
+        - '&7del clan.'
+        - ''
+        - '&eClick para ver.'
+      logs:
+        slot: 16
+        material: WRITABLE_BOOK
+        name: '&d&lRegistro del clan'
+        lore:
+        - ''
+        - '&7Muestra acciones recientes:'
+        - '&8banco, miembros, base,'
+        - '&8relaciones y bajas.'
+        - ''
+        - '&eClick para ver.'
+      close:
+        slot: 26
+        material: BARRIER
+        name: '&c&lCerrar'
+        lore:
+        - '&7Cierra el menú.'
+    back:
+      slot: 22
+      action: MDVSOCIAL
+      target: clan_con_clan
+      material: ARROW
+      name: '&6&lVolver al menú social'
+  hub:
+    title: '&8&lClan &b{id}'
+    items:
+      summary:
+        slot: 4
+        name: '&6&l{name}'
+        lore:
+        - '&7ID: &b{id}'
+        - '&7Miembros: &e{members}'
+        - '&7Banco: &e{bank}'
+        - '&7Fuerza: &6{strength}'
+      members:
+        slot: 10
+        material: PLAYER_HEAD
+        head-owner: '{player}'
+        name: '&a&lMiembros'
+        lore:
+        - ''
+        - '&7Cabezas de jugadores, roles'
+        - '&7y acciones de cada miembro.'
+        - ''
+        - '&eClick para abrir.'
+      info:
+        slot: 11
+        material: WRITABLE_BOOK
+        name: '&e&lTablero e información'
+        lore:
+        - ''
+        - '&7Banner, tablero, buzón,'
+        - '&7solicitudes y registros.'
+        - ''
+        - '&eClick para abrir.'
+      relations:
+        slot: 12
+        material: RED_BANNER
+        name: '&c&lRelaciones'
+        lore:
+        - ''
+        - '&7Aliados, enemigos, bajas'
+        - '&7y ranking de clanes.'
+        - ''
+        - '&eClick para abrir.'
+      storage:
+        slot: 13
+        material: CHEST
+        name: '&6&lAlmacén y banco'
+        lore:
+        - ''
+        - '&7Acceso al almacén'
+        - '&7y banco del clan.'
+        - ''
+        - '&eClick para abrir.'
+      base:
+        slot: 14
+        material: ENDER_PEARL
+        name: '&b&lIr a la base'
+        lore:
+        - ''
+        - '&7Ejecuta &f/clan base&7.'
+        - ''
+        - '&eClick para viajar.'
+      clan-list:
+        slot: 15
+        material: BOOK
+        name: '&b&lLista de clanes'
+        lore:
+        - ''
+        - '&7Mira todos los clanes'
+        - '&7de MDVCRAFT.'
+        - ''
+        - '&eClick para abrir.'
+      leave:
+        slot: 16
+        material: BARRIER
+        name: '&c&lAbandonar clan'
+        lore:
+        - ''
+        - '&7Ejecuta &f/clan salir&7.'
+        - '&8Cuidado.'
+        - ''
+        - '&eClick para salir.'
+      settings:
+        slot: 17
+        material: COMPARATOR
+        name: '&6&lAjustes del clan'
+        lore:
+        - ''
+        - '&7Nombre, ID, rangos, banner,'
+        - '&7permisos y disolver.'
+        - ''
+        - '&eClick para abrir.'
+      close:
+        slot: 26
+        material: BARRIER
+        name: '&c&lCerrar'
+        lore:
+        - '&7Cierra el menú.'
+    back:
+      slot: 22
+      action: NATIVE
+      target: gestion
+      material: ARROW
+      name: '&6&lGestión rápida'
+  storage:
+    title: '&8Almacén y banco'
+    items:
+      storage:
+        slot: 11
+        material: CHEST
+        name: '&a&lAlmacén del clan'
+        lore:
+        - ''
+        - '&7Inventario compartido.'
+        - '&7Todos pueden usarlo según config.'
+        - ''
+        - '&eClick para abrir.'
+      bank:
+        slot: 15
+        material: GOLD_BLOCK
+        name: '&e&lBanco del clan'
+        lore:
+        - ''
+        - '&7Balance: &e{bank}'
+        - ''
+        - '&7Comandos:'
+        - '&f/clan banco depositar <cantidad>'
+        - '&f/clan banco retirar <cantidad>'
+        - ''
+        - '&eClick para ver balance.'
+    back:
+      slot: 22
+      action: NATIVE
+      target: gestion
+      material: ARROW
+      name: '&6&lVolver'

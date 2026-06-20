@@ -1,0 +1,28 @@
+global:
+  filler:
+    material: BLACK_STAINED_GLASS_PANE
+    name: ' '
+    lore: []
+  back:
+    material: PLAYER_HEAD
+    texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
+    name: '&6&lVolver'
+    lore:
+    - '&7Regresa al menú anterior.'
+  previous-page:
+    material: ARROW
+    name: '&ePágina anterior'
+    lore:
+    - '&7Click para volver.'
+  next-page:
+    material: SPECTRAL_ARROW
+    name: '&ePágina siguiente'
+    lore:
+    - '&7Click para avanzar.'
+  locked:
+    material: GRAY_DYE
+    name: '&7Función bloqueada'
+    lore:
+    - ''
+    - '{reason}'
+    - '&8No puedes usar esta función.'

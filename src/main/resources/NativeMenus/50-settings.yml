@@ -1,0 +1,94 @@
+menus:
+  settings:
+    title: '&8Ajustes &b{id}'
+    items:
+      rename-name:
+        slot: 10
+        material: NAME_TAG
+        name: '&e&lCambiar nombre'
+        lore:
+        - ''
+        - '&7Nombre actual: &f{name}'
+        - ''
+        - '&eClick para escribir el nuevo nombre.'
+      rename-id:
+        slot: 11
+        material: OAK_SIGN
+        name: '&b&lCambiar ID'
+        lore:
+        - ''
+        - '&7ID actual: &b{id}'
+        - '&7El ID se ve en chat/listas.'
+        - ''
+        - '&eClick para escribir el nuevo ID.'
+      roles:
+        slot: 12
+        material: WRITABLE_BOOK
+        name: '&d&lNombres de rangos'
+        lore:
+        - ''
+        - '&7Cambia los nombres visibles'
+        - '&7de los rangos 0-5.'
+        - ''
+        - '&eClick para abrir.'
+      banner:
+        slot: 13
+        name: '&f&lCambiar banner'
+        lore:
+        - ''
+        - '&7Usa el banner en tu mano.'
+        - ''
+        - '&eClick: guardar banner en mano'
+        - '&cClick derecho: quitar banner'
+      permissions:
+        slot: 14
+        material: KNOWLEDGE_BOOK
+        name: '&b&lVer permisos'
+        lore:
+        - ''
+        - '&7Muestra qué rango necesita'
+        - '&7cada acción del clan.'
+        - ''
+        - '&eClick para abrir.'
+      open:
+        slot: 15
+        material: OAK_DOOR
+        name: '&a&lEntrada del clan'
+        lore:
+        - ''
+        - '&7Estado actual: {entry}'
+        - ''
+        - '&eClick para alternar.'
+      disband:
+        slot: 16
+        material: TNT
+        name: '&4&lDisolver clan'
+        lore:
+        - ''
+        - '&cAcción peligrosa.'
+        - '&7Usa el comando de confirmación.'
+        - ''
+        - '&eClick para instrucciones.'
+    back:
+      slot: 49
+      action: NATIVE
+      target: gestion
+      material: ARROW
+      name: '&6&lVolver'
+  role-settings:
+    title: '&8Rangos &b{id}'
+    role-item:
+      material: PAPER
+      name: '&eRango {role_number} &8- &b{role_name}'
+      lore:
+      - ''
+      - '&7Este es el nombre visible'
+      - '&7del rango {role_number}.'
+      - ''
+      - '&eClick para renombrar.'
+    back:
+      slot: 22
+      action: NATIVE
+      target: ajustes
+      material: ARROW
+      name: '&6&lVolver'

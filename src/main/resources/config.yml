@@ -124,11 +124,23 @@ placeholders:
   tag-format: '&8[&b{id}&8]&r'
   lpc-tag-format: '&8[&b{id}&8]&r '
 
+integrations:
+  mmocore:
+    # MDVClans probará estos placeholders en orden y usará el primero que devuelva algo válido.
+    # Se ignoran respuestas como NoMatch, none, null, n/a o placeholders sin resolver.
+    level-placeholders:
+      - '%mmocore_level%'
+    race-placeholders:
+      - '%mmocore_race%'
+      - '%mmocore_class%'
+      - '%mmocore_class_name%'
+      - '%mmocore_player_class%'
+      - '%mmocore_profession%'
 
 gui:
   native-enabled: true
   # Los menús nativos se abren con /clan abrir <ui>.
-  # Edita títulos/items/lore en native-menus.yml.
+  # Edita títulos/items/lore en NativeMenus/*.yml.
   # MDVSocial debe crear sus propios puentes y ejecutar /clan abrir <ui>.
 
 

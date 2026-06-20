@@ -1,0 +1,257 @@
+menus:
+  relations:
+    title: '&8Relaciones'
+    items:
+      list:
+        slot: 11
+        material: BLUE_BANNER
+        name: '&9&lRelaciones con clanes'
+        lore:
+        - ''
+        - '&7Muestra aliados y enemigos.'
+        - '&7Los neutrales se omiten.'
+        - ''
+        - '&eClick para abrir.'
+      kills:
+        slot: 13
+        material: IRON_SWORD
+        name: '&c&lKills y bajas'
+        lore:
+        - ''
+        - '&7Banners de clanes que han'
+        - '&7matado miembros de tu clan.'
+        - ''
+        - '&eClick para abrir.'
+      ranking:
+        slot: 15
+        material: NETHER_STAR
+        name: '&6&lRanking'
+        lore:
+        - ''
+        - '&7Top por fuerza, kills'
+        - '&7y banco.'
+        - ''
+        - '&eClick para abrir.'
+    back:
+      slot: 22
+      action: MDVSOCIAL
+      target: clan_con_clan
+      material: PLAYER_HEAD
+      texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
+      name: '&6&lVolver'
+      lore:
+      - '&7Regresa al menú de clanes.'
+  clan-list:
+    title: '&8Clanes de MDVCRAFT'
+    clan-item:
+      name: '&8[&b{id}&8] &f{name}'
+      lore:
+      - '&7ID: &b{id}'
+      - '&7Miembros: &e{members}&7/&e{max_members}'
+      - '&7Entrada: {entry}'
+      - '&7Fuerza: &6{strength}'
+      - ''
+      - '{click_hint}'
+      - '{click_extra}'
+    back:
+      slot: 49
+      action: MDVSOCIAL
+      target: clan_sin_clan
+      material: PLAYER_HEAD
+      texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
+      name: '&6&lVolver'
+      lore:
+      - '&7Regresa al menú de clanes.'
+  relations-list:
+    title: '&8Aliados y enemigos'
+    clan-item:
+      name: '{relation} &8[&b{id}&8]'
+      lore:
+      - '&7Clan: &f{name}'
+      - '&7Relación: {relation}'
+      - ''
+      - '&eClick para ver info.'
+    back:
+      slot: 49
+      action: NATIVE
+      target: relaciones
+      material: PLAYER_HEAD
+      texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
+      name: '&6&lVolver'
+      lore:
+      - '&7Regresa al menú de relaciones.'
+  kills:
+    title: '&8Kills y bajas'
+    items:
+      own:
+        slot: 4
+        name: '&a&lTu clan'
+        lore:
+        - '&7Kills hechas: &a{kills_done}'
+        - '&7Bajas sufridas: &c{deaths_suffered}'
+        - '&7Fuerza: &6{strength}'
+    enemy-item:
+      name: '&c{id} &7nos hizo &c{kills_against_us} &7bajas'
+      lore:
+      - '&7Clan: &f{name}'
+      - '&7Kills contra nosotros: &c{kills_against_us}'
+    back:
+      slot: 49
+      action: NATIVE
+      target: relaciones
+      material: PLAYER_HEAD
+      texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
+      name: '&6&lVolver'
+      lore:
+      - '&7Regresa al menú de relaciones.'
+  top:
+    title: '&8Ranking: {mode}'
+    items:
+      force:
+        slot: 3
+        material: NETHER_STAR
+        name: '&6&lTop fuerza'
+        lore:
+        - '&eClick para ver.'
+      kills:
+        slot: 4
+        material: IRON_SWORD
+        name: '&c&lTop kills'
+        lore:
+        - '&eClick para ver.'
+      bank:
+        slot: 5
+        material: GOLD_BLOCK
+        name: '&e&lTop banco'
+        lore:
+        - '&eClick para ver.'
+    entry:
+      name: '&e#{position} &8[&b{id}&8]'
+      lore:
+      - '&7Clan: &f{name}'
+      - '&7Valor: &6{value}'
+      - '&7Miembros: &e{members}'
+    back:
+      slot: 49
+      action: NATIVE
+      target: relaciones
+      material: PLAYER_HEAD
+      texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
+      name: '&6&lVolver'
+      lore:
+      - '&7Regresa al menú de relaciones.'
+  clan-action:
+    title: '&8Clan &b{id}'
+    items:
+      summary:
+        slot: 4
+        name: '&8[&b{id}&8] &f{name}'
+        lore:
+        - '&7Miembros: &e{members}'
+        - '&7Entrada: {entry}'
+        - '&7Fuerza: &6{strength}'
+      join:
+        slot: 13
+        material: LIME_DYE
+        name: '&a&lUnirse'
+        lore:
+        - ''
+        - '&7Este clan está abierto.'
+        - ''
+        - '&eClick para unirte.'
+      request:
+        slot: 13
+        material: PAPER
+        name: '&e&lEnviar solicitud'
+        lore:
+        - ''
+        - '&7Este clan es por invitación.'
+        - '&7Enviarás una solicitud de ingreso.'
+        - ''
+        - '&eClick para solicitar.'
+      info:
+        slot: 10
+        material: BOOK
+        name: '&b&lVer info'
+        lore:
+        - ''
+        - '&eClick para ver información.'
+      ally:
+        slot: 11
+        material: BLUE_DYE
+        name: '&9&lProponer alianza'
+        lore:
+        - ''
+        - '&7Envía/acepta relación aliada.'
+        - ''
+        - '&eClick para establecer.'
+      enemy:
+        slot: 12
+        material: RED_DYE
+        name: '&c&lDeclarar enemigo'
+        lore:
+        - ''
+        - '&7Marca este clan como enemigo.'
+        - ''
+        - '&eClick para establecer.'
+      neutral:
+        slot: 14
+        material: GRAY_DYE
+        name: '&7&lVolver neutral'
+        lore:
+        - ''
+        - '&7Quita alianza/enemistad.'
+        - ''
+        - '&eClick para establecer.'
+      mail:
+        slot: 15
+        material: WRITABLE_BOOK
+        name: '&d&lCorreo de clan'
+        lore:
+        - ''
+        - '&7Escribe un correo formal'
+        - '&7al buzón de este clan.'
+        - ''
+        - '&eClick para escribir.'
+    back:
+      slot: 22
+      action: NATIVE
+      target: lista
+      material: ARROW
+      name: '&6&lVolver'
+  mail-action:
+    title: '&8Correo #{mail_id}'
+    items:
+      message:
+        slot: 4
+        name: '&dCorreo de &b{from_id}'
+        lore:
+        - '&7Enviado por: &f{sender}'
+        - '&7Fecha: &f{date}'
+        - ''
+        - '&f{message}'
+      reply:
+        slot: 11
+        material: WRITABLE_BOOK
+        name: '&a&lResponder'
+        lore:
+        - ''
+        - '&7Responder al clan que'
+        - '&7envió este correo.'
+        - ''
+        - '&eClick para escribir.'
+      delete:
+        slot: 15
+        material: RED_DYE
+        name: '&c&lEliminar'
+        lore:
+        - ''
+        - '&7Borra este correo del buzón.'
+        - ''
+        - '&eClick para eliminar.'
+    back:
+      slot: 22
+      action: NATIVE
+      target: correo
+      material: ARROW
+      name: '&6&lVolver'
