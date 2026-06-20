@@ -26,6 +26,12 @@ creation:
   name-max: 19
   id-regex: '^[A-Za-z0-9]+$'
 
+
+clan-description:
+  enabled: true
+  max-length: 180
+  default-text: 'Este clan aún no tiene descripción.'
+
 limits:
   max-clans: 60
   max-members: 20
@@ -61,6 +67,7 @@ rank-permissions:
   banner-set: 4
   logs-view: 4
   board-edit: 4
+  description-edit: 4
   mail-send: 4
   mail-delete: 4
   settings: 4
@@ -86,6 +93,8 @@ friendly-fire:
 relations:
   # Aliado necesita confirmación del otro clan.
   ally-requires-accept: true
+  # Mensaje que llega al buzón del clan cuando otro clan solicita alianza.
+  ally-request-mail-message: 'El clan {from_name} [{from_id}] solicita una alianza con tu clan.'
 
 bank:
   enabled: true
@@ -97,6 +106,10 @@ storage-chest:
 
 logs:
   enabled: true
+  cleanup:
+    enabled: true
+    auto-delete-days: 30
+    max-per-clan: 250
 
 kills:
   enabled: true

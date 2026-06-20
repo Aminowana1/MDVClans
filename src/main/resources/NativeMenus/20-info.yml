@@ -1,6 +1,6 @@
 menus:
   info:
-    title: '&8Tablero &b{id}'
+    title: '&8Tablero &6&l{name}'
     items:
       banner:
         slot: 4
@@ -14,6 +14,35 @@ menus:
           - '&8Sin banner: WHITE_BANNER.'
           - ''
           - '&eClick para ver.'
+      requests:
+        slot: 9
+        material: PLAYER_HEAD
+        name: '&a&lSolicitudes pendientes'
+        lore:
+          - ''
+          - '&7Jugadores que quieren entrar'
+          - '&7cuando el clan está restringido.'
+          - ''
+          - '&7Pendientes: &e{join_requests}'
+          - ''
+          - '&eClick para abrir.'
+      description:
+        slot: 10
+        material: MAP
+        name: '&6&lDescripción pública'
+        lore:
+          - ''
+          - '&7Visible en la lista de clanes'
+          - '&7y en la información pública.'
+          - ''
+          - '&f{description_line_1}'
+          - '&f{description_line_2}'
+          - '&f{description_line_3}'
+          - '&f{description_line_4}'
+          - '&f{description_line_5}'
+          - ''
+          - '&eClick: ver descripción.'
+          - '&6Shift-click: editar.'
       board:
         slot: 11
         material: WRITABLE_BOOK
@@ -34,18 +63,6 @@ menus:
           - ''
           - '&eClick: ver mensaje.'
           - '{board_edit_hint}'
-      requests:
-        slot: 9
-        material: PLAYER_HEAD
-        name: '&a&lSolicitudes pendientes'
-        lore:
-          - ''
-          - '&7Jugadores que quieren entrar'
-          - '&7cuando el clan está restringido.'
-          - ''
-          - '&7Pendientes: &e{join_requests}'
-          - ''
-          - '&eClick para abrir.'
       mailbox:
         slot: 13
         material: CHEST
@@ -66,13 +83,26 @@ menus:
         name: '&6&lRegistros del clan'
         lore:
           - ''
-          - '&7Muestra acciones recientes:'
-          - '&8miembros, banco, base,'
-          - '&8relaciones y bajas.'
+          - '&7Muestra acciones recientes.'
+          - '&8Puedes filtrar por categoría'
+          - '&8desde el menú de registros.'
           - ''
           - '{can_logs}'
           - ''
           - '&eClick para abrir.'
+      summary:
+        slot: 16
+        material: MAP
+        name: '&f&lResumen del clan'
+        lore:
+          - ''
+          - '&7Clan: &f{name}'
+          - '&7ID: &6{id}'
+          - '&7Creado: &f{created}'
+          - '&7Miembros: &e{members}'
+          - '&7Banco: &e{bank}'
+          - ''
+          - '&8Información general.'
       permissions:
         slot: 17
         material: KNOWLEDGE_BOOK
@@ -83,19 +113,6 @@ menus:
           - '&7cada rango del clan.'
           - ''
           - '&eClick para abrir.'
-      summary:
-        slot: 16
-        material: MAP
-        name: '&f&lResumen del clan'
-        lore:
-          - ''
-          - '&7Clan: &f{name}'
-          - '&7ID: &b{id}'
-          - '&7Creado: &f{created}'
-          - '&7Miembros: &e{members}'
-          - '&7Banco: &e{bank}'
-          - ''
-          - '&8Información general.'
     back:
       slot: 22
       action: MDVSOCIAL
@@ -109,14 +126,21 @@ menus:
   mailbox:
     title: '&8Buzón del clan'
     mail-item:
-      name: '&dCorreo #{mail_id} &7de &b{from_id}'
+      name: '&6&l#&f{mail_id} &8- &d{from_name}'
       lore:
-        - '&7Enviado por: &f{sender}'
-        - '&7Fecha: &f{date}'
         - ''
-        - '&f{message}'
+        - '&7De: &d{from_name} &8[&6{from_id}&8]'
+        - '&7Mensajero: &e{sender}'
+        - '&7Fecha: &a{date}'
         - ''
-        - '&eClick: abrir opciones'
+        - '&6&lContenido:'
+        - '&f{message_line_1}'
+        - '&f{message_line_2}'
+        - '&f{message_line_3}'
+        - '&f{message_line_4}'
+        - '&f{message_line_5}'
+        - ''
+        - '&eClick para abrir opciones.'
     back:
       slot: 49
       action: NATIVE
@@ -128,15 +152,27 @@ menus:
         - '&7Regresa al tablero de información.'
 
   logs:
-    title: '&8Registros del clan'
+    title: '&8Registros: &6{filter}'
+    filters:
+      all: {slot: 1, material: BOOK, name: '&eTodos', lore: ['{active}']}
+      miembros: {slot: 2, material: PLAYER_HEAD, name: '&aMiembros', lore: ['{active}']}
+      banco: {slot: 3, material: GOLD_NUGGET, name: '&eBanco', lore: ['{active}']}
+      diplomacia: {slot: 4, material: BLUE_BANNER, name: '&9Diplomacia', lore: ['{active}']}
+      correo: {slot: 5, material: WRITABLE_BOOK, name: '&dCorreo', lore: ['{active}']}
+      combate: {slot: 6, material: IRON_SWORD, name: '&cCombate', lore: ['{active}']}
+      admin: {slot: 7, material: COMPARATOR, name: '&6Admin', lore: ['{active}']}
     log-item:
       material: PAPER
-      name: '&e{action}'
+      name: '&e#{log_id} &6{action}'
       lore:
+        - ''
+        - '&7Categoría: &e{category}'
         - '&7Actor: &f{actor}'
         - '&7Fecha: &f{date}'
         - ''
         - '&7{detail}'
+        - ''
+        - '&8Click derecho admin: borrar log.'
     back:
       slot: 49
       action: NATIVE
@@ -148,16 +184,23 @@ menus:
         - '&7Regresa al tablero de información.'
 
   join-requests:
-    title: '&8Solicitudes &b{id}'
+    title: '&8Solicitudes &6{id}'
     request-head:
-      name: '&e{player}'
+      name: '&e&l{player}'
       lore:
+        - ''
+        - '&6&lSolicitud de ingreso'
+        - '&7Jugador: &e{player}'
         - '&7Estado: {status}'
-        - '&7Solicitud: &f{requested}'
+        - '&7Enviada: &f{requested}'
+        - ''
+        - '&6&lPerfil'
         - '&7Nivel: &e{level}'
         - '&7Raza: &d{race}'
         - ''
-        - '{manage_hint}'
+        - '&8&m------------------------'
+        - '&aClick izquierdo &7para aceptar.'
+        - '&cClick derecho &7para rechazar.'
     back:
       slot: 49
       action: NATIVE
@@ -176,7 +219,7 @@ menus:
       permission-row-start-slots: [9, 18, 27, 36]
     role-header:
       material: GRAY_BANNER
-      name: '&bRango {role_number}'
+      name: '&6&lRango {role_number}'
       lore:
         - '&f{role_name}'
         - ''
@@ -190,7 +233,7 @@ menus:
         - '&7Descripción:'
         - '{permission_description}'
         - ''
-        - '&7Rango requerido: &b{required_rank}'
+        - '&7Rango requerido: &6{required_rank}'
         - '&7Nombre del rango: &f{required_role}'
         - ''
         - '&8Las lanas de la derecha indican'
@@ -199,7 +242,7 @@ menus:
       material: LIME_WOOL
       name: '&a✔ Permitido'
       lore:
-        - '&7Rango: &b{role_number} &8- &f{role_name}'
+        - '&7Rango: &6{role_number} &8- &f{role_name}'
         - '&7Permiso: {permission_name}'
         - ''
         - '&aEste rango puede usarlo.'
@@ -207,7 +250,7 @@ menus:
       material: RED_WOOL
       name: '&c✖ Bloqueado'
       lore:
-        - '&7Rango: &b{role_number} &8- &f{role_name}'
+        - '&7Rango: &6{role_number} &8- &f{role_name}'
         - '&7Permiso: {permission_name}'
         - ''
         - '&cEste rango no puede usarlo.'

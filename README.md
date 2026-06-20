@@ -1,8 +1,8 @@
-# MDVClans 1.7.6
+# MDVClans 1.8.0
 
 Actualización para MDVCRAFT centrada en perfiles de jugador de MMOCore dentro de las GUIs de clan.
 
-## Cambios 1.7.6
+## Cambios 1.8.0
 
 - Las solicitudes de ingreso ahora resuelven `{race}` y `{level}` usando la misma lógica que la lista de miembros.
 - Se añadió caché interna `player_profiles` en SQLite para guardar la última raza/nivel conocidos.
@@ -60,5 +60,5 @@ mvn clean package
 Jar esperado:
 
 ```text
-target/MDVClans-1.7.6.jar
+target/MDVClans-1.8.0.jar
 ```

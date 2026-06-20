@@ -59,6 +59,19 @@ menus:
         - '&7Estado actual: {entry}'
         - ''
         - '&eClick para alternar.'
+      description:
+        slot: 18
+        material: MAP
+        name: '&6&lDescripción pública'
+        lore:
+        - ''
+        - '&7Descripción actual:'
+        - '&f{description_line_1}'
+        - '&f{description_line_2}'
+        - '&f{description_line_3}'
+        - ''
+        - '&eClick: editar.'
+        - '&cClick derecho: limpiar.'
       disband:
         slot: 16
         material: TNT

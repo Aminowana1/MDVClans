@@ -87,3 +87,8 @@ permission-labels:
     name: '&4Disolver clan'
     material: RED_WOOL
     description: ['&7Permite disolver el clan.', '&cAcción peligrosa.']
+
+  description-edit:
+    name: '&6Editar descripción pública'
+    material: ORANGE_WOOL
+    description: ['&7Permite cambiar la descripción', '&7pública visible del clan.']

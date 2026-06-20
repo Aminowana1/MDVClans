@@ -51,6 +51,11 @@ menus:
       - '&7Entrada: {entry}'
       - '&7Fuerza: &6{strength}'
       - ''
+      - '&7Descripción:'
+      - '&f{description_line_1}'
+      - '&f{description_line_2}'
+      - '&f{description_line_3}'
+      - ''
       - '{click_hint}'
       - '{click_extra}'
     back:
@@ -69,6 +74,10 @@ menus:
       lore:
       - '&7Clan: &f{name}'
       - '&7Relación: {relation}'
+      - ''
+      - '&7Descripción:'
+      - '&f{description_line_1}'
+      - '&f{description_line_2}'
       - ''
       - '&eClick para ver info.'
     back:
@@ -131,6 +140,7 @@ menus:
       - '&7Clan: &f{name}'
       - '&7Valor: &6{value}'
       - '&7Miembros: &e{members}'
+      - '&7Descripción: &f{description_line_1}'
     back:
       slot: 49
       action: NATIVE

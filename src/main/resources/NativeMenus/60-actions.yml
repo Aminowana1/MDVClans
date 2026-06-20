@@ -1,6 +1,6 @@
 menus:
   member-action:
-    title: '&8Miembro &b{player}'
+    title: '&8Miembro &6{player}'
     items:
       member:
         slot: 4
@@ -62,15 +62,21 @@ menus:
         - '&7Regresa a la lista de miembros.'
 
   clan-action:
-    title: '&8Clan &b{id}'
+    title: '&8Clan &6{id}'
     items:
       summary:
         slot: 4
-        name: '&8[&b{id}&8] &f{name}'
+        name: '&d{name} &8[&6{id}&8]'
         lore:
+          - ''
           - '&7Miembros: &e{members}'
           - '&7Entrada: {entry}'
           - '&7Fuerza: &6{strength}'
+          - ''
+          - '&7Descripción:'
+          - '&f{description_line_1}'
+          - '&f{description_line_2}'
+          - '&f{description_line_3}'
       join:
         slot: 13
         material: LIME_DYE
@@ -93,19 +99,23 @@ menus:
       info:
         slot: 10
         material: BOOK
-        name: '&b&lVer info'
+        name: '&6&lVer descripción'
         lore:
           - ''
-          - '&eClick para ver información.'
+          - '&7Muestra la información pública'
+          - '&7del clan seleccionado.'
+          - ''
+          - '&eClick para ver en chat.'
       ally:
         slot: 11
         material: BLUE_DYE
-        name: '&9&lProponer alianza'
+        name: '&9&lSolicitar alianza'
         lore:
           - ''
-          - '&7Envía/acepta relación aliada.'
+          - '&7Envía una solicitud formal'
+          - '&7al buzón de este clan.'
           - ''
-          - '&eClick para establecer.'
+          - '&eClick para enviar.'
       enemy:
         slot: 12
         material: RED_DYE
@@ -145,28 +155,57 @@ menus:
         - '&7Regresa a la lista de clanes.'
 
   mail-action:
-    title: '&8Correo #{mail_id}'
+    title: '&8Correo #&f{mail_id}'
     items:
       message:
         slot: 4
-        name: '&dCorreo de &b{from_id}'
-        lore:
-          - '&7Enviado por: &f{sender}'
-          - '&7Fecha: &f{date}'
-          - ''
-          - '&f{message}'
-      reply:
-        slot: 11
         material: WRITABLE_BOOK
-        name: '&a&lResponder'
+        name: '&6&l#&f{mail_id} &8- &d{from_name}'
         lore:
           - ''
-          - '&7Responder al clan que'
-          - '&7envió este correo.'
+          - '&7De: &d{from_name} &8[&6{from_id}&8]'
+          - '&7Mensajero: &e{sender}'
+          - '&7Fecha: &a{date}'
           - ''
+          - '&6&lContenido:'
+          - '&f{message_line_1}'
+          - '&f{message_line_2}'
+          - '&f{message_line_3}'
+          - '&f{message_line_4}'
+          - '&f{message_line_5}'
+      accept-ally:
+        slot: 10
+        material: LIME_DYE
+        name: '&a&lAceptar alianza'
+        lore:
+          - ''
+          - '&7Acepta la solicitud diplomática'
+          - '&7del clan &d{from_name}&7.'
+          - ''
+          - '&eClick para aceptar.'
+      reject-ally:
+        slot: 12
+        material: RED_DYE
+        name: '&c&lRechazar alianza'
+        lore:
+          - ''
+          - '&7Rechaza esta solicitud.'
+          - '&8El correo se marcará como eliminado.'
+          - ''
+          - '&eClick para rechazar.'
+      reply:
+        slot: 14
+        material: WRITABLE_BOOK
+        name: '&d&lEnviar correo'
+        lore:
+          - ''
+          - '&7Escribe al clan que envió'
+          - '&7esta solicitud o correo.'
+          - ''
+          - '&8No acepta ni rechaza la alianza.'
           - '&eClick para escribir.'
       delete:
-        slot: 15
+        slot: 16
         material: RED_DYE
         name: '&c&lEliminar'
         lore:
