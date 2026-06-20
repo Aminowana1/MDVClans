@@ -1,0 +1,5 @@
+-proc:none
+-Xmaxerrs
+10000
+-XDrawDiagnostics
+src/main/java/com/mdvcraft/mdvclans/MDVClansPlugin.java

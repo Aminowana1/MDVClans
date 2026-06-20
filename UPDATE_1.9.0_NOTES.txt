@@ -1,0 +1,46 @@
+MDVClans 1.9.0 - notas de actualización manual
+
+No hace falta borrar la carpeta completa de MDVClans.
+
+Antes de probar:
+- Haz backup de plugins/MDVClans/Data/clans.db
+- Reemplaza el jar compilado por MDVClans-1.9.0.jar
+
+config.yml:
+1) Cambia roles a 0-4:
+roles:
+  min: 0
+  max: 4
+  defaults:
+    '0': 'Recluta'
+    '1': 'Miembro'
+    '2': 'Veterano'
+    '3': 'Oficial'
+    '4': 'Líder'
+
+2) En rank-permissions agrega:
+  permissions-edit: 4
+
+Recomendado: cambia cualquier permiso que esté en 5 a 4.
+El código igual lo clampa a 4, pero dejarlo limpio evita confusión.
+
+NativeMenus/20-info.yml:
+- En menus.permissions.table cambia role-header-slots a:
+  role-header-slots: [3, 4, 5, 6, 7]
+
+NativeMenus/50-settings.yml:
+- Cambia el texto de rangos 0-5 a 0-4.
+- Cambia el item permissions para que diga Configurar permisos.
+- Agrega el bloque menus.permissions-edit incluido en el source 1.9.0.
+
+NativeMenus/70-permission-labels.yml:
+Agrega:
+  permissions-edit:
+    name: '&bAdministrar permisos'
+    material: LIGHT_BLUE_WOOL
+    description: ['&7Permite abrir el editor', '&7de permisos por rol.']
+
+Base de datos:
+- No hagas cambios SQL manuales.
+- El plugin crea automáticamente clan_role_permissions y mdvclans_meta.
+- La migración de roles 0-5 a 0-4 corre una sola vez.

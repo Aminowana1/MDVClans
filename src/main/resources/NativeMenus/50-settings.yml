@@ -28,7 +28,7 @@ menus:
         lore:
         - ''
         - '&7Cambia los nombres visibles'
-        - '&7de los rangos 0-5.'
+        - '&7de los rangos 0-4.'
         - ''
         - '&eClick para abrir.'
       banner:
@@ -43,13 +43,13 @@ menus:
       permissions:
         slot: 14
         material: KNOWLEDGE_BOOK
-        name: '&b&lVer permisos'
+        name: '&b&lConfigurar permisos'
         lore:
         - ''
-        - '&7Muestra qué rango necesita'
-        - '&7cada acción del clan.'
+        - '&7Edita qué acciones puede usar'
+        - '&7cada rango del clan.'
         - ''
-        - '&eClick para abrir.'
+        - '&eClick para abrir el editor.'
       open:
         slot: 15
         material: OAK_DOOR
@@ -92,6 +92,11 @@ menus:
   role-settings:
     title: '&8Rangos &b{id}'
     role-item:
+      slot-0: 10
+      slot-1: 11
+      slot-2: 12
+      slot-3: 13
+      slot-4: 14
       material: PAPER
       name: '&eRango {role_number} &8- &b{role_name}'
       lore:
@@ -106,3 +111,68 @@ menus:
       target: ajustes
       material: ARROW
       name: '&6&lVolver'
+
+  permissions-edit:
+    title: '&8Editar permisos &7({page}/{max_page})'
+    table:
+      rows-per-page: 4
+      role-header-slots: [3, 4, 5, 6, 7]
+      permission-row-start-slots: [9, 18, 27, 36]
+    role-header:
+      material: GRAY_BANNER
+      name: '&6&lRango {role_number}'
+      lore:
+        - '&f{role_name}'
+        - ''
+        - '{leader_note}'
+    permission-item:
+      material: BOOK
+      name: '&e#{permission_index} {permission_name}'
+      lore:
+        - ''
+        - '&7Descripción:'
+        - '{permission_description}'
+        - ''
+        - '&7Default config: rango &6{required_rank}'
+        - '&7Rol default: &f{required_role}'
+        - ''
+        - '&8Click en las lanas para alternar'
+        - '&8el permiso de cada rango.'
+    allowed-item:
+      material: LIME_WOOL
+      name: '&a✔ Permitido'
+      lore:
+        - '&7Rango: &6{role_number} &8- &f{role_name}'
+        - '&7Permiso: {permission_name}'
+        - ''
+        - '&aEste rango puede usarlo.'
+        - '{edit_hint}'
+    denied-item:
+      material: RED_WOOL
+      name: '&c✖ Bloqueado'
+      lore:
+        - '&7Rango: &6{role_number} &8- &f{role_name}'
+        - '&7Permiso: {permission_name}'
+        - ''
+        - '&cEste rango no puede usarlo.'
+        - '{edit_hint}'
+    items:
+      reset:
+        slot: 50
+        material: REDSTONE_BLOCK
+        name: '&c&lResetear permisos'
+        lore:
+          - ''
+          - '&7Borra la configuración custom'
+          - '&7de este clan y vuelve a'
+          - '&7los valores de config.yml.'
+          - ''
+          - '&eClick para resetear.'
+    back:
+      slot: 49
+      action: NATIVE
+      target: ajustes
+      material: ARROW
+      name: '&6&lVolver'
+      lore:
+        - '&7Regresa a Ajustes.'

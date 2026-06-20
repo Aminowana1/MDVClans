@@ -215,7 +215,7 @@ menus:
     title: '&8Permisos &7({page}/{max_page})'
     table:
       rows-per-page: 4
-      role-header-slots: [3, 4, 5, 6, 7, 8]
+      role-header-slots: [3, 4, 5, 6, 7]
       permission-row-start-slots: [9, 18, 27, 36]
     role-header:
       material: GRAY_BANNER
@@ -238,6 +238,7 @@ menus:
         - ''
         - '&8Las lanas de la derecha indican'
         - '&8si cada rango tiene el permiso.'
+        - '&8Solo lectura: se edita en Ajustes.'
     allowed-item:
       material: LIME_WOOL
       name: '&a✔ Permitido'

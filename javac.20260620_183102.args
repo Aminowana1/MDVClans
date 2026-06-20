@@ -1,0 +1,3 @@
+-proc:none
+-XDrawDiagnostics
+src/main/java/com/mdvcraft/mdvclans/MDVClansPlugin.java

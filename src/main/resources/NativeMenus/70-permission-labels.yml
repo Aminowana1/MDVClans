@@ -83,6 +83,10 @@ permission-labels:
     name: '&6Abrir ajustes'
     material: ORANGE_WOOL
     description: ['&7Permite acceder al panel', '&7de ajustes del clan.']
+  permissions-edit:
+    name: '&bAdministrar permisos'
+    material: LIGHT_BLUE_WOOL
+    description: ['&7Permite abrir el editor', '&7de permisos por rol.']
   disband:
     name: '&4Disolver clan'
     material: RED_WOOL

@@ -157,7 +157,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.8.2 habilitado.");
+        getLogger().info("MDVClans 1.9.0 habilitado.");
     }
 
     @Override
@@ -284,6 +284,18 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     "PRIMARY KEY(clan_id, role)," +
                     "FOREIGN KEY(clan_id) REFERENCES clans(id) ON DELETE CASCADE" +
                     ")");
+            st.executeUpdate("CREATE TABLE IF NOT EXISTS clan_role_permissions (" +
+                    "clan_id INTEGER NOT NULL," +
+                    "permission_key TEXT NOT NULL," +
+                    "role INTEGER NOT NULL," +
+                    "allowed INTEGER NOT NULL DEFAULT 0," +
+                    "PRIMARY KEY(clan_id, permission_key, role)," +
+                    "FOREIGN KEY(clan_id) REFERENCES clans(id) ON DELETE CASCADE" +
+                    ")");
+            st.executeUpdate("CREATE TABLE IF NOT EXISTS mdvclans_meta (" +
+                    "meta_key TEXT NOT NULL PRIMARY KEY," +
+                    "meta_value TEXT"
+                    + ")");
             st.executeUpdate("CREATE TABLE IF NOT EXISTS invites (" +
                     "clan_id INTEGER NOT NULL," +
                     "target_uuid TEXT NOT NULL," +
@@ -374,6 +386,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         addColumnIfMissing("clans", "description", "TEXT");
         addColumnIfMissing("clan_mails", "mail_type", "TEXT NOT NULL DEFAULT 'NORMAL'");
         addColumnIfMissing("clan_mails", "relation_clan_id", "INTEGER NOT NULL DEFAULT 0");
+        migrateRolesToV19();
+        ensureRoleNamesForAllClans();
     }
 
     private synchronized void addColumnIfMissing(String table, String column, String definition) {
@@ -504,7 +518,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         player.sendMessage(color("&e/clan chat [mensaje] &7- Alterna o habla por clan."));
         player.sendMessage(color("&e/clan setbase &7/ &e/clan base &7- Base del clan."));
         player.sendMessage(color("&e/clan relacion <ID> <neutral|aliado|enemigo>"));
-        player.sendMessage(color("&e/clan rol <0-5> <nombre> &7- Nombra un rango."));
+        player.sendMessage(color("&e/clan rol <0-4> <nombre> &7- Nombra un rango."));
         player.sendMessage(color("&e/clan editar <nombre|id> <valor> &7- Ajustes del clan."));
         player.sendMessage(color("&e/clan solicitudes &7- Solicitudes pendientes."));
         player.sendMessage(color("&e/clan banco &7- Banco del clan."));
@@ -848,7 +862,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     private void handleSetRank(Player player, String[] args) throws SQLException {
         if (args.length < 3) {
-            msg(player, "&cUso: &e/clan setrango <jugador> <0-5>");
+            msg(player, "&cUso: &e/clan setrango <jugador> <0-4>");
             return;
         }
         Member actor = requireMember(player);
@@ -880,7 +894,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     private void handleRoleName(Player player, String[] args) throws SQLException {
         if (args.length < 3) {
-            msg(player, "&cUso: &e/clan rol <0-5> <nombre>");
+            msg(player, "&cUso: &e/clan rol <0-4> <nombre>");
             return;
         }
         Member member = requireMember(player);
@@ -1127,6 +1141,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "ajustes", "settings", "configuracion" -> openSettingsMenu(player);
             case "rangos", "roles" -> openRoleSettingsMenu(player);
             case "permisos", "permissions" -> openPermissionsMenu(player, page);
+            case "permisos_editar", "editar_permisos", "permissions_edit", "permissionsedit" -> openPermissionsEditMenu(player, page);
             case "solicitudes", "requests", "join_requests" -> openJoinRequestsMenu(player, page);
             default -> openMainMenu(player);
         }
@@ -1868,19 +1883,18 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         return null;
     }
 
-    private boolean hasRank(Player player, Member member, String key) {
-        int required = getConfig().getInt("rank-permissions." + key, maxRole());
-        if (member.role() >= required || player.hasPermission("mdvclans.admin")) return true;
-        msg(player, "&cNecesitas rango &e" + required + " &co superior para hacer eso.");
+    private boolean hasRank(Player player, Member member, String key) throws SQLException {
+        if (player.hasPermission("mdvclans.admin") || can(member, key)) return true;
+        int required = defaultRequiredRank(key);
+        msg(player, "&cNo tienes permiso de clan para hacer eso. &7Por defecto requiere rango &e" + required + " &7o permiso custom.");
         return false;
     }
 
-    private boolean can(Member member, String key) {
-        int required = getConfig().getInt("rank-permissions." + key, maxRole());
-        return member.role() >= required;
+    private boolean can(Member member, String key) throws SQLException {
+        return isClanRolePermissionAllowed(member.clanId(), key, member.role());
     }
 
-    private boolean canModifyMember(Member actor, Member target, String key) {
+    private boolean canModifyMember(Member actor, Member target, String key) throws SQLException {
         if (!can(actor, key)) return false;
         if (target.uuid().equals(actor.uuid())) return false;
         return target.role() < actor.role();
@@ -1895,8 +1909,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         return member.get();
     }
 
-    private int minRole() { return getConfig().getInt("roles.min", 0); }
-    private int maxRole() { return getConfig().getInt("roles.max", 5); }
+    private int minRole() { return Math.max(0, getConfig().getInt("roles.min", 0)); }
+    private int maxRole() { return Math.min(4, Math.max(minRole(), getConfig().getInt("roles.max", 4))); }
 
     private String normalizeTag(String raw) {
         return ChatColor.stripColor(raw).replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
@@ -2073,6 +2087,115 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private synchronized int clearAllClanBases() throws SQLException {
         try (PreparedStatement ps = connection.prepareStatement("UPDATE clans SET base_world=NULL,base_x=0,base_y=0,base_z=0,base_yaw=0,base_pitch=0 WHERE base_world IS NOT NULL AND base_world<>''")) {
             return ps.executeUpdate();
+        }
+    }
+
+    private synchronized boolean isMetaFlagSet(String key) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("SELECT meta_value FROM mdvclans_meta WHERE meta_key=?")) {
+            ps.setString(1, key);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && "true".equalsIgnoreCase(rs.getString("meta_value"));
+            }
+        }
+    }
+
+    private synchronized void setMetaFlag(String key, String value) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("INSERT OR REPLACE INTO mdvclans_meta(meta_key,meta_value) VALUES(?,?)")) {
+            ps.setString(1, key);
+            ps.setString(2, value);
+            ps.executeUpdate();
+        }
+    }
+
+    private synchronized void migrateRolesToV19() throws SQLException {
+        if (isMetaFlagSet("roles-migrated-1.9")) return;
+        try (Statement st = connection.createStatement()) {
+            st.executeUpdate("UPDATE members SET role=CASE " +
+                    "WHEN role>=5 THEN 4 " +
+                    "WHEN role=4 THEN 3 " +
+                    "WHEN role=3 THEN 2 " +
+                    "WHEN role=2 THEN 1 " +
+                    "ELSE 0 END");
+            st.executeUpdate("UPDATE members SET role=4 WHERE uuid IN (" +
+                    "SELECT owner_uuid FROM clans c WHERE NOT EXISTS (SELECT 1 FROM members m2 WHERE m2.clan_id=c.id AND m2.role=4))");
+            st.executeUpdate("CREATE TEMP TABLE role_names_v19(clan_id INTEGER NOT NULL, role INTEGER NOT NULL, name TEXT NOT NULL, PRIMARY KEY(clan_id, role))");
+            st.executeUpdate("INSERT OR REPLACE INTO role_names_v19 SELECT clan_id,0,name FROM role_names WHERE role=0");
+            st.executeUpdate("INSERT OR REPLACE INTO role_names_v19 SELECT clan_id,1,name FROM role_names WHERE role=2");
+            st.executeUpdate("INSERT OR REPLACE INTO role_names_v19 SELECT clan_id,2,name FROM role_names WHERE role=3");
+            st.executeUpdate("INSERT OR REPLACE INTO role_names_v19 SELECT clan_id,3,name FROM role_names WHERE role=4");
+            st.executeUpdate("INSERT OR REPLACE INTO role_names_v19 SELECT clan_id,4,name FROM role_names WHERE role>=5");
+            st.executeUpdate("DELETE FROM role_names");
+            st.executeUpdate("INSERT OR REPLACE INTO role_names(clan_id,role,name) SELECT clan_id,role,name FROM role_names_v19");
+            st.executeUpdate("DROP TABLE role_names_v19");
+            st.executeUpdate("DELETE FROM clan_role_permissions WHERE role<0 OR role>4");
+        }
+        setMetaFlag("roles-migrated-1.9", "true");
+    }
+
+    private synchronized void ensureRoleNamesForAllClans() throws SQLException {
+        List<Integer> clanIds = new ArrayList<>();
+        try (Statement st = connection.createStatement(); ResultSet rs = st.executeQuery("SELECT id FROM clans")) {
+            while (rs.next()) clanIds.add(rs.getInt("id"));
+        }
+        for (int clanId : clanIds) {
+            for (int role = minRole(); role <= maxRole(); role++) {
+                try (PreparedStatement ps = connection.prepareStatement("INSERT OR IGNORE INTO role_names(clan_id,role,name) VALUES(?,?,?)")) {
+                    ps.setInt(1, clanId);
+                    ps.setInt(2, role);
+                    ps.setString(3, getConfig().getString("roles.defaults." + role, "Rango " + role));
+                    ps.executeUpdate();
+                }
+            }
+        }
+    }
+
+    private String normalizePermissionKey(String key) {
+        if (key == null) return "";
+        return key.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private int defaultRequiredRank(String key) {
+        int required = getConfig().getInt("rank-permissions." + normalizePermissionKey(key), maxRole());
+        return Math.max(minRole(), Math.min(maxRole(), required));
+    }
+
+    private boolean defaultPermissionAllowed(String key, int role) {
+        int normalizedRole = Math.max(minRole(), Math.min(maxRole(), role));
+        return normalizedRole >= defaultRequiredRank(key);
+    }
+
+    private synchronized boolean isClanRolePermissionAllowed(int clanId, String key, int role) throws SQLException {
+        String permissionKey = normalizePermissionKey(key);
+        int normalizedRole = Math.max(minRole(), Math.min(maxRole(), role));
+        if (normalizedRole >= maxRole()) return true;
+        try (PreparedStatement ps = connection.prepareStatement("SELECT allowed FROM clan_role_permissions WHERE clan_id=? AND permission_key=? AND role=?")) {
+            ps.setInt(1, clanId);
+            ps.setString(2, permissionKey);
+            ps.setInt(3, normalizedRole);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt("allowed") != 0;
+            }
+        }
+        return defaultPermissionAllowed(permissionKey, normalizedRole);
+    }
+
+    private synchronized void setClanRolePermission(int clanId, String key, int role, boolean allowed) throws SQLException {
+        String permissionKey = normalizePermissionKey(key);
+        int normalizedRole = Math.max(minRole(), Math.min(maxRole(), role));
+        if (normalizedRole >= maxRole()) return;
+        try (PreparedStatement ps = connection.prepareStatement("INSERT OR REPLACE INTO clan_role_permissions(clan_id,permission_key,role,allowed) VALUES(?,?,?,?)")) {
+            ps.setInt(1, clanId);
+            ps.setString(2, permissionKey);
+            ps.setInt(3, normalizedRole);
+            ps.setInt(4, allowed ? 1 : 0);
+            ps.executeUpdate();
+        }
+    }
+
+    private synchronized void resetClanRolePermissions(int clanId) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("DELETE FROM clan_role_permissions WHERE clan_id=?")) {
+            ps.setInt(1, clanId);
+            ps.executeUpdate();
         }
     }
 
@@ -2916,12 +3039,12 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         fill(inv);
         inv.setItem(nativeSlot("menus.settings.items.rename-name.slot", 10), can(member, "rename-clan") ? nativeItem("menus.settings.items.rename-name", Material.NAME_TAG, "&e&lCambiar nombre", List.of("", "&7Nombre actual: &f{name}", "", "&eClick para escribir el nuevo nombre."), ph) : lockedItem("&7Cambiar nombre", "&cRequiere rango alto."));
         inv.setItem(nativeSlot("menus.settings.items.rename-id.slot", 11), can(member, "rename-tag") ? nativeItem("menus.settings.items.rename-id", Material.OAK_SIGN, "&b&lCambiar ID", List.of("", "&7ID actual: &b{id}", "&7El ID se ve en chat/listas.", "", "&eClick para escribir el nuevo ID."), ph) : lockedItem("&7Cambiar ID", "&cRequiere rango alto."));
-        inv.setItem(nativeSlot("menus.settings.items.roles.slot", 12), can(member, "rename-role") ? nativeItem("menus.settings.items.roles", Material.WRITABLE_BOOK, "&d&lNombres de rangos", List.of("", "&7Cambia los nombres visibles", "&7de los rangos 0-5.", "", "&eClick para abrir."), ph) : lockedItem("&7Nombres de rangos", "&cRequiere rango alto."));
+        inv.setItem(nativeSlot("menus.settings.items.roles.slot", 12), can(member, "rename-role") ? nativeItem("menus.settings.items.roles", Material.WRITABLE_BOOK, "&d&lNombres de rangos", List.of("", "&7Cambia los nombres visibles", "&7de los rangos 0-4.", "", "&eClick para abrir."), ph) : lockedItem("&7Nombres de rangos", "&cRequiere rango alto."));
         if (nativeSection("menus.settings.items.description") != null) {
             inv.setItem(nativeSlot("menus.settings.items.description.slot", 18), can(member, "description-edit") ? nativeItem("menus.settings.items.description", Material.MAP, "&6&lDescripción pública", List.of("", "&7Descripción actual:", "&f{description}", "", "&eClick para editar.", "&cClick derecho para limpiar."), ph) : lockedItem("&7Descripción pública", "&cRequiere rango alto."));
         }
         inv.setItem(nativeSlot("menus.settings.items.banner.slot", 13), can(member, "banner-set") ? clanBannerItem(clan, applyPlaceholders(configString("menus.settings.items.banner.name", "&f&lCambiar banner"), ph), lines("menus.settings.items.banner.lore", List.of("", "&7Usa el banner en tu mano.", "", "&eClick: guardar banner en mano", "&cClick derecho: quitar banner"), ph), ph) : lockedItem("&7Cambiar banner", "&cRequiere rango alto."));
-        inv.setItem(nativeSlot("menus.settings.items.permissions.slot", 14), nativeItem("menus.settings.items.permissions", Material.KNOWLEDGE_BOOK, "&b&lVer permisos", List.of("", "&7Muestra qué rango necesita", "&7cada acción del clan.", "", "&eClick para abrir."), ph));
+        inv.setItem(nativeSlot("menus.settings.items.permissions.slot", 14), can(member, "permissions-edit") ? nativeItem("menus.settings.items.permissions", Material.KNOWLEDGE_BOOK, "&b&lConfigurar permisos", List.of("", "&7Edita qué acciones puede usar", "&7cada rango del clan.", "", "&eClick para abrir el editor."), ph) : lockedItem("&7Configurar permisos", "&cRequiere permiso de administrar permisos."));
         inv.setItem(nativeSlot("menus.settings.items.open.slot", 15), can(member, "open") ? nativeItem("menus.settings.items.open", Material.OAK_DOOR, "&a&lEntrada del clan", List.of("", "&7Estado actual: {entry}", "", "&eClick para alternar."), ph) : lockedItem("&7Entrada del clan", "&cRequiere rango alto."));
         inv.setItem(nativeSlot("menus.settings.items.disband.slot", 16), can(member, "disband") ? nativeItem("menus.settings.items.disband", Material.TNT, "&4&lDisolver clan", List.of("", "&cAcción peligrosa.", "&7Usa el comando de confirmación.", "", "&eClick para instrucciones."), ph) : lockedItem("&7Disolver clan", "&cSolo el rango máximo."));
         setBackItem(inv, "settings", 49, "&6&lVolver", List.of("&7Regresa al menú principal."));
@@ -2934,7 +3057,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         Clan clan = getClan(member.clanId()).orElseThrow();
         Inventory inv = Bukkit.createInventory(new ClanMenuHolder("rolesettings", 1, clan.id(), null, -1), 27, nativeTitle("role-settings", "&8Rangos &b{id}", clanPlaceholders(clan)));
         fill(inv);
-        int[] slots = {10, 11, 12, 13, 14, 15};
+        int[] slots = {10, 11, 12, 13, 14};
         for (int role = minRole(); role <= maxRole() && role < slots.length; role++) {
             Map<String, String> ph = clanPlaceholders(clan);
             ph.put("role_number", String.valueOf(role));
@@ -2947,58 +3070,77 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
     private void openPermissionsMenu(Player player, int page) throws SQLException {
+        openPermissionTableMenu(player, page, false);
+    }
+
+    private void openPermissionsEditMenu(Player player, int page) throws SQLException {
+        Member member = requireMember(player); if (member == null) return;
+        if (!hasRank(player, member, "permissions-edit")) return;
+        openPermissionTableMenu(player, page, true);
+    }
+
+    private void openPermissionTableMenu(Player player, int page, boolean editable) throws SQLException {
         Member member = requireMember(player); if (member == null) return;
         Clan clan = getClan(member.clanId()).orElseThrow();
         List<String> keys = permissionKeys();
-        int rowsPerPage = Math.max(1, Math.min(5, nativeMenus == null ? 4 : nativeMenus.getInt("menus.permissions.table.rows-per-page", 4)));
-        int[] headerSlots = nativeIntArray("menus.permissions.table.role-header-slots", new int[]{3,4,5,6,7,8});
-        int[] rowStarts = nativeIntArray("menus.permissions.table.permission-row-start-slots", new int[]{9,18,27,36});
+        String menuHolder = editable ? "permissionsedit" : "permissions";
+        String path = permissionMenuPath(editable);
+        int rowsPerPage = Math.max(1, Math.min(5, nativeMenus == null ? 4 : nativeMenus.getInt(path + ".table.rows-per-page", 4)));
+        int[] headerSlots = nativeIntArray(path + ".table.role-header-slots", new int[]{3,4,5,6,7});
+        int[] rowStarts = nativeIntArray(path + ".table.permission-row-start-slots", new int[]{9,18,27,36});
         rowsPerPage = Math.min(rowsPerPage, Math.max(1, rowStarts.length));
-        int start = Math.max(0, page - 1) * rowsPerPage;
+        int maxPage = Math.max(1, (int) Math.ceil(keys.size() / (double) rowsPerPage));
+        page = Math.max(1, Math.min(page, maxPage));
+        int start = (page - 1) * rowsPerPage;
         Map<String, String> basePh = clanPlaceholders(clan);
         basePh.put("page", String.valueOf(page));
-        basePh.put("max_page", String.valueOf(Math.max(1, (int) Math.ceil(keys.size() / (double) rowsPerPage))));
-        Inventory inv = Bukkit.createInventory(new ClanMenuHolder("permissions", Math.max(1, page), clan.id(), null, -1), 54, nativeTitle("permissions", "&8Permisos del clan", basePh));
+        basePh.put("max_page", String.valueOf(maxPage));
+        basePh.put("mode", editable ? "Edición" : "Vista");
+        Inventory inv = Bukkit.createInventory(new ClanMenuHolder(menuHolder, page, clan.id(), null, -1), 54, nativeTitle(menuConfigKey(menuHolder), editable ? "&8Editar permisos &7({page}/{max_page})" : "&8Permisos &7({page}/{max_page})", basePh));
         fill(inv);
         for (int role = minRole(); role <= maxRole() && role - minRole() < headerSlots.length; role++) {
             Map<String, String> ph = new HashMap<>(basePh);
             ph.put("role_number", String.valueOf(role));
             ph.put("role_name", getRoleName(clan.id(), role));
-            inv.setItem(headerSlots[role - minRole()], nativeItem("menus.permissions.role-header", Material.GRAY_BANNER, "&bRango {role_number}", List.of("&f{role_name}", "", "&7Columna de permisos", "&7para este rango."), ph));
+            ph.put("leader_note", role >= maxRole() ? "&aEl líder siempre tiene todos los permisos." : "&7Columna de permisos para este rango.");
+            inv.setItem(headerSlots[role - minRole()], nativeItem(path + ".role-header", Material.GRAY_BANNER, "&6&lRango {role_number}", List.of("&f{role_name}", "", "{leader_note}"), ph));
         }
 
         for (int row = 0; row < rowsPerPage && start + row < keys.size() && row < rowStarts.length; row++) {
             String key = keys.get(start + row);
-            int req = getConfig().getInt("rank-permissions." + key, maxRole());
+            int req = defaultRequiredRank(key);
             Map<String, String> ph = new HashMap<>(basePh);
             ph.put("permission", key);
             ph.put("permission_key", key);
             ph.put("permission_name", permissionName(key));
             ph.put("permission_index", String.valueOf(start + row + 1));
             ph.put("required_rank", String.valueOf(req));
-            ph.put("required_role", getRoleName(clan.id(), Math.max(minRole(), Math.min(maxRole(), req))));
+            ph.put("required_role", getRoleName(clan.id(), req));
             ph.put("permission_description", String.join("|", permissionDescription(key)));
 
             int rowStart = rowStarts[row];
-            inv.setItem(rowStart, nativeItem("menus.permissions.permission-item", permissionMaterial(key, req), "&e#{permission_index} {permission_name}", permissionTableLore(key), ph));
+            inv.setItem(rowStart, nativeItem(path + ".permission-item", permissionMaterial(key, req), "&e#{permission_index} {permission_name}", permissionTableLore(key, editable), ph));
 
             for (int role = minRole(); role <= maxRole() && role - minRole() < headerSlots.length; role++) {
-                boolean allowed = role >= req;
+                boolean allowed = isClanRolePermissionAllowed(clan.id(), key, role);
                 Map<String, String> statusPh = new HashMap<>(ph);
                 statusPh.put("role_number", String.valueOf(role));
                 statusPh.put("role_name", getRoleName(clan.id(), role));
                 statusPh.put("permission_status", allowed ? "&aPermitido" : "&cBloqueado");
                 statusPh.put("permission_status_plain", allowed ? "Permitido" : "Bloqueado");
+                statusPh.put("edit_hint", editable ? (role >= maxRole() ? "&8El líder no se puede bloquear." : "&eClick para alternar este permiso.") : "&8Solo lectura.");
                 int slot = rowStart + 3 + (role - minRole());
-                inv.setItem(slot, nativeItem(allowed ? "menus.permissions.allowed-item" : "menus.permissions.denied-item", allowed ? Material.LIME_WOOL : Material.RED_WOOL, allowed ? "&a✔ Permitido" : "&c✖ Bloqueado", List.of("&7Rango: &b{role_number} &8- &f{role_name}", "&7Permiso: {permission_name}", "", "{permission_status}"), statusPh));
+                inv.setItem(slot, nativeItem(path + (allowed ? ".allowed-item" : ".denied-item"), allowed ? Material.LIME_WOOL : Material.RED_WOOL, allowed ? "&a✔ Permitido" : "&c✖ Bloqueado", List.of("&7Rango: &6{role_number} &8- &f{role_name}", "&7Permiso: {permission_name}", "", "{permission_status}", "{edit_hint}"), statusPh));
             }
         }
 
-        nav(inv, page, keys.size(), rowsPerPage, "permissions", clan.id());
-        setBackItem(inv, "permissions", 49, "&6&lVolver", List.of("&7Regresa al tablero de información."));
+        if (editable) {
+            inv.setItem(nativeSlot("menus.permissions-edit.items.reset.slot", 50), nativeItem("menus.permissions-edit.items.reset", Material.REDSTONE_BLOCK, "&c&lResetear permisos", List.of("", "&7Borra la configuración custom", "&7de este clan y vuelve a", "&7los permisos por defecto.", "", "&eClick para resetear."), basePh));
+        }
+        nav(inv, page, keys.size(), rowsPerPage, menuHolder, clan.id());
+        setBackItem(inv, menuHolder, 49, "&6&lVolver", List.of(editable ? "&7Regresa a ajustes." : "&7Regresa al tablero de información."));
         openNativeInventory(player, inv);
     }
-
 
     private void openJoinRequestsMenu(Player player, int page) throws SQLException {
         Member member = requireMember(player); if (member == null) return;
@@ -3226,6 +3368,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "clanaction" -> "clan-action";
             case "mailaction" -> "mail-action";
             case "rolesettings" -> "role-settings";
+            case "permissionsedit" -> "permissions-edit";
             case "joinrequests" -> "join-requests";
             default -> holderMenu;
         };
@@ -3251,6 +3394,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "settings" -> "ajustes";
             case "rolesettings" -> "rangos";
             case "permissions" -> "permisos";
+            case "permissionsedit" -> "permisos_editar";
             case "joinrequests" -> "solicitudes";
             case "memberaction" -> "miembros";
             case "clanaction" -> "lista";
@@ -3268,7 +3412,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "members", "info", "relations", "storagehub", "settings", "clanlist" -> "gestion";
             case "relationslist", "bajas" -> "relaciones";
             case "mailbox", "logs", "joinrequests" -> "info";
-            case "rolesettings", "permissions" -> "ajustes";
+            case "rolesettings", "permissionsedit" -> "ajustes";
+            case "permissions" -> "info";
             case "memberaction" -> "miembros";
             case "clanaction" -> "lista";
             case "mailaction" -> "correo";
@@ -3289,6 +3434,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "settings" -> handleSettingsClick(player, slot, click);
             case "rolesettings" -> handleRoleSettingsClick(player, slot);
             case "permissions" -> { }
+            case "permissionsedit" -> handlePermissionsEditClick(player, holder.page(), slot, click);
             case "joinrequests" -> handleJoinRequestsClick(player, holder.page(), slot, click);
             case "memberaction" -> handleMemberActionClick(player, holder.targetUuid(), slot);
             case "clanaction" -> handleClanActionClick(player, holder.clanId(), slot);
@@ -3472,14 +3618,14 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             }
         }
         else if (slot == nativeSlot("menus.settings.items.banner.slot", 13)) { player.closeInventory(); player.performCommand(click == ClickType.RIGHT ? "clan estandarte quitar" : "clan estandarte set"); }
-        else if (slot == nativeSlot("menus.settings.items.permissions.slot", 14)) openPermissionsMenu(player, 1);
+        else if (slot == nativeSlot("menus.settings.items.permissions.slot", 14)) openPermissionsEditMenu(player, 1);
         else if (slot == nativeSlot("menus.settings.items.open.slot", 15)) { player.closeInventory(); Clan clan = getPlayerClan(player.getUniqueId()).orElseThrow(); player.performCommand("clan abierto " + (clan.open() ? "off" : "on")); }
         else if (slot == nativeSlot("menus.settings.items.disband.slot", 16)) { player.closeInventory(); msg(player, "&cPara disolver usa: &e/clan disolver confirmar"); }
     }
 
 
     private void handleRoleSettingsClick(Player player, int slot) throws SQLException {
-        int[] defaults = {10, 11, 12, 13, 14, 15};
+        int[] defaults = {10, 11, 12, 13, 14};
         for (int role = minRole(); role <= maxRole() && role < defaults.length; role++) {
             if (slot == nativeSlot("menus.role-settings.role-item.slot-" + role, defaults[role])) {
                 Member member = requireMember(player); if (member == null) return;
@@ -3492,6 +3638,45 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
     }
 
+
+    private void handlePermissionsEditClick(Player player, int page, int slot, ClickType click) throws SQLException {
+        Member member = requireMember(player); if (member == null) return;
+        if (!hasRank(player, member, "permissions-edit")) return;
+        if (slot == nativeSlot("menus.permissions-edit.items.reset.slot", 50)) {
+            resetClanRolePermissions(member.clanId());
+            logAction(member.clanId(), player, "PERMISOS", "Reseteó los permisos custom del clan");
+            msg(player, "&aPermisos del clan reseteados a los valores por defecto.");
+            openPermissionsEditMenu(player, page);
+            return;
+        }
+        List<String> keys = permissionKeys();
+        String path = permissionMenuPath(true);
+        int rowsPerPage = Math.max(1, Math.min(5, nativeMenus == null ? 4 : nativeMenus.getInt(path + ".table.rows-per-page", 4)));
+        int[] headerSlots = nativeIntArray(path + ".table.role-header-slots", new int[]{3,4,5,6,7});
+        int[] rowStarts = nativeIntArray(path + ".table.permission-row-start-slots", new int[]{9,18,27,36});
+        rowsPerPage = Math.min(rowsPerPage, Math.max(1, rowStarts.length));
+        int start = Math.max(0, page - 1) * rowsPerPage;
+        for (int row = 0; row < rowsPerPage && start + row < keys.size() && row < rowStarts.length; row++) {
+            int relative = slot - (rowStarts[row] + 3);
+            if (relative < 0 || relative >= headerSlots.length) continue;
+            int role = minRole() + relative;
+            if (role < minRole() || role > maxRole()) continue;
+            String key = keys.get(start + row);
+            if (role >= maxRole()) {
+                msg(player, "&cEl líder siempre tiene todos los permisos y no se puede bloquear.");
+                return;
+            }
+            if (!player.hasPermission("mdvclans.admin") && member.role() < maxRole() && role >= member.role()) {
+                msg(player, "&cSolo puedes modificar permisos de rangos menores al tuyo.");
+                return;
+            }
+            boolean current = isClanRolePermissionAllowed(member.clanId(), key, role);
+            setClanRolePermission(member.clanId(), key, role, !current);
+            logAction(member.clanId(), player, "PERMISOS", (current ? "Bloqueó" : "Permitió") + " " + key + " para rango " + role);
+            openPermissionsEditMenu(player, page);
+            return;
+        }
+    }
 
     private void handleJoinRequestsClick(Player player, int page, int slot, ClickType click) throws SQLException {
         Member member = requireMember(player); if (member == null) return;
@@ -3636,6 +3821,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         else if (menu.equals("mailbox")) openMailboxMenu(player, page);
         else if (menu.equals("joinrequests")) openJoinRequestsMenu(player, page);
         else if (menu.equals("permissions")) openPermissionsMenu(player, page);
+        else if (menu.equals("permissionsedit")) openPermissionsEditMenu(player, page);
         else openMainMenu(player);
     }
 
@@ -3701,6 +3887,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "rename-clan" -> "&eCambiar nombre del clan";
             case "rename-tag" -> "&bCambiar ID del clan";
             case "settings" -> "&6Abrir ajustes";
+            case "permissions-edit" -> "&bAdministrar permisos";
             case "disband" -> "&4Disolver clan";
             default -> "&e" + key;
         };
@@ -3732,6 +3919,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "rename-clan" -> List.of("&7Permite cambiar el nombre", "&7formal del clan.");
             case "rename-tag" -> List.of("&7Permite cambiar el ID/tag", "&7visible del clan.");
             case "settings" -> List.of("&7Permite acceder al panel", "&7de ajustes del clan.");
+            case "permissions-edit" -> List.of("&7Permite abrir el editor", "&7de permisos por rol.");
             case "disband" -> List.of("&7Permite disolver el clan.", "&cAcción peligrosa.");
             default -> List.of("&7Permiso interno del clan.");
         };
@@ -3751,22 +3939,27 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private List<String> permissionKeys() {
-        return List.of("invite", "kick", "promote", "demote", "set-rank", "rename-role", "setbase", "relation", "open", "bank-deposit", "bank-withdraw", "storage-open", "banner-set", "logs-view", "board-edit", "description-edit", "mail-send", "mail-delete", "join-requests", "rename-clan", "rename-tag", "settings", "disband");
+        return List.of("invite", "kick", "promote", "demote", "set-rank", "rename-role", "setbase", "relation", "open", "bank-deposit", "bank-withdraw", "storage-open", "banner-set", "logs-view", "board-edit", "description-edit", "mail-send", "mail-delete", "join-requests", "rename-clan", "rename-tag", "settings", "permissions-edit", "disband");
     }
 
-    private List<String> permissionTableLore(String key) {
-        List<String> configured = nativeMenus == null ? Collections.emptyList() : nativeMenus.getStringList("menus.permissions.permission-item.lore");
+    private String permissionMenuPath(boolean editable) {
+        if (editable && nativeSection("menus.permissions-edit") != null) return "menus.permissions-edit";
+        return "menus.permissions";
+    }
+
+    private List<String> permissionTableLore(String key, boolean editable) {
+        String path = permissionMenuPath(editable) + ".permission-item.lore";
+        List<String> configured = nativeMenus == null ? Collections.emptyList() : nativeMenus.getStringList(path);
         if (configured != null && !configured.isEmpty()) return configured;
         List<String> lore = new ArrayList<>();
         lore.add("");
         lore.add("&7Descripción:");
         lore.addAll(permissionDescription(key));
         lore.add("");
-        lore.add("&7Rango requerido: &b{required_rank}");
+        lore.add("&7Rango requerido por defecto: &6{required_rank}");
         lore.add("&7Nombre del rango: &f{required_role}");
         lore.add("");
-        lore.add("&8A la derecha se marca qué rangos");
-        lore.add("&8tienen este permiso habilitado.");
+        lore.add(editable ? "&8Click en las lanas para alternar." : "&8Las lanas muestran el estado actual.");
         return lore;
     }
 
@@ -4610,7 +4803,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 if (equalsAny(sub, "descripcion", "descripción", "desc")) return filter(List.of("ver", "set", "limpiar"), args[1]);
                 if (equalsAny(sub, "editar")) return filter(List.of("nombre", "id"), args[1]);
                 if (equalsAny(sub, "solicitudes")) return filter(List.of("ver", "aceptar", "borrar"), args[1]);
-                if (equalsAny(sub, "menu", "abrir", "ui", "interfaz")) return filter(List.of("auto", "gestion", "sinclan", "miembros", "info", "relaciones", "relaciones_lista", "almacen", "lista", "lista_sinclan", "crear", "creacion", "correo", "top", "top_kills", "top_banco", "bajas", "logs", "ajustes", "rangos", "permisos", "solicitudes", "principal"), args[1]);
+                if (equalsAny(sub, "menu", "abrir", "ui", "interfaz")) return filter(List.of("auto", "gestion", "sinclan", "miembros", "info", "relaciones", "relaciones_lista", "almacen", "lista", "lista_sinclan", "crear", "creacion", "correo", "top", "top_kills", "top_banco", "bajas", "logs", "ajustes", "rangos", "permisos", "permisos_editar", "solicitudes", "principal"), args[1]);
                 if (equalsAny(sub, "disolver")) return filter(List.of("confirmar"), args[1]);
             }
             if (args.length == 3 && equalsAny(sub, "relacion")) return filter(List.of("neutral", "aliado", "enemigo"), args[2]);

@@ -44,39 +44,42 @@ invites:
 
 roles:
   min: 0
-  max: 5
+  max: 4
   defaults:
     '0': 'Recluta'
-    '1': 'Plebeyo'
-    '2': 'Caballero'
-    '3': 'Conde'
-    '4': 'Noble'
-    '5': 'Líder'
+    '1': 'Miembro'
+    '2': 'Veterano'
+    '3': 'Oficial'
+    '4': 'Líder'
 
+# Valores por defecto para clanes nuevos o clanes sin permisos custom.
+# Desde 1.9.0 cada clan puede sobrescribir esto desde Ajustes > Configurar permisos.
+# El líder/rango 4 siempre conserva todos los permisos.
 rank-permissions:
-  invite: 3
+  invite: 2
   kick: 3
-  promote: 4
-  demote: 4
-  set-rank: 5
-  rename-role: 5
-  setbase: 4
-  relation: 4
-  open: 4
-  disband: 5
+  promote: 3
+  demote: 3
+  set-rank: 4
+  rename-role: 4
+  setbase: 3
+  relation: 3
+  open: 3
+  disband: 4
   bank-deposit: 0
-  bank-withdraw: 4
+  bank-withdraw: 3
   storage-open: 0
-  banner-set: 4
-  logs-view: 4
-  board-edit: 4
-  description-edit: 4
-  mail-send: 4
-  mail-delete: 4
-  settings: 4
-  rename-tag: 5
-  rename-clan: 5
-  join-requests: 3
+  banner-set: 3
+  logs-view: 3
+  board-edit: 3
+  description-edit: 3
+  mail-send: 3
+  mail-delete: 3
+  settings: 3
+  permissions-edit: 4
+  rename-tag: 4
+  rename-clan: 4
+  join-requests: 2
 
 chat:
   format: '&8[&3Clan&8] &b{player}&7: &f{message}'
