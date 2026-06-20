@@ -30,6 +30,9 @@ creation:
 clan-description:
   enabled: true
   max-length: 180
+  # La descripción se divide automáticamente en esta cantidad de líneas.
+  # Ejemplo: max-length 150 / lines 5 = aprox. 30 caracteres por línea.
+  lines: 5
   default-text: 'Este clan aún no tiene descripción.'
 
 limits:
@@ -104,6 +107,11 @@ storage-chest:
   size: 27
   title: '&8Almacén de clan {id}'
 
+clan-mail:
+  # Los correos se cortan automáticamente para que no queden en una sola línea gigante.
+  lines: 10
+  line-length: 45
+
 logs:
   enabled: true
   cleanup:
@@ -126,6 +134,10 @@ top:
 nametags:
   enabled: true
   update-interval-ticks: 100
+  # Necesario cuando el scoreboard principal es compartido; evita que los colores se mezclen entre jugadores.
+  force-personal-scoreboard-if-main: true
+  # Más fuerte: fuerza scoreboard personal siempre. Úsalo solo si otro plugin no te rompe el sidebar.
+  force-personal-scoreboard: false
   formats:
     same: '&a[{id}] '
     ally: '&9[{id}] '

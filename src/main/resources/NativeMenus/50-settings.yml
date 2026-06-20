@@ -71,6 +71,7 @@ menus:
         - '&f{description_line_3}'
         - ''
         - '&eClick: editar.'
+        - '&8Se dividirá automáticamente.'
         - '&cClick derecho: limpiar.'
       disband:
         slot: 16

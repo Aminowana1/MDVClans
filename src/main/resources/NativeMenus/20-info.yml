@@ -42,7 +42,7 @@ menus:
           - '&f{description_line_5}'
           - ''
           - '&eClick: ver descripción.'
-          - '&6Shift-click: editar.'
+          - '&8Se edita desde Ajustes.'
       board:
         slot: 11
         material: WRITABLE_BOOK

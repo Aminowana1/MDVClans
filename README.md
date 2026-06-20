@@ -1,55 +1,19 @@
-# MDVClans 1.8.0
+# MDVClans 1.8.1
 
-Actualización para MDVCRAFT centrada en perfiles de jugador de MMOCore dentro de las GUIs de clan.
+Parche de corrección sobre 1.8.0.
 
-## Cambios 1.8.0
+## Cambios
 
-- Las solicitudes de ingreso ahora resuelven `{race}` y `{level}` usando la misma lógica que la lista de miembros.
-- Se añadió caché interna `player_profiles` en SQLite para guardar la última raza/nivel conocidos.
-- Si el jugador está desconectado, MDVClans intenta mostrar raza/nivel desde caché.
-- Si MMOCore permite leer `PlayerData` offline, MDVClans también intenta leer nivel y clase/raza por reflexión.
-- En join se actualiza la caché de perfil tras unos ticks, para dar tiempo a que MMOCore cargue los datos.
-
-## Config nueva
-
-En `config.yml`:
-
-```yaml
-integrations:
-  mmocore:
-    use-direct-api: true
-    level-placeholders:
-      - '%mmocore_level%'
-    race-placeholders:
-      - '%mmocore_race%'
-      - '%mmocore_class%'
-      - '%mmocore_class_name%'
-      - '%mmocore_player_class%'
-      - '%mmocore_profession%'
-
-profile-cache:
-  enabled: true
-  update-on-join-delay-ticks: 80
-  unknown-level-text: 'Sin datos'
-  unknown-race-text: 'Sin raza'
-```
-
-## Menús nativos
-
-Edita:
-
-```text
-plugins/MDVClans/NativeMenus/*.yml
-```
-
-MDVSocial debe abrir GUIs nativas con acciones/commands como:
-
-```bash
-/clan abrir miembros
-/clan abrir info
-/clan abrir solicitudes
-/clan abrir lista
-```
+- La descripción pública ahora se divide automáticamente en líneas.
+  - Usa `clan-description.max-length` y `clan-description.lines`.
+  - Ejemplo: 150 caracteres / 5 líneas = aprox. 30 caracteres por línea.
+- Los correos de clan ahora se dividen automáticamente en `message_line_1` a `message_line_10`.
+- El tablero del clan sigue usando líneas manuales con `|`, pensado para reglas o avisos intencionales.
+- El item de descripción del menú `info` ahora solo permite ver la descripción.
+- La descripción se edita desde el item de `settings`.
+- Corrección visual para evitar que el item quede como ghost item en la mano al editar descripción desde GUI.
+- Ajuste de nametags para evitar desync de colores cuando el scoreboard principal es compartido.
+- Re-sincronización extra de nametags al aceptar alianzas.
 
 ## Compilar
 
@@ -60,5 +24,5 @@ mvn clean package
 Jar esperado:
 
 ```text
-target/MDVClans-1.8.0.jar
+target/MDVClans-1.8.1.jar
 ```

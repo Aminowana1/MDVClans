@@ -173,6 +173,11 @@ menus:
           - '&f{message_line_3}'
           - '&f{message_line_4}'
           - '&f{message_line_5}'
+          - '&f{message_line_6}'
+          - '&f{message_line_7}'
+          - '&f{message_line_8}'
+          - '&f{message_line_9}'
+          - '&f{message_line_10}'
       accept-ally:
         slot: 10
         material: LIME_DYE
