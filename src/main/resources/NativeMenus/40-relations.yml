@@ -79,7 +79,7 @@ menus:
       - '&f{description_line_1}'
       - '&f{description_line_2}'
       - ''
-      - '&eClick para ver info.'
+      - '&eClick para abrir opciones.'
     back:
       slot: 49
       action: NATIVE
@@ -104,6 +104,8 @@ menus:
       lore:
       - '&7Clan: &f{name}'
       - '&7Kills contra nosotros: &c{kills_against_us}'
+      - ''
+      - '&eClick para abrir opciones.'
     back:
       slot: 49
       action: NATIVE
@@ -141,6 +143,8 @@ menus:
       - '&7Valor: &6{value}'
       - '&7Miembros: &e{members}'
       - '&7Descripción: &f{description_line_1}'
+      - ''
+      - '&eClick para abrir opciones.'
     back:
       slot: 49
       action: NATIVE

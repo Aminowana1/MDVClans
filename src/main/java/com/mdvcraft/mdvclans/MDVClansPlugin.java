@@ -157,7 +157,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.8.1 habilitado.");
+        getLogger().info("MDVClans 1.8.2 habilitado.");
     }
 
     @Override
@@ -3298,9 +3298,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "clanlist" -> handleClanListClick(player, holder.page(), slot, click);
             case "relationslist" -> handleRelationsListClick(player, holder.page(), slot);
             case "mailbox" -> handleMailboxClick(player, holder.page(), slot, click);
-            case "bajas" -> { }
+            case "bajas" -> handleKillStatsClick(player, slot);
             case "logs" -> handleLogsClick(player, holder.page(), slot, click);
-            default -> { if (menu.startsWith("top:")) handleTopGuiClick(player, slot); }
+            default -> { if (menu.startsWith("top:")) handleTopGuiClick(player, menu, slot); }
         }
     }
 
@@ -3436,8 +3436,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         List<ClanRelationView> relations = getVisibleRelations(member.clanId());
         int index = pageIndexFromSlot(page, slot);
         if (index < 0 || index >= relations.size()) return;
-        player.closeInventory();
-        player.performCommand("clan info " + relations.get(index).clan().tag());
+        openClanActionMenu(player, relations.get(index).clan().id());
     }
 
     private void handleMailboxClick(Player player, int page, int slot, ClickType click) throws SQLException {
@@ -3608,10 +3607,25 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
     }
 
-    private void handleTopGuiClick(Player player, int slot) throws SQLException {
-        if (slot == nativeSlot("menus.top.items.force.slot", 3)) openTopGui(player, "fuerza");
-        else if (slot == nativeSlot("menus.top.items.kills.slot", 4)) openTopGui(player, "kills");
-        else if (slot == nativeSlot("menus.top.items.bank.slot", 5)) openTopGui(player, "banco");
+    private void handleKillStatsClick(Player player, int slot) throws SQLException {
+        Member member = requireMember(player); if (member == null) return;
+        List<ClanTopEntry> suffered = getTopKillersAgainst(member.clanId(), GUI_PAGE_SIZE);
+        int index = pageIndexFromSlot(1, slot);
+        if (index < 0 || index >= suffered.size()) return;
+        openClanActionMenu(player, suffered.get(index).clan().id());
+    }
+
+    private void handleTopGuiClick(Player player, String menu, int slot) throws SQLException {
+        if (slot == nativeSlot("menus.top.items.force.slot", 3)) { openTopGui(player, "fuerza"); return; }
+        if (slot == nativeSlot("menus.top.items.kills.slot", 4)) { openTopGui(player, "kills"); return; }
+        if (slot == nativeSlot("menus.top.items.bank.slot", 5)) { openTopGui(player, "banco"); return; }
+
+        String mode = menu != null && menu.startsWith("top:") ? menu.substring("top:".length()) : "fuerza";
+        if (!equalsAny(mode, "fuerza", "kills", "banco")) mode = "fuerza";
+        List<ClanTopEntry> entries = topEntries(mode);
+        int index = pageIndexFromSlot(1, slot);
+        if (index < 0 || index >= entries.size()) return;
+        openClanActionMenu(player, entries.get(index).clan().id());
     }
 
 
