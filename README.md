@@ -1,14 +1,38 @@
-# MDVClans 1.7.5
+# MDVClans 1.7.6
 
-Actualización de pulido técnico para MDVCRAFT.
+Actualización para MDVCRAFT centrada en perfiles de jugador de MMOCore dentro de las GUIs de clan.
 
-## Cambios principales
+## Cambios 1.7.6
 
-- `NativeMenus/*.yml` controla los items/títulos/lore de las GUIs nativas, separado por secciones para que no quede un archivo gigante.
-- Corrección de nametags por relación: mismo clan verde, aliado azul, enemigo rojo simétrico, neutral gris.
-- Sync extra de nametags en join/respawn y tras cambios de relación.
-- `/mdvclans wipebases confirmar` borra todas las bases de clanes para reset de mundo.
-- Banners de clan ocultan tooltip de patrones/ingredientes si `banners.hide-patterns: true`.
+- Las solicitudes de ingreso ahora resuelven `{race}` y `{level}` usando la misma lógica que la lista de miembros.
+- Se añadió caché interna `player_profiles` en SQLite para guardar la última raza/nivel conocidos.
+- Si el jugador está desconectado, MDVClans intenta mostrar raza/nivel desde caché.
+- Si MMOCore permite leer `PlayerData` offline, MDVClans también intenta leer nivel y clase/raza por reflexión.
+- En join se actualiza la caché de perfil tras unos ticks, para dar tiempo a que MMOCore cargue los datos.
+
+## Config nueva
+
+En `config.yml`:
+
+```yaml
+integrations:
+  mmocore:
+    use-direct-api: true
+    level-placeholders:
+      - '%mmocore_level%'
+    race-placeholders:
+      - '%mmocore_race%'
+      - '%mmocore_class%'
+      - '%mmocore_class_name%'
+      - '%mmocore_player_class%'
+      - '%mmocore_profession%'
+
+profile-cache:
+  enabled: true
+  update-on-join-delay-ticks: 80
+  unknown-level-text: 'Sin datos'
+  unknown-race-text: 'Sin raza'
+```
 
 ## Menús nativos
 
@@ -18,11 +42,12 @@ Edita:
 plugins/MDVClans/NativeMenus/*.yml
 ```
 
-MDVSocial solo debe abrir nativas con comandos como:
+MDVSocial debe abrir GUIs nativas con acciones/commands como:
 
 ```bash
 /clan abrir miembros
 /clan abrir info
+/clan abrir solicitudes
 /clan abrir lista
 ```
 
@@ -32,46 +57,8 @@ MDVSocial solo debe abrir nativas con comandos como:
 mvn clean package
 ```
 
+Jar esperado:
 
-## Cambios 1.7.5
-
-- Creación de clan guiada por chat: primero nombre, luego ID/tag.
-- Menús nativos separados en `plugins/MDVClans/NativeMenus/`.
-- Permisos de clan con nombres/descripciones en español y lanas por jerarquía.
-- Raza/nivel de MMOCore lee una lista configurable de placeholders e ignora `NoMatch`.
-- `%mdvclans_board%`, `%mdvclans_board_line_1%`, `%mdvclans_board_line_2%`, `%mdvclans_board_line_3%` para menús de MDVSocial.
-- Correo personal desde el menú de miembro: pide el texto por chat y lo envía con MDVSocial.
-- Edición de tablero y logs quedan restringidos por rango.
-
-## MDVClans 1.7.5
-
-Cambios principales:
-
-- El tablero de información soporta hasta 10 líneas.
-- Placeholders PAPI añadidos: `%mdvclans_board_line_1%` hasta `%mdvclans_board_line_10%`.
-- Los menús nativos usan `{board_line_1}` hasta `{board_line_10}`.
-- La GUI de permisos se rediseñó como tabla visual por rangos, con columnas de rango y lanas verdes/rojas indicando si cada rango tiene el permiso.
-- Se agregaron `NativeMenus/60-actions.yml` y `NativeMenus/70-permission-labels.yml` para que también sean configurables los menús de acción y las etiquetas/descripciones de permisos.
-- Se actualizó `native-menus.yml` combinado para compatibilidad, aunque se recomienda usar `NativeMenus/*.yml`.
-
-Para separar líneas del tablero usa `|`:
-
-```bash
-/clan tablero set Bienvenidos|Farmeo hoy a las 20:00|No sacar del almacén sin avisar
-```
-
-Ejemplo en menú nativo:
-
-```yaml
-lore:
-  - '&f{board_line_1}'
-  - '&f{board_line_2}'
-  - '&f{board_line_3}'
-  - '&f{board_line_4}'
-  - '&f{board_line_5}'
-  - '&f{board_line_6}'
-  - '&f{board_line_7}'
-  - '&f{board_line_8}'
-  - '&f{board_line_9}'
-  - '&f{board_line_10}'
+```text
+target/MDVClans-1.7.6.jar
 ```

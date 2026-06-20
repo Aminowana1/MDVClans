@@ -126,6 +126,8 @@ placeholders:
 
 integrations:
   mmocore:
+    # Intenta leer PlayerData de MMOCore por reflexión. Sirve para datos offline si MMOCore los tiene cargados.
+    use-direct-api: true
     # MDVClans probará estos placeholders en orden y usará el primero que devuelva algo válido.
     # Se ignoran respuestas como NoMatch, none, null, n/a o placeholders sin resolver.
     level-placeholders:
@@ -136,6 +138,14 @@ integrations:
       - '%mmocore_class_name%'
       - '%mmocore_player_class%'
       - '%mmocore_profession%'
+
+
+profile-cache:
+  # Guarda la última raza/nivel conocidos para poder mostrarlos aunque el jugador esté desconectado.
+  enabled: true
+  update-on-join-delay-ticks: 80
+  unknown-level-text: 'Sin datos'
+  unknown-race-text: 'Sin raza'
 
 gui:
   native-enabled: true

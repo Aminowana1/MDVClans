@@ -153,7 +153,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.7.5 habilitado.");
+        getLogger().info("MDVClans 1.7.6 habilitado.");
     }
 
     @Override
@@ -339,6 +339,13 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     "deleted INTEGER NOT NULL DEFAULT 0," +
                     "FOREIGN KEY(from_clan_id) REFERENCES clans(id) ON DELETE CASCADE," +
                     "FOREIGN KEY(to_clan_id) REFERENCES clans(id) ON DELETE CASCADE" +
+                    ")");
+            st.executeUpdate("CREATE TABLE IF NOT EXISTS player_profiles (" +
+                    "uuid TEXT NOT NULL PRIMARY KEY," +
+                    "name TEXT," +
+                    "level TEXT," +
+                    "race TEXT," +
+                    "updated_at INTEGER NOT NULL DEFAULT 0" +
                     ")");
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_members_clan ON members(clan_id)");
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_invites_target ON invites(target_uuid)");
@@ -2754,16 +2761,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             ph.put("player", req.name());
             ph.put("status", online != null ? "&aConectado" : "&cDesconectado");
             ph.put("requested", date(req.requestedAt()));
-            String level = "solo si está online";
-            String race = "solo si está online";
-            if (online != null && Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
-                String papiLevel = safePapi(online, "%mmocore_level%");
-                String papiRace = safePapi(online, "%mmocore_race%");
-                if (!papiLevel.isBlank()) level = papiLevel;
-                if (!papiRace.isBlank()) race = papiRace;
-            }
-            ph.put("level", level);
-            ph.put("race", race);
+            PlayerProfileSnapshot profile = resolvePlayerProfile(req.uuid(), req.name());
+            ph.put("level", profile.level());
+            ph.put("race", profile.race());
             ph.put("manage_hint", canManage ? "&aClick izquierdo: aceptar|&cClick derecho: borrar" : "&8No tienes rango para gestionar.");
 
             ItemStack head = nativeItem("menus.join-requests.request-head", Material.PLAYER_HEAD, "&e{player}", List.of("&7Estado: {status}", "&7Solicitud: &f{requested}", "&7Nivel: &e{level}", "&7Raza: &d{race}", "", "{manage_hint}"), ph);
@@ -3453,7 +3453,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         return configured == null || configured.isEmpty() ? defaults : configured;
     }
 
-    private String firstPapi(Player player, List<String> placeholders) {
+    private String firstPapi(OfflinePlayer player, List<String> placeholders) {
         if (player == null || Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) return "";
         for (String placeholder : placeholders) {
             String value = safePapi(player, placeholder);
@@ -3466,35 +3466,153 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         Map<String, String> ph = new HashMap<>();
         OfflinePlayer off = Bukkit.getOfflinePlayer(member.uuid());
         Player online = Bukkit.getPlayer(member.uuid());
+        PlayerProfileSnapshot profile = resolvePlayerProfile(member.uuid(), member.name());
         ph.put("player", member.name());
         ph.put("role_number", String.valueOf(member.role()));
         ph.put("role_name", getRoleName(clanId, member.role()));
         ph.put("status", online != null ? "&aConectado" : "&cDesconectado");
         ph.put("last_seen", online != null ? "Ahora" : date(off.getLastSeen()));
         ph.put("joined", date(member.joinedAt()));
-        String level = "solo si está online";
-        String race = "solo si está online";
-        if (online != null) {
-            String papiLevel = firstPapi(online, papiPlaceholderList("integrations.mmocore.level-placeholders", List.of("%mmocore_level%")));
-            String papiRace = firstPapi(online, papiPlaceholderList("integrations.mmocore.race-placeholders", List.of("%mmocore_race%", "%mmocore_class%", "%mmocore_class_name%", "%mmocore_player_class%", "%mmocore_profession%")));
-            if (!papiLevel.isBlank()) level = papiLevel;
-            if (!papiRace.isBlank()) race = papiRace;
-        }
-        ph.put("level", level);
-        ph.put("race", race);
+        ph.put("level", profile.level());
+        ph.put("race", profile.race());
         return ph;
     }
 
-    private String safePapi(Player player, String placeholder) {
+    private String safePapi(OfflinePlayer player, String placeholder) {
         try {
             String out = PlaceholderAPI.setPlaceholders(player, placeholder);
-            if (out == null || out.equalsIgnoreCase(placeholder) || out.contains("%")) return "";
-            String clean = ChatColor.stripColor(color(out)).trim();
-            if (clean.isBlank()) return "";
-            String lower = clean.toLowerCase(Locale.ROOT);
-            if (lower.equals("nomatch") || lower.equals("no match") || lower.equals("none") || lower.equals("null") || lower.equals("n/a") || lower.equals("na") || lower.equals("-") || lower.equals("sin raza")) return "";
+            if (invalidProfileValue(out, placeholder)) return "";
             return out;
         } catch (Throwable ignored) { return ""; }
+    }
+
+    private boolean invalidProfileValue(String out, String placeholder) {
+        if (out == null || out.equalsIgnoreCase(placeholder) || out.contains("%")) return true;
+        String clean = ChatColor.stripColor(color(out)).trim();
+        if (clean.isBlank()) return true;
+        String lower = clean.toLowerCase(Locale.ROOT);
+        return lower.equals("nomatch") || lower.equals("no match") || lower.equals("none") || lower.equals("null") || lower.equals("n/a") || lower.equals("na") || lower.equals("-") || lower.equals("sin raza") || lower.equals("sin clase") || lower.equals("no class");
+    }
+
+    private PlayerProfileSnapshot resolvePlayerProfile(UUID uuid, String fallbackName) {
+        String level = "";
+        String race = "";
+        OfflinePlayer offline = Bukkit.getOfflinePlayer(uuid);
+        Player online = Bukkit.getPlayer(uuid);
+
+        if (online != null) {
+            level = firstPapi(online, papiPlaceholderList("integrations.mmocore.level-placeholders", List.of("%mmocore_level%")));
+            race = firstPapi(online, papiPlaceholderList("integrations.mmocore.race-placeholders", List.of("%mmocore_race%", "%mmocore_class%", "%mmocore_class_name%", "%mmocore_player_class%", "%mmocore_profession%")));
+        }
+
+        PlayerProfileSnapshot mmocore = resolveMMOCoreProfile(offline);
+        if (level.isBlank()) level = mmocore.level();
+        if (race.isBlank()) race = mmocore.race();
+
+        if (level.isBlank() || race.isBlank()) {
+            PlayerProfileSnapshot cached = getCachedPlayerProfile(uuid).orElse(PlayerProfileSnapshot.empty());
+            if (level.isBlank()) level = cached.level();
+            if (race.isBlank()) race = cached.race();
+        }
+
+        if (!level.isBlank() || !race.isBlank()) {
+            savePlayerProfileCache(uuid, online != null ? online.getName() : (offline.getName() != null ? offline.getName() : fallbackName), level, race);
+        }
+
+        if (level.isBlank()) level = getConfig().getString("profile-cache.unknown-level-text", "Sin datos");
+        if (race.isBlank()) race = getConfig().getString("profile-cache.unknown-race-text", "Sin raza");
+        return new PlayerProfileSnapshot(level, race);
+    }
+
+    private PlayerProfileSnapshot resolveMMOCoreProfile(OfflinePlayer player) {
+        if (player == null || !getConfig().getBoolean("integrations.mmocore.use-direct-api", true)) return PlayerProfileSnapshot.empty();
+        if (Bukkit.getPluginManager().getPlugin("MMOCore") == null) return PlayerProfileSnapshot.empty();
+        try {
+            Class<?> dataClass = Class.forName("net.Indyuce.mmocore.api.player.PlayerData");
+            Object data;
+            try {
+                data = dataClass.getMethod("get", OfflinePlayer.class).invoke(null, player);
+            } catch (Throwable ignored) {
+                data = dataClass.getMethod("get", UUID.class).invoke(null, player.getUniqueId());
+            }
+            if (data == null) return PlayerProfileSnapshot.empty();
+
+            String level = "";
+            try {
+                Object rawLevel = dataClass.getMethod("getLevel").invoke(data);
+                if (rawLevel != null) level = String.valueOf(rawLevel);
+            } catch (Throwable ignored) {}
+
+            String race = "";
+            try {
+                Object profess = dataClass.getMethod("getProfess").invoke(data);
+                if (profess != null) {
+                    try { race = String.valueOf(profess.getClass().getMethod("getName").invoke(profess)); }
+                    catch (Throwable ignoredName) {
+                        try { race = String.valueOf(profess.getClass().getMethod("getId").invoke(profess)); }
+                        catch (Throwable ignoredId) {}
+                    }
+                }
+            } catch (Throwable ignored) {}
+
+            if (invalidProfileValue(level, "")) level = "";
+            if (invalidProfileValue(race, "")) race = "";
+            return new PlayerProfileSnapshot(level, race);
+        } catch (Throwable ignored) {
+            return PlayerProfileSnapshot.empty();
+        }
+    }
+
+    private void scheduleProfileCacheUpdate(Player player, long delayTicks) {
+        if (player == null || !getConfig().getBoolean("profile-cache.enabled", true)) return;
+        UUID uuid = player.getUniqueId();
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            Player current = Bukkit.getPlayer(uuid);
+            if (current != null) updatePlayerProfileCache(current);
+        }, Math.max(1L, delayTicks));
+    }
+
+    private void updatePlayerProfileCache(Player player) {
+        if (player == null || !getConfig().getBoolean("profile-cache.enabled", true)) return;
+        String level = firstPapi(player, papiPlaceholderList("integrations.mmocore.level-placeholders", List.of("%mmocore_level%")));
+        String race = firstPapi(player, papiPlaceholderList("integrations.mmocore.race-placeholders", List.of("%mmocore_race%", "%mmocore_class%", "%mmocore_class_name%", "%mmocore_player_class%", "%mmocore_profession%")));
+        PlayerProfileSnapshot mmocore = resolveMMOCoreProfile(player);
+        if (level.isBlank()) level = mmocore.level();
+        if (race.isBlank()) race = mmocore.race();
+        if (!level.isBlank() || !race.isBlank()) savePlayerProfileCache(player.getUniqueId(), player.getName(), level, race);
+    }
+
+    private Optional<PlayerProfileSnapshot> getCachedPlayerProfile(UUID uuid) {
+        if (uuid == null || connection == null || !getConfig().getBoolean("profile-cache.enabled", true)) return Optional.empty();
+        try (PreparedStatement ps = connection.prepareStatement("SELECT level,race FROM player_profiles WHERE uuid=?")) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    String level = rs.getString("level");
+                    String race = rs.getString("race");
+                    return Optional.of(new PlayerProfileSnapshot(level == null ? "" : level, race == null ? "" : race));
+                }
+            }
+        } catch (SQLException ignored) {}
+        return Optional.empty();
+    }
+
+    private void savePlayerProfileCache(UUID uuid, String name, String level, String race) {
+        if (uuid == null || connection == null || !getConfig().getBoolean("profile-cache.enabled", true)) return;
+        String cleanLevel = invalidProfileValue(level, "") ? "" : level;
+        String cleanRace = invalidProfileValue(race, "") ? "" : race;
+        if (cleanLevel.isBlank() && cleanRace.isBlank()) return;
+        Optional<PlayerProfileSnapshot> old = getCachedPlayerProfile(uuid);
+        if (cleanLevel.isBlank() && old.isPresent()) cleanLevel = old.get().level();
+        if (cleanRace.isBlank() && old.isPresent()) cleanRace = old.get().race();
+        try (PreparedStatement ps = connection.prepareStatement("INSERT OR REPLACE INTO player_profiles(uuid,name,level,race,updated_at) VALUES(?,?,?,?,?)")) {
+            ps.setString(1, uuid.toString());
+            ps.setString(2, name == null ? "" : name);
+            ps.setString(3, cleanLevel);
+            ps.setString(4, cleanRace);
+            ps.setLong(5, System.currentTimeMillis());
+            ps.executeUpdate();
+        } catch (SQLException ignored) {}
     }
 
     private List<String> boardItemLore(Clan clan) {
@@ -3587,15 +3705,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         lore.add(color("&7Estado: " + (online != null ? "&aConectado" : "&cDesconectado")));
         lore.add(color("&7Última vez: &f" + (online != null ? "Ahora" : date(off.getLastSeen()))));
         lore.add(color("&7Ingreso: &f" + date(member.joinedAt())));
-        if (online != null) {
-            String level = firstPapi(online, papiPlaceholderList("integrations.mmocore.level-placeholders", List.of("%mmocore_level%")));
-            String race = firstPapi(online, papiPlaceholderList("integrations.mmocore.race-placeholders", List.of("%mmocore_race%", "%mmocore_class%", "%mmocore_class_name%", "%mmocore_player_class%", "%mmocore_profession%")));
-            if (!level.isBlank()) lore.add(color("&7Nivel: &e" + level));
-            if (!race.isBlank()) lore.add(color("&7Raza: &d" + race));
-            if (level.isBlank() && race.isBlank()) lore.add(color("&7Nivel/Raza: &8sin datos"));
-        } else {
-            lore.add(color("&7Nivel/Raza: &8solo si está online"));
-        }
+        PlayerProfileSnapshot profile = resolvePlayerProfile(member.uuid(), member.name());
+        lore.add(color("&7Nivel: &e" + profile.level()));
+        lore.add(color("&7Raza: &d" + profile.race()));
         if (extra != null) for (String line : extra) lore.add(color(line));
         return lore;
     }
@@ -3798,6 +3910,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     public void onPlayerJoinNametag(PlayerJoinEvent event) {
         requestNametagSync(10L);
         requestNametagSync(40L);
+        scheduleProfileCacheUpdate(event.getPlayer(), 20L);
+        scheduleProfileCacheUpdate(event.getPlayer(), Math.max(40L, getConfig().getLong("profile-cache.update-on-join-delay-ticks", 80L)));
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -4092,6 +4206,10 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     public record ClanMail(int id, int fromClanId, int toClanId, String senderName, long sentAt, String message) {}
 
     public record ClanRelationView(Clan clan, String relation) {}
+
+    public record PlayerProfileSnapshot(String level, String race) {
+        public static PlayerProfileSnapshot empty() { return new PlayerProfileSnapshot("", ""); }
+    }
 
     public record ClanJoinRequest(UUID uuid, String name, long requestedAt) {}
 
