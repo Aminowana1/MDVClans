@@ -4480,16 +4480,17 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         meta.setOwningPlayer(Bukkit.getOfflinePlayer(member.uuid()));
         Map<String, String> ph = memberPlaceholders(member, clanId, viewer);
         String name = nativeMenus == null ? "&e{player} &8(&b{role_name}&8)" : nativeMenus.getString("menus.members.member-head.name", "&e{player} &8(&b{role_name}&8)");
-        meta.setDisplayName(color(applyPlaceholders(name, ph)));
+        meta.setDisplayName(color(applyPlaceholdersAndPapi(name, ph, off)));
         List<String> configured = lines("menus.members.member-head.lore", List.of(
                 "&7Rango: &b{role_number} &8- &f{role_name}",
                 "&7Estado: {status}",
                 "&7Última vez: &f{last_seen}",
                 "&7Ingreso: &f{joined}",
+                "&7Título: &r{title_colored}",
                 "&7Nivel: &e{level}",
                 "&7Raza: &d{race}",
                 "",
-                "&eClick para abrir opciones."), ph);
+                "&eClick para abrir opciones."), ph, off);
         meta.setLore(configured.stream().map(this::color).collect(Collectors.toList()));
         item.setItemMeta(meta);
         return item;
@@ -4668,7 +4669,35 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         ph.put("joined", date(member.joinedAt()));
         ph.put("level", profile.level());
         ph.put("race", profile.race());
+        ph.putAll(resolveMDVSocialTitlePlaceholders(member.uuid()));
         return ph;
+    }
+
+    private Map<String, String> resolveMDVSocialTitlePlaceholders(UUID uuid) {
+        Map<String, String> ph = new HashMap<>();
+        String unknown = getConfig().getString("integrations.mdvsocial.unknown-title-text", "Sin título");
+        String title = mdvSocialTargetPlaceholder(uuid, "title", unknown);
+        String titleColored = mdvSocialTargetPlaceholder(uuid, "title_colored", title);
+        String titlePrefix = mdvSocialTargetPlaceholder(uuid, "title_prefix", "");
+        String titlePrefixPlain = mdvSocialTargetPlaceholder(uuid, "title_prefix_plain", ChatColor.stripColor(color(titlePrefix)));
+        String titleId = mdvSocialTargetPlaceholder(uuid, "title_id", "");
+        String activeTitle = mdvSocialTargetPlaceholder(uuid, "active_title", titleId);
+
+        ph.put("title", title);
+        ph.put("title_plain", ChatColor.stripColor(color(title)));
+        ph.put("title_colored", titleColored);
+        ph.put("title_prefix", titlePrefix);
+        ph.put("title_prefix_plain", titlePrefixPlain);
+        ph.put("title_id", titleId);
+        ph.put("active_title", activeTitle);
+        return ph;
+    }
+
+    private String mdvSocialTargetPlaceholder(UUID uuid, String key, String fallback) {
+        if (uuid == null || Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) return fallback == null ? "" : fallback;
+        String placeholder = "%mdvsocial_" + key + "_of_uuid_" + uuid + "%";
+        String value = safePapi(Bukkit.getOfflinePlayer(uuid), placeholder);
+        return value.isBlank() ? (fallback == null ? "" : fallback) : value;
     }
 
     private String safePapi(OfflinePlayer player, String placeholder) {
@@ -4979,9 +5008,13 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private List<String> lines(String path, List<String> def, Map<String, String> placeholders) {
+        return lines(path, def, placeholders, null);
+    }
+
+    private List<String> lines(String path, List<String> def, Map<String, String> placeholders, OfflinePlayer papiPlayer) {
         List<String> configured = nativeMenus == null ? Collections.emptyList() : nativeMenus.getStringList(path);
         List<String> source = configured == null || configured.isEmpty() ? def : configured;
-        return source.stream().map(line -> applyPlaceholders(line, placeholders)).collect(Collectors.toList());
+        return source.stream().map(line -> applyPlaceholdersAndPapi(line, placeholders, papiPlayer)).collect(Collectors.toList());
     }
 
     private ItemStack nativeItem(String path, Material defMaterial, String defName, List<String> defLore, Map<String, String> placeholders) {
@@ -5099,6 +5132,19 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             out = out.replace("{" + entry.getKey() + "}", entry.getValue() == null ? "" : entry.getValue());
         }
         return out;
+    }
+
+    // 1.10.4: permite usar PlaceholderAPI después de reemplazar placeholders internos.
+    // Ejemplo en lista de miembros: %mdvsocial_title_colored_of_{player}%
+    private String applyPlaceholdersAndPapi(String text, Map<String, String> placeholders, OfflinePlayer papiPlayer) {
+        String out = applyPlaceholders(text, placeholders);
+        if (out == null || papiPlayer == null || !out.contains("%")) return out;
+        if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") == null) return out;
+        try {
+            return PlaceholderAPI.setPlaceholders(papiPlayer, out);
+        } catch (Throwable ignored) {
+            return out;
+        }
     }
 
     private Map<String, String> clanPlaceholders(Clan clan) throws SQLException {

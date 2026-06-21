@@ -199,6 +199,8 @@ placeholders:
   lpc-tag-format: '&8[&b{id}&8]&r '
 
 integrations:
+  mdvsocial:
+    unknown-title-text: 'Sin título'
   mmocore:
     # Intenta leer PlayerData de MMOCore por reflexión. Sirve para datos offline si MMOCore los tiene cargados.
     use-direct-api: true

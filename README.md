@@ -39,3 +39,19 @@ El jar queda en `target/MDVClans-1.10.0.jar`.
 ## 1.10.1
 
 Añade menú nativo de bases: `/clan abrir bases`, botones de TP y botones para establecer bases, con estado desbloqueado/no establecido/bloqueado por tier.
+
+## 1.10.4
+
+- Soporte para mostrar títulos equipados de MDVSocial en la lista de miembros.
+- Placeholders internos: `{title}`, `{title_plain}`, `{title_colored}`, `{title_prefix}`, `{title_prefix_plain}`, `{title_id}`, `{active_title}`.
+- En `NativeMenus/30-members.yml` se recomienda usar:
+
+```yaml
+- '&7Título: &r{title_colored}'
+```
+
+También se parsea PlaceholderAPI en las cabezas de miembros después de reemplazar `{player}`, por lo que también puede usarse:
+
+```yaml
+- '&7Título: &r%mdvsocial_title_colored_of_{player}%'
+```

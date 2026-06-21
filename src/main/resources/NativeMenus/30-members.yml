@@ -8,6 +8,7 @@ menus:
       - '&7Estado: {status}'
       - '&7Última vez: &f{last_seen}'
       - '&7Ingreso: &f{joined}'
+      - '&7Título: &r{title_colored}'
       - '&7Nivel: &e{level}'
       - '&7Raza: &d{race}'
       - ''

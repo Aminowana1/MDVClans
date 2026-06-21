@@ -1,0 +1,30 @@
+MDVClans 1.10.4 — Títulos de MDVSocial en miembros
+
+Cambios:
+- La lista de miembros ahora tiene placeholders internos para títulos de MDVSocial:
+  {title}
+  {title_plain}
+  {title_colored}
+  {title_prefix}
+  {title_prefix_plain}
+  {title_id}
+  {active_title}
+- También se procesa PlaceholderAPI en el nombre/lore de las cabezas de miembros después de reemplazar {player}.
+  Esto permite usar: %mdvsocial_title_colored_of_{player}%
+- Se agregó default opcional en config.yml:
+  integrations.mdvsocial.unknown-title-text: 'Sin título'
+
+Uso recomendado en NativeMenus/30-members.yml:
+  - '&7Título: &r{title_colored}'
+
+Uso alternativo:
+  - '&7Título: &r%mdvsocial_title_colored_of_{player}%'
+
+Actualización sin borrar carpeta:
+- Solo reemplaza el jar.
+- Opcional: agrega en config.yml:
+  integrations:
+    mdvsocial:
+      unknown-title-text: 'Sin título'
+- Agrega al lore de NativeMenus/30-members.yml:
+  - '&7Título: &r{title_colored}'
