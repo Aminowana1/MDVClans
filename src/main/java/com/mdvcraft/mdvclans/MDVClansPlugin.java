@@ -3737,7 +3737,6 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         if (targetOpt.isEmpty() || targetOpt.get().clanId() != actor.clanId()) { msg(player, "&cEse jugador ya no está en tu clan."); return; }
         Member target = targetOpt.get();
         Map<String, String> ph = memberPlaceholders(target, actor.clanId(), player);
-        OfflinePlayer off = Bukkit.getOfflinePlayer(member.uuid());
         Inventory inv = Bukkit.createInventory(new ClanMenuHolder("memberaction", 1, actor.clanId(), target.uuid(), -1), 27, nativeTitle("member-action", "&8Miembro &b{player}", ph));
         fill(inv);
         if (nativeConfiguredItemEnabled("menus.member-action.items.member")) {
