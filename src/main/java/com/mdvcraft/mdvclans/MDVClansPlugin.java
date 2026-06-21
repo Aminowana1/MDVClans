@@ -98,6 +98,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     private static final int[] PAGE_CONTENT_SLOTS = {10,11,12,13,14,15,16,19,20,21,22,23,24,25,28,29,30,31,32,33,34,37,38,39,40,41,42,43};
     private static final int GUI_PAGE_SIZE = PAGE_CONTENT_SLOTS.length;
+    private static final int STORAGE_NAV_SLOT = 53;
+    private static final int STORAGE_PAGE_ITEM_SLOTS = 53;
 
     private final Map<UUID, PendingTeleport> pendingTeleports = new ConcurrentHashMap<>();
     private final Map<UUID, Long> baseCooldowns = new ConcurrentHashMap<>();
@@ -157,7 +159,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.9.0 habilitado.");
+        getLogger().info("MDVClans 1.10.0 habilitado.");
     }
 
     @Override
@@ -256,6 +258,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     "owner_uuid TEXT NOT NULL," +
                     "open INTEGER NOT NULL DEFAULT 0," +
                     "created_at INTEGER NOT NULL," +
+                    "tier INTEGER NOT NULL DEFAULT 0," +
                     "bank_balance REAL NOT NULL DEFAULT 0," +
                     "banner TEXT," +
                     "storage TEXT," +
@@ -296,6 +299,18 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     "meta_key TEXT NOT NULL PRIMARY KEY," +
                     "meta_value TEXT"
                     + ")");
+            st.executeUpdate("CREATE TABLE IF NOT EXISTS clan_bases (" +
+                    "clan_id INTEGER NOT NULL," +
+                    "base_number INTEGER NOT NULL," +
+                    "world TEXT NOT NULL," +
+                    "x REAL NOT NULL," +
+                    "y REAL NOT NULL," +
+                    "z REAL NOT NULL," +
+                    "yaw REAL NOT NULL," +
+                    "pitch REAL NOT NULL," +
+                    "PRIMARY KEY(clan_id, base_number)," +
+                    "FOREIGN KEY(clan_id) REFERENCES clans(id) ON DELETE CASCADE" +
+                    ")");
             st.executeUpdate("CREATE TABLE IF NOT EXISTS invites (" +
                     "clan_id INTEGER NOT NULL," +
                     "target_uuid TEXT NOT NULL," +
@@ -368,6 +383,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     "updated_at INTEGER NOT NULL DEFAULT 0" +
                     ")");
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_members_clan ON members(clan_id)");
+            st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_clan_bases_clan ON clan_bases(clan_id)");
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_invites_target ON invites(target_uuid)");
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_join_requests_target ON join_requests(target_uuid)");
             st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_logs_clan ON clan_logs(clan_id, time DESC)");
@@ -379,6 +395,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 getLogger().warning("No se pudo crear índice único para nombres de clanes. Revisa si existen nombres duplicados en clans.db");
             }
         }
+        addColumnIfMissing("clans", "tier", "INTEGER NOT NULL DEFAULT 0");
         addColumnIfMissing("clans", "bank_balance", "REAL NOT NULL DEFAULT 0");
         addColumnIfMissing("clans", "banner", "TEXT");
         addColumnIfMissing("clans", "storage", "TEXT");
@@ -387,6 +404,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         addColumnIfMissing("clan_mails", "mail_type", "TEXT NOT NULL DEFAULT 'NORMAL'");
         addColumnIfMissing("clan_mails", "relation_clan_id", "INTEGER NOT NULL DEFAULT 0");
         migrateRolesToV19();
+        migrateBasesToV110();
         ensureRoleNamesForAllClans();
     }
 
@@ -437,10 +455,11 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 case "rol", "rango", "rolnombre" -> handleRoleName(player, args);
                 case "chat" -> handleClanChatCommand(player, args, 1);
                 case "c" -> handleClanChatCommand(player, args, 1);
-                case "setbase" -> handleSetBase(player);
-                case "base", "home" -> handleBase(player);
+                case "setbase" -> handleSetBase(player, args);
+                case "base", "home" -> handleBase(player, args);
                 case "relacion", "relation" -> handleRelation(player, args);
                 case "banco" -> handleBank(player, args);
+                case "mejorar", "upgrade", "tier" -> handleTierUpgrade(player);
                 case "depositar" -> handleBankShortcut(player, args, true);
                 case "retirar" -> handleBankShortcut(player, args, false);
                 case "almacen", "almacén" -> handleStorage(player);
@@ -522,6 +541,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         player.sendMessage(color("&e/clan editar <nombre|id> <valor> &7- Ajustes del clan."));
         player.sendMessage(color("&e/clan solicitudes &7- Solicitudes pendientes."));
         player.sendMessage(color("&e/clan banco &7- Banco del clan."));
+        player.sendMessage(color("&e/clan mejorar &7- Mejora el tier del clan usando el banco."));
         player.sendMessage(color("&e/clan almacen &7- Almacén compartido."));
         player.sendMessage(color("&e/clan estandarte set/ver &7- Banner oficial."));
         player.sendMessage(color("&e/clan top [fuerza|kills|banco] &7- Ranking."));
@@ -632,11 +652,12 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         Clan clan = clanOpt.get();
         List<Member> members = getMembers(clan.id());
         player.sendMessage(color("&8&m-----------------------------"));
-        player.sendMessage(color("&6Clan: &8[&b" + clan.tag() + "&8] &f" + clan.name()));
-        player.sendMessage(color("&7Miembros: &e" + members.size() + "&7/&e" + getConfig().getInt("limits.max-members", 20)));
+        player.sendMessage(color("&6Clan: &8[&b" + clan.tag() + "&8] &f" + clan.name() + " &8- &d" + tierName(clan.tier())));
+        player.sendMessage(color("&7Miembros: &e" + members.size() + "&7/&e" + maxMembersForClan(clan)));
         player.sendMessage(color("&7Entrada: " + (clan.open() ? "&aAbierta" : "&cCon invitación")));
         player.sendMessage(color("&7Descripción: &f" + clanDescription(clan)));
-        player.sendMessage(color("&7Base: " + (clan.hasBase() ? "&aDefinida" : "&cNo definida")));
+        player.sendMessage(color("&7Tier: &d" + tierName(clan.tier()) + " &8(" + clan.tier() + ")"));
+        player.sendMessage(color("&7Bases: &e" + countClanBases(clan.id()) + "&7/&e" + maxBasesForClan(clan)));
         player.sendMessage(color("&7Banco: &e" + formatNumber(clan.bankBalance()) + " &7| Fuerza: &e" + formatNumber(calculateStrength(clan))));
         player.sendMessage(color("&7Kills de clan: &e" + getTotalKillsByClan(clan.id()) + " &7| Bajas sufridas: &c" + getTotalDeathsByClan(clan.id())));
         player.sendMessage(color("&7Estandarte: " + (clan.hasBanner() ? "&aDefinido" : "&cNo definido")));
@@ -663,7 +684,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         for (int i = start; i < Math.min(start + pageSize, clans.size()); i++) {
             Clan c = clans.get(i);
             int count = countMembers(c.id());
-            player.sendMessage(color("&8[&b" + c.tag() + "&8] &f" + c.name() + " &7- &e" + count + " &7miembros &8| &6Fuerza &e" + formatNumber(calculateStrength(c))));
+            player.sendMessage(color("&8[&b" + c.tag() + "&8] &f" + c.name() + " &8- &d" + tierName(c.tier()) + " &7- &e" + count + " &7miembros &8| &6Fuerza &e" + formatNumber(calculateStrength(c))));
         }
         if (clans.isEmpty()) player.sendMessage(color("&7No hay clanes creados todavía."));
     }
@@ -677,7 +698,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         if (inviter == null) return;
         if (!hasRank(player, inviter, "invite")) return;
         Clan clan = getClan(inviter.clanId()).orElseThrow();
-        if (countMembers(clan.id()) >= getConfig().getInt("limits.max-members", 20)) {
+        if (countMembers(clan.id()) >= maxMembersForClan(clan)) {
             msg(player, "&cTu clan ya alcanzó el límite de miembros.");
             return;
         }
@@ -752,7 +773,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void joinClan(Player player, Clan clan, String successMessage) throws SQLException {
-        if (countMembers(clan.id()) >= getConfig().getInt("limits.max-members", 20)) {
+        if (countMembers(clan.id()) >= maxMembersForClan(clan)) {
             msg(player, "&cEse clan ya alcanzó el límite de miembros.");
             return;
         }
@@ -931,29 +952,40 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         sendClanChat(player, join(args, messageStart));
     }
 
-    private void handleSetBase(Player player) throws SQLException {
+    private void handleSetBase(Player player, String[] args) throws SQLException {
         Member member = requireMember(player);
         if (member == null) return;
         if (!hasRank(player, member, "setbase")) return;
+        Clan clan = getClan(member.clanId()).orElseThrow();
+        int baseNumber = parseBaseNumber(args, 1);
+        int maxBases = maxBasesForClan(clan);
+        if (baseNumber < 1 || baseNumber > maxBases) {
+            msg(player, "&cTu clan solo puede tener bases del &e1 &cal &e" + maxBases + "&c. Tier actual: &d" + tierName(clan.tier()) + "&c.");
+            return;
+        }
         if (!isWorldAllowed(player.getWorld())) {
             msg(player, "&cNo puedes fijar base de clan en este mundo.");
             return;
         }
-        setClanBase(member.clanId(), player.getLocation());
-        logAction(member.clanId(), player, "SETBASE", "Base actualizada en " + player.getWorld().getName());
-        broadcastToClan(member.clanId(), "&aLa base del clan fue actualizada por &e" + player.getName() + "&a.");
+        setClanBase(member.clanId(), baseNumber, player.getLocation());
+        logAction(member.clanId(), player, "SETBASE", "Base " + baseNumber + " actualizada en " + player.getWorld().getName());
+        broadcastToClan(member.clanId(), "&aLa base &e#" + baseNumber + " &adel clan fue actualizada por &e" + player.getName() + "&a.");
     }
 
-    private void handleBase(Player player) throws SQLException {
+    private void handleBase(Player player, String[] args) throws SQLException {
         Member member = requireMember(player);
         if (member == null) return;
-        Optional<Clan> clanOpt = getClan(member.clanId());
-        if (clanOpt.isEmpty() || !clanOpt.get().hasBase()) {
-            msg(player, "&cTu clan no tiene base definida.");
+        Clan clan = getClan(member.clanId()).orElseThrow();
+        int baseNumber = parseBaseNumber(args, 1);
+        Optional<ClanBase> baseOpt = getClanBase(clan.id(), baseNumber);
+        if (baseOpt.isEmpty()) {
+            int totalBases = countClanBases(clan.id());
+            if (totalBases <= 0) msg(player, "&cTu clan no tiene base definida.");
+            else msg(player, "&cLa base &e#" + baseNumber + " &cno está definida. Bases disponibles: &e" + totalBases + "&c.");
             return;
         }
-        Clan clan = clanOpt.get();
-        World world = Bukkit.getWorld(clan.baseWorld());
+        ClanBase base = baseOpt.get();
+        World world = Bukkit.getWorld(base.world());
         if (world == null) {
             msg(player, "&cEl mundo de la base no está cargado.");
             return;
@@ -966,11 +998,11 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             return;
         }
         int delay = Math.max(0, getConfig().getInt("base.teleport-delay-seconds", 10));
-        Location destination = new Location(world, clan.baseX(), clan.baseY(), clan.baseZ(), clan.baseYaw(), clan.basePitch());
+        Location destination = new Location(world, base.x(), base.y(), base.z(), base.yaw(), base.pitch());
         if (delay <= 0) {
             player.teleport(destination);
             baseCooldowns.put(player.getUniqueId(), now);
-            msg(player, "&aTeletransportado a la base del clan.");
+            msg(player, "&aTeletransportado a la base &e#" + baseNumber + "&a del clan.");
             return;
         }
         if (pendingTeleports.containsKey(player.getUniqueId())) {
@@ -983,7 +1015,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             if (!player.isOnline()) return;
             player.teleport(destination);
             baseCooldowns.put(player.getUniqueId(), System.currentTimeMillis());
-            msg(player, "&aTeletransportado a la base del clan.");
+            msg(player, "&aTeletransportado a la base &e#" + baseNumber + "&a del clan.");
         }, delay * 20L).getTaskId();
         pendingTeleports.put(player.getUniqueId(), new PendingTeleport(taskId, start));
         msg(player, "&7Teletransporte en &e" + delay + "s&7. No te muevas ni recibas daño.");
@@ -1036,6 +1068,14 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     msg(player, "&eYa tienes una solicitud de alianza pendiente con &6" + target.tag() + "&e.");
                     return;
                 }
+                if (!canAcceptNewAlly(own, target.id())) {
+                    msg(player, "&cTu clan alcanzó el máximo de aliados para su tier (&e" + countAllies(own.id()) + "&c/&e" + maxAlliesForClan(own) + "&c). Mejora el clan para tener más alianzas.");
+                    return;
+                }
+                if (!canAcceptNewAlly(target, own.id())) {
+                    msg(player, "&cEse clan ya alcanzó el máximo de aliados de su tier.");
+                    return;
+                }
                 setRelation(own.id(), target.id(), REL_ALLY_REQUEST);
                 createAllianceRequestMail(own, target, player);
                 logAction(own.id(), player, "DIPLOMACIA", "Solicitud de alianza a " + target.tag());
@@ -1058,6 +1098,14 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void acceptAlliance(Clan own, Clan target, Player actor) throws SQLException {
+        if (!canAcceptNewAlly(own, target.id())) {
+            if (actor != null) msg(actor, "&cTu clan alcanzó el máximo de aliados para su tier (&e" + countAllies(own.id()) + "&c/&e" + maxAlliesForClan(own) + "&c).");
+            return;
+        }
+        if (!canAcceptNewAlly(target, own.id())) {
+            if (actor != null) msg(actor, "&cEl otro clan alcanzó el máximo de aliados de su tier.");
+            return;
+        }
         setRelation(own.id(), target.id(), REL_ALLY);
         setRelation(target.id(), own.id(), REL_ALLY);
         requestNametagSync(5L);
@@ -1344,6 +1392,10 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void handleStorage(Player player) throws SQLException {
+        openClanStorage(player, 1);
+    }
+
+    private void openClanStorage(Player player, int page) throws SQLException {
         if (!getConfig().getBoolean("storage-chest.enabled", true)) {
             msg(player, "&cEl almacén de clan está desactivado.");
             return;
@@ -1352,15 +1404,20 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         if (member == null) return;
         if (!hasRank(player, member, "storage-open")) return;
         Clan clan = getClan(member.clanId()).orElseThrow();
-        int size = Math.max(9, Math.min(54, getConfig().getInt("storage-chest.size", 27)));
-        size = ((size + 8) / 9) * 9;
-        String title = color(getConfig().getString("storage-chest.title", "&8Almacén de clan {id}").replace("{id}", clan.tag()).replace("{name}", clan.name()));
-        Inventory inv = Bukkit.createInventory(player, size, title);
-        ItemStack[] items = deserializeInventory(clan.storage(), size);
-        inv.setContents(items);
-        openStorageViewers.put(player.getUniqueId(), clan.id());
+        int totalSlots = storageSlotsForClan(clan);
+        int pages = storagePagesForSlots(totalSlots);
+        page = Math.max(1, Math.min(page, pages));
+        int invSize = storageInventorySize(totalSlots);
+        Map<String, String> ph = clanPlaceholders(clan);
+        ph.put("storage_page", String.valueOf(page));
+        ph.put("storage_max_page", String.valueOf(pages));
+        String title = color(applyPlaceholders(getConfig().getString("storage-chest.title", "&8Almacén {id} &7{storage_page}/{storage_max_page}"), ph));
+        Inventory inv = Bukkit.createInventory(new StorageInventoryHolder(clan.id(), page, totalSlots), invSize, title);
+        ItemStack[] allItems = deserializeInventory(clan.storage(), totalSlots);
+        putStoragePage(inv, allItems, page, totalSlots);
+        if (pages > 1) inv.setItem(STORAGE_NAV_SLOT, storageNavItem(page, pages));
         openNativeInventory(player, inv);
-        logAction(clan.id(), player, "ALMACEN", "Abrió el almacén");
+        logAction(clan.id(), player, "ALMACEN", "Abrió almacén página " + page + "/" + pages);
     }
 
     private void handleBanner(Player player, String[] args) throws SQLException {
@@ -1627,6 +1684,23 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     @EventHandler(ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (event.getInventory().getHolder() instanceof StorageInventoryHolder storageHolder) {
+            if (event.getClickedInventory() == null || !event.getClickedInventory().equals(event.getView().getTopInventory())) return;
+            if (event.getSlot() != STORAGE_NAV_SLOT || storagePagesForSlots(storageHolder.totalSlots()) <= 1) return;
+            event.setCancelled(true);
+            try {
+                saveStoragePage(storageHolder.clanId(), event.getInventory(), storageHolder.page(), storageHolder.totalSlots());
+                int pages = storagePagesForSlots(storageHolder.totalSlots());
+                int nextPage = event.getClick().isRightClick() ? storageHolder.page() - 1 : storageHolder.page() + 1;
+                if (nextPage < 1) nextPage = pages;
+                if (nextPage > pages) nextPage = 1;
+                openClanStorage(player, nextPage);
+            } catch (Exception e) {
+                getLogger().warning("Error navegando almacén de clan: " + e.getMessage());
+                msg(player, "&cNo se pudo cambiar de página del almacén.");
+            }
+            return;
+        }
         if (!(event.getInventory().getHolder() instanceof ClanMenuHolder holder)) return;
         if (event.getClickedInventory() == null || !event.getClickedInventory().equals(event.getView().getTopInventory())) return;
         event.setCancelled(true);
@@ -1641,13 +1715,12 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
         if (!(event.getPlayer() instanceof Player player)) return;
-        Integer clanId = openStorageViewers.remove(player.getUniqueId());
-        if (clanId == null) return;
+        if (!(event.getInventory().getHolder() instanceof StorageInventoryHolder holder)) return;
         try {
-            saveClanStorage(clanId, event.getInventory().getContents());
-            logAction(clanId, player, "ALMACEN", "Cerró y guardó el almacén");
+            saveStoragePage(holder.clanId(), event.getInventory(), holder.page(), holder.totalSlots());
+            logAction(holder.clanId(), player, "ALMACEN", "Cerró y guardó el almacén");
         } catch (Exception e) {
-            getLogger().warning("No se pudo guardar almacén de clan " + clanId + ": " + e.getMessage());
+            getLogger().warning("No se pudo guardar almacén de clan " + holder.clanId() + ": " + e.getMessage());
             msg(player, "&cNo se pudo guardar el almacén del clan. Avisa a un admin.");
         }
     }
@@ -2071,23 +2144,70 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
     }
 
-    private synchronized void setClanBase(int clanId, Location loc) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement("UPDATE clans SET base_world=?,base_x=?,base_y=?,base_z=?,base_yaw=?,base_pitch=? WHERE id=?")) {
-            ps.setString(1, loc.getWorld().getName());
-            ps.setDouble(2, loc.getX());
-            ps.setDouble(3, loc.getY());
-            ps.setDouble(4, loc.getZ());
-            ps.setFloat(5, loc.getYaw());
-            ps.setFloat(6, loc.getPitch());
-            ps.setInt(7, clanId);
+    private synchronized void setClanBase(int clanId, int baseNumber, Location loc) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("INSERT OR REPLACE INTO clan_bases(clan_id,base_number,world,x,y,z,yaw,pitch) VALUES(?,?,?,?,?,?,?,?)")) {
+            ps.setInt(1, clanId);
+            ps.setInt(2, baseNumber);
+            ps.setString(3, loc.getWorld().getName());
+            ps.setDouble(4, loc.getX());
+            ps.setDouble(5, loc.getY());
+            ps.setDouble(6, loc.getZ());
+            ps.setFloat(7, loc.getYaw());
+            ps.setFloat(8, loc.getPitch());
             ps.executeUpdate();
+        }
+        if (baseNumber == 1) {
+            try (PreparedStatement ps = connection.prepareStatement("UPDATE clans SET base_world=?,base_x=?,base_y=?,base_z=?,base_yaw=?,base_pitch=? WHERE id=?")) {
+                ps.setString(1, loc.getWorld().getName());
+                ps.setDouble(2, loc.getX());
+                ps.setDouble(3, loc.getY());
+                ps.setDouble(4, loc.getZ());
+                ps.setFloat(5, loc.getYaw());
+                ps.setFloat(6, loc.getPitch());
+                ps.setInt(7, clanId);
+                ps.executeUpdate();
+            }
+        }
+    }
+
+    private synchronized Optional<ClanBase> getClanBase(int clanId, int baseNumber) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("SELECT * FROM clan_bases WHERE clan_id=? AND base_number=?")) {
+            ps.setInt(1, clanId);
+            ps.setInt(2, baseNumber);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return Optional.of(new ClanBase(
+                        rs.getInt("clan_id"),
+                        rs.getInt("base_number"),
+                        rs.getString("world"),
+                        rs.getDouble("x"),
+                        rs.getDouble("y"),
+                        rs.getDouble("z"),
+                        rs.getFloat("yaw"),
+                        rs.getFloat("pitch")
+                ));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private synchronized int countClanBases(int clanId) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("SELECT COUNT(*) FROM clan_bases WHERE clan_id=?")) {
+            ps.setInt(1, clanId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
         }
     }
 
     private synchronized int clearAllClanBases() throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement("UPDATE clans SET base_world=NULL,base_x=0,base_y=0,base_z=0,base_yaw=0,base_pitch=0 WHERE base_world IS NOT NULL AND base_world<>''")) {
-            return ps.executeUpdate();
+        int affected;
+        try (PreparedStatement ps = connection.prepareStatement("DELETE FROM clan_bases")) {
+            affected = ps.executeUpdate();
         }
+        try (PreparedStatement ps = connection.prepareStatement("UPDATE clans SET base_world=NULL,base_x=0,base_y=0,base_z=0,base_yaw=0,base_pitch=0 WHERE base_world IS NOT NULL AND base_world<>''")) {
+            affected += ps.executeUpdate();
+        }
+        return affected;
     }
 
     private synchronized boolean isMetaFlagSet(String key) throws SQLException {
@@ -2130,6 +2250,15 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             st.executeUpdate("DELETE FROM clan_role_permissions WHERE role<0 OR role>4");
         }
         setMetaFlag("roles-migrated-1.9", "true");
+    }
+
+    private synchronized void migrateBasesToV110() throws SQLException {
+        if (isMetaFlagSet("bases-migrated-1.10")) return;
+        try (Statement st = connection.createStatement()) {
+            st.executeUpdate("INSERT OR IGNORE INTO clan_bases(clan_id,base_number,world,x,y,z,yaw,pitch) " +
+                    "SELECT id,1,base_world,base_x,base_y,base_z,base_yaw,base_pitch FROM clans WHERE base_world IS NOT NULL AND base_world<>''");
+        }
+        setMetaFlag("bases-migrated-1.10", "true");
     }
 
     private synchronized void ensureRoleNamesForAllClans() throws SQLException {
@@ -2445,6 +2574,96 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
     }
 
+    private synchronized void setClanTier(int clanId, int tier) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("UPDATE clans SET tier=? WHERE id=?")) {
+            ps.setInt(1, tier);
+            ps.setInt(2, clanId);
+            ps.executeUpdate();
+        }
+    }
+
+    private void handleTierUpgrade(Player player) throws SQLException {
+        Member member = requireMember(player);
+        if (member == null) return;
+        if (!hasRank(player, member, "tier-upgrade")) return;
+        Clan clan = getClan(member.clanId()).orElseThrow();
+        int currentTier = Math.max(0, clan.tier());
+        int maxTier = maxClanTier();
+        if (currentTier >= maxTier) {
+            msg(player, "&aTu clan ya alcanzó el tier máximo: &d" + tierName(currentTier) + "&a.");
+            return;
+        }
+        ClanTier next = tierDefinition(currentTier + 1);
+        double cost = Math.max(0.0, next.cost());
+        if (clan.bankBalance() + 0.0001 < cost) {
+            msg(player, "&cFaltan &e" + formatNumber(cost - clan.bankBalance()) + " &cmonedas en el banco del clan para subir a &d" + next.name() + "&c.");
+            return;
+        }
+        addBankBalance(clan.id(), -cost);
+        setClanTier(clan.id(), next.tier());
+        logAction(clan.id(), player, "TIER", "Mejoró el clan a " + next.name() + " por " + formatNumber(cost));
+        broadcastToClan(clan.id(), "&d&l¡El clan subió a " + next.name() + "! &7Costo pagado desde el banco: &e" + formatNumber(cost) + "&7.");
+    }
+
+    private ItemStack storageNavItem(int page, int pages) {
+        ItemStack item = new ItemStack(Material.ARROW);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(color("&ePágina " + page + "/" + pages));
+            meta.setLore(List.of(
+                    color("&7Click izquierdo: siguiente"),
+                    color("&7Click derecho: anterior"),
+                    color("&8Este slot se reserva para navegación.")
+            ));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private void putStoragePage(Inventory inv, ItemStack[] allItems, int page, int totalSlots) {
+        int start = (page - 1) * STORAGE_PAGE_ITEM_SLOTS;
+        int usable = storageUsableSlotsOnPage(inv.getSize(), page, totalSlots);
+        for (int slot = 0; slot < usable; slot++) {
+            int index = start + slot;
+            inv.setItem(slot, index >= 0 && index < allItems.length ? allItems[index] : null);
+        }
+    }
+
+    private int storageUsableSlotsOnPage(int invSize, int page, int totalSlots) {
+        if (totalSlots <= 54) return Math.min(invSize, totalSlots);
+        int start = (page - 1) * STORAGE_PAGE_ITEM_SLOTS;
+        return Math.max(0, Math.min(STORAGE_PAGE_ITEM_SLOTS, totalSlots - start));
+    }
+
+    private synchronized void saveStoragePage(int clanId, Inventory inv, int page, int totalSlots) throws SQLException, IOException {
+        Clan clan = getClan(clanId).orElseThrow();
+        int mergeSize = Math.max(totalSlots, inventorySerializedSize(clan.storage()));
+        ItemStack[] allItems = deserializeInventory(clan.storage(), mergeSize);
+        int start = (page - 1) * STORAGE_PAGE_ITEM_SLOTS;
+        int usable = storageUsableSlotsOnPage(inv.getSize(), page, totalSlots);
+        for (int slot = 0; slot < usable; slot++) {
+            int index = start + slot;
+            if (index >= 0 && index < allItems.length) allItems[index] = inv.getItem(slot);
+        }
+        saveClanStorage(clanId, allItems);
+    }
+
+    private synchronized int countAllies(int clanId) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("SELECT COUNT(*) FROM relations r1 JOIN relations r2 ON r2.clan_id=r1.target_clan_id AND r2.target_clan_id=r1.clan_id WHERE r1.clan_id=? AND r1.relation=? AND r2.relation=?")) {
+            ps.setInt(1, clanId);
+            ps.setString(2, REL_ALLY);
+            ps.setString(3, REL_ALLY);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        }
+    }
+
+    private boolean canAcceptNewAlly(Clan clan, int otherClanId) throws SQLException {
+        if (areAllies(clan.id(), otherClanId)) return true;
+        return countAllies(clan.id()) < maxAlliesForClan(clan);
+    }
+
     private synchronized void setClanBanner(int clanId, String data) throws SQLException {
         try (PreparedStatement ps = connection.prepareStatement("UPDATE clans SET banner=? WHERE id=?")) {
             ps.setString(1, data);
@@ -2662,7 +2881,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "combate" -> List.of("KILL", "MUERTE");
             case "base" -> List.of("SETBASE");
             case "almacen" -> List.of("ALMACEN");
-            case "admin" -> List.of("AJUSTES", "ROL", "ESTANDARTE", "TABLERO", "DESCRIPCION", "DISOLVER");
+            case "admin" -> List.of("AJUSTES", "ROL", "ESTANDARTE", "TABLERO", "DESCRIPCION", "TIER", "DISOLVER");
             case "all" -> Collections.emptyList();
             default -> List.of(normalizeLogFilter(filter));
         };
@@ -2678,6 +2897,178 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 + countMembers(clan.id()) * memberWeight;
     }
 
+    private int parseBaseNumber(String[] args, int defaultNumber) {
+        if (args == null || args.length < 2) return defaultNumber;
+        try { return Math.max(1, Integer.parseInt(args[1])); }
+        catch (NumberFormatException ignored) { return defaultNumber; }
+    }
+
+    private ClanTier tierDefinition(int tier) {
+        int normalized = Math.max(0, Math.min(maxClanTier(), tier));
+        String path = "clan-tiers." + normalized;
+        String name = getConfig().getString(path + ".name", switch (normalized) {
+            case 1 -> "Hermandad";
+            case 2 -> "Compañía";
+            case 3 -> "Gremio";
+            case 4 -> "Reino";
+            default -> "Banda";
+        });
+        double cost = getConfig().getDouble(path + ".cost", switch (normalized) {
+            case 1 -> 5000.0;
+            case 2 -> 15000.0;
+            case 3 -> 50000.0;
+            case 4 -> 250000.0;
+            default -> 0.0;
+        });
+        int maxMembers = getConfig().getInt(path + ".max-members", switch (normalized) {
+            case 1 -> 12;
+            case 2 -> 16;
+            case 3 -> 24;
+            case 4 -> 55;
+            default -> 8;
+        });
+        int maxBases = getConfig().getInt(path + ".max-bases", normalized >= 2 ? 2 : 1);
+        int storageSlots = getConfig().getInt(path + ".storage-slots", switch (normalized) {
+            case 1 -> 18;
+            case 2 -> 27;
+            case 3 -> 54;
+            case 4 -> 159;
+            default -> 9;
+        });
+        int storagePages = getConfig().getInt(path + ".storage-pages", storageSlots > 54 ? storagePagesForSlots(storageSlots) : 1);
+        int maxAllies = getConfig().getInt(path + ".max-allies", switch (normalized) {
+            case 1 -> 3;
+            case 2 -> 4;
+            case 3 -> 6;
+            case 4 -> 8;
+            default -> 2;
+        });
+        return new ClanTier(normalized, name, cost, Math.max(1, maxMembers), Math.max(1, maxBases), Math.max(9, storageSlots), Math.max(1, storagePages), Math.max(0, maxAllies));
+    }
+
+    private int maxClanTier() {
+        ConfigurationSection sec = getConfig().getConfigurationSection("clan-tiers");
+        if (sec == null) return 4;
+        int max = 0;
+        for (String key : sec.getKeys(false)) {
+            try { max = Math.max(max, Integer.parseInt(key)); }
+            catch (NumberFormatException ignored) { }
+        }
+        return Math.max(0, max);
+    }
+
+    private String tierName(int tier) {
+        return tierDefinition(tier).name();
+    }
+
+    private int maxMembersForClan(Clan clan) {
+        return tierDefinition(clan == null ? 0 : clan.tier()).maxMembers();
+    }
+
+    private int maxBasesForClan(Clan clan) {
+        return tierDefinition(clan == null ? 0 : clan.tier()).maxBases();
+    }
+
+    private int maxAlliesForClan(Clan clan) {
+        return tierDefinition(clan == null ? 0 : clan.tier()).maxAllies();
+    }
+
+    private int storageSlotsForClan(Clan clan) {
+        ClanTier tier = tierDefinition(clan == null ? 0 : clan.tier());
+        int slots = tier.storageSlots();
+        if (tier.storagePages() > 1 && slots <= 54) slots = tier.storagePages() * STORAGE_PAGE_ITEM_SLOTS;
+        return Math.max(9, slots);
+    }
+
+    private int storagePagesForSlots(int slots) {
+        if (slots <= 54) return 1;
+        return Math.max(1, (int) Math.ceil(slots / (double) STORAGE_PAGE_ITEM_SLOTS));
+    }
+
+    private int storageInventorySize(int totalSlots) {
+        if (totalSlots > 54) return 54;
+        int rows = Math.max(1, (int) Math.ceil(totalSlots / 9.0));
+        return Math.max(9, Math.min(54, rows * 9));
+    }
+
+    private String storageDisplay(Clan clan) {
+        int slots = storageSlotsForClan(clan);
+        int pages = storagePagesForSlots(slots);
+        if (pages > 1) return pages + " páginas";
+        return slots + " slots";
+    }
+
+    private List<String> tierUpgradeLore(Clan clan) {
+        ClanTier current = tierDefinition(clan.tier());
+        if (clan.tier() >= maxClanTier()) {
+            return List.of("", "&7Tier actual: &d" + current.name(), "", "&aEste clan ya alcanzó", "&ael tier máximo.");
+        }
+        ClanTier next = tierDefinition(clan.tier() + 1);
+        double missing = Math.max(0.0, next.cost() - clan.bankBalance());
+        List<String> lore = new ArrayList<>();
+        lore.add("");
+        lore.add("&7Tier actual: &d" + current.name());
+        lore.add("&7Siguiente tier: &d" + next.name());
+        lore.add("");
+        lore.add("&7Costo: &e" + formatNumber(next.cost()) + " monedas");
+        lore.add("&7Pago: &6Banco del clan");
+        lore.add("&7Banco actual: &e" + formatNumber(clan.bankBalance()));
+        if (missing > 0.0) lore.add("&cFaltan: &e" + formatNumber(missing));
+        lore.add("");
+        lore.add("&6&lMejoras al subir:");
+        lore.add("&7Miembros: &e" + current.maxMembers() + " &8→ &a" + next.maxMembers());
+        lore.add("&7Bases: &e" + current.maxBases() + " &8→ &a" + next.maxBases());
+        lore.add("&7Almacén: &e" + storageDisplayForTier(current) + " &8→ &a" + storageDisplayForTier(next));
+        lore.add("&7Aliados: &e" + current.maxAllies() + " &8→ &a" + next.maxAllies());
+        lore.add("");
+        lore.add(missing <= 0.0 ? "&eClick para mejorar." : "&8Necesitas más dinero en el banco.");
+        return lore;
+    }
+
+    private String storageDisplayForTier(ClanTier tier) {
+        int slots = tier.storageSlots();
+        int pages = storagePagesForSlots(slots);
+        if (tier.storagePages() > 1) pages = tier.storagePages();
+        if (pages > 1) return pages + " páginas";
+        return slots + " slots";
+    }
+
+    private Map<String, String> tierPlaceholders(Clan clan) throws SQLException {
+        Map<String, String> ph = new HashMap<>();
+        ClanTier current = tierDefinition(clan.tier());
+        ClanTier next = tierDefinition(Math.min(maxClanTier(), clan.tier() + 1));
+        ph.put("clan_tier", String.valueOf(clan.tier()));
+        ph.put("tier", String.valueOf(clan.tier()));
+        ph.put("clan_tier_name", current.name());
+        ph.put("tier_name", current.name());
+        ph.put("clan_next_tier", clan.tier() >= maxClanTier() ? "MAX" : String.valueOf(clan.tier() + 1));
+        ph.put("clan_next_tier_name", clan.tier() >= maxClanTier() ? current.name() : next.name());
+        ph.put("next_tier_name", clan.tier() >= maxClanTier() ? current.name() : next.name());
+        ph.put("clan_tier_cost", clan.tier() >= maxClanTier() ? "0" : formatNumber(next.cost()));
+        ph.put("tier_cost", clan.tier() >= maxClanTier() ? "0" : formatNumber(next.cost()));
+        ph.put("max_members", String.valueOf(current.maxMembers()));
+        ph.put("clan_max_members", String.valueOf(current.maxMembers()));
+        ph.put("max_bases", String.valueOf(current.maxBases()));
+        ph.put("clan_max_bases", String.valueOf(current.maxBases()));
+        ph.put("max_allies", String.valueOf(current.maxAllies()));
+        ph.put("clan_max_allies", String.valueOf(current.maxAllies()));
+        ph.put("storage_slots", String.valueOf(storageSlotsForClan(clan)));
+        ph.put("clan_storage_slots", String.valueOf(storageSlotsForClan(clan)));
+        ph.put("storage_pages", String.valueOf(storagePagesForSlots(storageSlotsForClan(clan))));
+        ph.put("clan_storage_pages", String.valueOf(storagePagesForSlots(storageSlotsForClan(clan))));
+        ph.put("storage_display", storageDisplay(clan));
+        ph.put("clan_storage_display", storageDisplay(clan));
+        ph.put("bases", String.valueOf(countClanBases(clan.id())));
+        ph.put("allies", String.valueOf(countAllies(clan.id())));
+        ph.put("next_max_members", String.valueOf(next.maxMembers()));
+        ph.put("next_max_bases", String.valueOf(next.maxBases()));
+        ph.put("next_max_allies", String.valueOf(next.maxAllies()));
+        ph.put("next_storage_slots", String.valueOf(next.storageSlots()));
+        ph.put("next_storage_pages", String.valueOf(next.storagePages()));
+        ph.put("next_storage_display", storageDisplayForTier(next));
+        return ph;
+    }
+
     private String formatNumber(double value) {
         if (Math.abs(value - Math.rint(value)) < 0.0001) return String.valueOf((long) Math.rint(value));
         return String.format(Locale.US, "%.2f", value);
@@ -2690,6 +3081,15 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             for (ItemStack item : items) dataOutput.writeObject(item);
         }
         return Base64.getEncoder().encodeToString(outputStream.toByteArray());
+    }
+
+    private int inventorySerializedSize(String data) {
+        if (data == null || data.isBlank()) return 0;
+        try (BukkitObjectInputStream dataInput = new BukkitObjectInputStream(new ByteArrayInputStream(Base64.getDecoder().decode(data)))) {
+            return Math.max(0, dataInput.readInt());
+        } catch (Exception ignored) {
+            return 0;
+        }
     }
 
     private ItemStack[] deserializeInventory(String data, int size) {
@@ -3047,6 +3447,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         inv.setItem(nativeSlot("menus.settings.items.permissions.slot", 14), can(member, "permissions-edit") ? nativeItem("menus.settings.items.permissions", Material.KNOWLEDGE_BOOK, "&b&lConfigurar permisos", List.of("", "&7Edita qué acciones puede usar", "&7cada rango del clan.", "", "&eClick para abrir el editor."), ph) : lockedItem("&7Configurar permisos", "&cRequiere permiso de administrar permisos."));
         inv.setItem(nativeSlot("menus.settings.items.open.slot", 15), can(member, "open") ? nativeItem("menus.settings.items.open", Material.OAK_DOOR, "&a&lEntrada del clan", List.of("", "&7Estado actual: {entry}", "", "&eClick para alternar."), ph) : lockedItem("&7Entrada del clan", "&cRequiere rango alto."));
         inv.setItem(nativeSlot("menus.settings.items.disband.slot", 16), can(member, "disband") ? nativeItem("menus.settings.items.disband", Material.TNT, "&4&lDisolver clan", List.of("", "&cAcción peligrosa.", "&7Usa el comando de confirmación.", "", "&eClick para instrucciones."), ph) : lockedItem("&7Disolver clan", "&cSolo el rango máximo."));
+        inv.setItem(nativeSlot("menus.settings.items.tier-upgrade.slot", 20), can(member, "tier-upgrade") ? nativeItem("menus.settings.items.tier-upgrade", Material.NETHER_STAR, "&d&lMejorar clan", tierUpgradeLore(clan), ph) : lockedItem("&7Mejorar clan", "&cRequiere permiso para mejorar el clan."));
         setBackItem(inv, "settings", 49, "&6&lVolver", List.of("&7Regresa al menú principal."));
         openNativeInventory(player, inv);
     }
@@ -3621,6 +4022,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         else if (slot == nativeSlot("menus.settings.items.permissions.slot", 14)) openPermissionsEditMenu(player, 1);
         else if (slot == nativeSlot("menus.settings.items.open.slot", 15)) { player.closeInventory(); Clan clan = getPlayerClan(player.getUniqueId()).orElseThrow(); player.performCommand("clan abierto " + (clan.open() ? "off" : "on")); }
         else if (slot == nativeSlot("menus.settings.items.disband.slot", 16)) { player.closeInventory(); msg(player, "&cPara disolver usa: &e/clan disolver confirmar"); }
+        else if (slot == nativeSlot("menus.settings.items.tier-upgrade.slot", 20)) { handleTierUpgrade(player); openSettingsMenu(player); }
     }
 
 
@@ -3888,6 +4290,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "rename-tag" -> "&bCambiar ID del clan";
             case "settings" -> "&6Abrir ajustes";
             case "permissions-edit" -> "&bAdministrar permisos";
+            case "tier-upgrade" -> "&dMejorar clan";
             case "disband" -> "&4Disolver clan";
             default -> "&e" + key;
         };
@@ -3920,6 +4323,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "rename-tag" -> List.of("&7Permite cambiar el ID/tag", "&7visible del clan.");
             case "settings" -> List.of("&7Permite acceder al panel", "&7de ajustes del clan.");
             case "permissions-edit" -> List.of("&7Permite abrir el editor", "&7de permisos por rol.");
+            case "tier-upgrade" -> List.of("&7Permite gastar dinero del banco", "&7para subir el tier del clan.");
             case "disband" -> List.of("&7Permite disolver el clan.", "&cAcción peligrosa.");
             default -> List.of("&7Permiso interno del clan.");
         };
@@ -3939,7 +4343,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private List<String> permissionKeys() {
-        return List.of("invite", "kick", "promote", "demote", "set-rank", "rename-role", "setbase", "relation", "open", "bank-deposit", "bank-withdraw", "storage-open", "banner-set", "logs-view", "board-edit", "description-edit", "mail-send", "mail-delete", "join-requests", "rename-clan", "rename-tag", "settings", "permissions-edit", "disband");
+        return List.of("invite", "kick", "promote", "demote", "set-rank", "rename-role", "setbase", "relation", "open", "bank-deposit", "bank-withdraw", "storage-open", "banner-set", "logs-view", "board-edit", "description-edit", "mail-send", "mail-delete", "join-requests", "rename-clan", "rename-tag", "settings", "permissions-edit", "tier-upgrade", "disband");
     }
 
     private String permissionMenuPath(boolean editable) {
@@ -4454,7 +4858,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             map.put("clan_name", clan.name());
             map.put("name", clan.name());
             map.put("members", String.valueOf(countMembers(clan.id())));
-            map.put("max_members", String.valueOf(getConfig().getInt("limits.max-members", 20)));
+            map.put("max_members", String.valueOf(maxMembersForClan(clan)));
+            map.putAll(tierPlaceholders(clan));
             map.put("bank", formatNumber(clan.bankBalance()));
             map.put("strength", formatNumber(calculateStrength(clan)));
             map.put("open", clan.open() ? "Abierto" : "Invitación");
@@ -4697,7 +5102,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             msg(actor, "&cEse jugador ya pertenece a otro clan. Solicitud borrada.");
             return;
         }
-        if (countMembers(clanId) >= getConfig().getInt("limits.max-members", 20)) {
+        Clan clan = getClan(clanId).orElseThrow();
+        if (countMembers(clanId) >= maxMembersForClan(clan)) {
             msg(actor, "&cTu clan ya alcanzó el límite de miembros.");
             return;
         }
@@ -4730,6 +5136,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 UUID.fromString(rs.getString("owner_uuid")),
                 rs.getInt("open") == 1,
                 rs.getLong("created_at"),
+                rs.getInt("tier"),
                 rs.getDouble("bank_balance"),
                 rs.getString("banner"),
                 rs.getString("storage"),
@@ -4785,7 +5192,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
         if (!(sender instanceof Player)) return Collections.emptyList();
         if (args.length == 1) {
-            return filter(List.of("ayuda", "crear", "info", "lista", "invitar", "aceptar", "unirse", "abierto", "salir", "expulsar", "promover", "degradar", "setrango", "rol", "chat", "c", "setbase", "base", "relacion", "banco", "depositar", "retirar", "almacen", "estandarte", "logs", "top", "bajas", "tablero", "correo", "editar", "solicitudes", "menu", "abrir", "ui", "interfaz", "disolver"), args[0]);
+            return filter(List.of("ayuda", "crear", "info", "lista", "invitar", "aceptar", "unirse", "abierto", "salir", "expulsar", "promover", "degradar", "setrango", "rol", "chat", "c", "setbase", "base", "relacion", "banco", "depositar", "retirar", "almacen", "mejorar", "tier", "upgrade", "estandarte", "logs", "top", "bajas", "tablero", "correo", "editar", "solicitudes", "menu", "abrir", "ui", "interfaz", "disolver"), args[0]);
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         try {
@@ -4842,7 +5249,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     public record Clan(int id, String tag, String name, UUID ownerUuid, boolean open, long createdAt,
-                       double bankBalance, String banner, String storage, String boardMessage, String description,
+                       int tier, double bankBalance, String banner, String storage, String boardMessage, String description,
                        String baseWorld, double baseX, double baseY, double baseZ, float baseYaw, float basePitch) {
         boolean hasBase() { return baseWorld != null && !baseWorld.isBlank(); }
         boolean hasBanner() { return banner != null && !banner.isBlank(); }
@@ -4857,6 +5264,10 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     public record ClanRelationView(Clan clan, String relation) {}
 
+    public record ClanTier(int tier, String name, double cost, int maxMembers, int maxBases, int storageSlots, int storagePages, int maxAllies) {}
+
+    public record ClanBase(int clanId, int baseNumber, String world, double x, double y, double z, float yaw, float pitch) {}
+
     public record PlayerProfileSnapshot(String level, String race) {
         public static PlayerProfileSnapshot empty() { return new PlayerProfileSnapshot("", ""); }
     }
@@ -4864,6 +5275,10 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     public record ClanJoinRequest(UUID uuid, String name, long requestedAt) {}
 
     private record ClanMenuHolder(String menu, int page, int clanId, UUID targetUuid, int mailId) implements InventoryHolder {
+        @Override public Inventory getInventory() { return null; }
+    }
+
+    private record StorageInventoryHolder(int clanId, int page, int totalSlots) implements InventoryHolder {
         @Override public Inventory getInventory() { return null; }
     }
 
@@ -4900,7 +5315,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 String noClan = getConfig().getString("placeholders.no-clan", "");
                 if (memberOpt.isEmpty()) {
                     return switch (params.toLowerCase(Locale.ROOT)) {
-                        case "id", "name", "tag", "lpc_tag", "role", "role_number", "member_count", "bank", "kills", "deaths", "strength", "description", "description_plain", "description_line_1", "description_line_2", "description_line_3", "description_line_4", "description_line_5", "board", "board_plain", "board_line_1", "board_line_2", "board_line_3", "board_line_4", "board_line_5", "board_line_6", "board_line_7", "board_line_8", "board_line_9", "board_line_10", "is_in_clan" -> params.equalsIgnoreCase("is_in_clan") ? "false" : noClan;
+                        case "id", "name", "tag", "lpc_tag", "role", "role_number", "member_count", "bank", "kills", "deaths", "strength", "tier", "tier_name", "max_members", "max_bases", "max_allies", "storage_slots", "storage_pages", "storage_display", "allies", "bases", "description", "description_plain", "description_line_1", "description_line_2", "description_line_3", "description_line_4", "description_line_5", "board", "board_plain", "board_line_1", "board_line_2", "board_line_3", "board_line_4", "board_line_5", "board_line_6", "board_line_7", "board_line_8", "board_line_9", "board_line_10", "is_in_clan" -> params.equalsIgnoreCase("is_in_clan") ? "false" : noClan;
                         default -> noClan;
                     };
                 }
@@ -4916,6 +5331,16 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     case "role" -> getRoleName(clan.id(), member.role());
                     case "role_number" -> String.valueOf(member.role());
                     case "member_count" -> String.valueOf(countMembers(clan.id()));
+                    case "tier" -> String.valueOf(clan.tier());
+                    case "tier_name" -> tierName(clan.tier());
+                    case "max_members" -> String.valueOf(maxMembersForClan(clan));
+                    case "max_bases" -> String.valueOf(maxBasesForClan(clan));
+                    case "max_allies" -> String.valueOf(maxAlliesForClan(clan));
+                    case "storage_slots" -> String.valueOf(storageSlotsForClan(clan));
+                    case "storage_pages" -> String.valueOf(storagePagesForSlots(storageSlotsForClan(clan)));
+                    case "storage_display" -> storageDisplay(clan);
+                    case "allies" -> String.valueOf(countAllies(clan.id()));
+                    case "bases" -> String.valueOf(countClanBases(clan.id()));
                     case "bank" -> formatNumber(clan.bankBalance());
                     case "kills" -> String.valueOf(getTotalKillsByClan(clan.id()));
                     case "deaths" -> String.valueOf(getTotalDeathsByClan(clan.id()));

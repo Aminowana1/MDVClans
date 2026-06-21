@@ -1,17 +1,17 @@
-# MDVClans 1.9.0
+# MDVClans 1.10.0
 
-Actualización de roles customizables y permisos por clan.
+Actualización de tiers/progreso de clanes para MDVCRAFT.
 
 ## Cambios principales
 
-- Migración automática de roles 0-5 al nuevo sistema 0-4.
-- Eliminado el rol fijo `Plebeyo` como nivel separado.
-- El líder queda como rango 4 y siempre conserva todos los permisos.
-- El menú de permisos de información ahora muestra rangos 0-4.
-- Nuevo editor de permisos desde Ajustes del clan.
-- Cada clan puede activar/desactivar permisos por rol con lanas verdes/rojas.
-- Los permisos reales de comandos y acciones GUI ahora respetan la configuración custom del clan.
-- Botón para resetear los permisos del clan a los valores por defecto de `config.yml`.
+- Tiers de clan configurables: Banda, Hermandad, Compañía, Gremio y Reino.
+- Cada clan guarda su tier en SQLite (`clans.tier`).
+- Subida de tier usando dinero del banco del clan.
+- Permiso nuevo `tier-upgrade` para decidir qué roles pueden mejorar el clan.
+- Límites por tier: miembros, bases, aliados y almacén.
+- Almacén dinámico por tier, con páginas cuando supera 54 slots.
+- Bases múltiples básicas con `/clan setbase [n]` y `/clan base [n]`.
+- Placeholders internos de menús para tier, límites y mejoras.
 
 ## Compilar
 
@@ -19,8 +19,4 @@ Actualización de roles customizables y permisos por clan.
 mvn clean package
 ```
 
-Jar esperado:
-
-```text
-target/MDVClans-1.9.0.jar
-```
+El jar queda en `target/MDVClans-1.10.0.jar`.

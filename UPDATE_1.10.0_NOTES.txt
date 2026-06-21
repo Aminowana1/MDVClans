@@ -1,0 +1,139 @@
+MDVClans 1.10.0 - Tiers de clan
+
+ANTES DE ACTUALIZAR
+- Haz backup de plugins/MDVClans/Data/clans.db
+- Compila con Maven/GitHub y reemplaza el jar por MDVClans-1.10.0.jar
+- No borres la carpeta del plugin si quieres conservar menús/config personalizados.
+
+QUÉ AÑADE
+- Tier de clan: Banda, Hermandad, Compañía, Gremio, Reino.
+- /clan mejorar, /clan tier y /clan upgrade.
+- El upgrade se paga con dinero del banco del clan.
+- Permiso nuevo: tier-upgrade.
+- Límites por tier: miembros, bases, almacén y aliados.
+- Bases múltiples: /clan setbase [numero] y /clan base [numero].
+- Almacén dinámico por tier; el tier Reino usa 3 páginas de 53 slots útiles.
+- Placeholders internos para mostrar tier y límites en menús/lore.
+
+MIGRACIÓN AUTOMÁTICA
+- Se agrega clans.tier con default 0.
+- Se crea clan_bases para soportar más de una base.
+- Si un clan tenía base vieja, se copia automáticamente como base #1.
+- La migración de bases corre una sola vez y marca mdvclans_meta.bases-migrated-1.10 = true.
+- Los clanes existentes empiezan como Tier 0 Banda. No se expulsan miembros si ya superan el límite; solo se bloquean nuevas entradas/invitaciones hasta mejorar.
+- El almacén viejo no se borra: si un clan baja visualmente a menos slots por tier, los items extra quedan guardados y reaparecen al desbloquear más espacio.
+
+CONFIG.YML - agrega este bloque:
+
+clan-tiers:
+  0:
+    name: 'Banda'
+    cost: 0
+    max-members: 8
+    max-bases: 1
+    storage-slots: 9
+    storage-pages: 1
+    max-allies: 2
+  1:
+    name: 'Hermandad'
+    cost: 5000
+    max-members: 12
+    max-bases: 1
+    storage-slots: 18
+    storage-pages: 1
+    max-allies: 3
+  2:
+    name: 'Compañía'
+    cost: 15000
+    max-members: 16
+    max-bases: 2
+    storage-slots: 27
+    storage-pages: 1
+    max-allies: 4
+  3:
+    name: 'Gremio'
+    cost: 50000
+    max-members: 24
+    max-bases: 2
+    storage-slots: 54
+    storage-pages: 1
+    max-allies: 6
+  4:
+    name: 'Reino'
+    cost: 250000
+    max-members: 55
+    max-bases: 2
+    storage-slots: 159
+    storage-pages: 3
+    max-allies: 8
+
+CONFIG.YML - agrega en rank-permissions:
+
+tier-upgrade: 4
+
+CONFIG.YML - recomendado actualizar storage-chest.title:
+
+title: '&8Almacén {id} &7{storage_page}/{storage_max_page}'
+
+NATIVEMENUS/50-settings.yml - agrega dentro de menus.settings.items:
+
+tier-upgrade:
+  slot: 20
+  material: NETHER_STAR
+  name: '&d&lMejorar clan'
+  lore:
+  - ''
+  - '&7Tier actual: &d{clan_tier_name}'
+  - '&7Siguiente: &d{clan_next_tier_name}'
+  - ''
+  - '&7Costo: &e{clan_tier_cost} monedas'
+  - '&7Pago: &6Banco del clan'
+  - '&7Banco actual: &e{bank}'
+  - ''
+  - '&6&lMejoras actuales:'
+  - '&7Miembros: &e{members}&7/&e{max_members}'
+  - '&7Bases: &e{bases}&7/&e{max_bases}'
+  - '&7Almacén: &e{storage_display}'
+  - '&7Aliados: &e{allies}&7/&e{max_allies}'
+  - ''
+  - '&eClick para mejorar.'
+
+NATIVEMENUS/70-permission-labels.yml - agrega:
+
+tier-upgrade:
+  name: '&dMejorar clan'
+  material: PURPLE_WOOL
+  description: ['&7Permite gastar dinero del banco', '&7para subir el tier del clan.']
+
+PLACEHOLDERS INTERNOS NUEVOS
+{clan_tier}
+{clan_tier_name}
+{clan_next_tier}
+{clan_next_tier_name}
+{clan_tier_cost}
+{max_members} / {clan_max_members}
+{max_bases} / {clan_max_bases}
+{max_allies} / {clan_max_allies}
+{storage_slots} / {clan_storage_slots}
+{storage_pages} / {clan_storage_pages}
+{storage_display} / {clan_storage_display}
+{bases}
+{allies}
+{next_max_members}
+{next_max_bases}
+{next_max_allies}
+{next_storage_slots}
+{next_storage_pages}
+{next_storage_display}
+
+PLACEHOLDERS PAPI BÁSICOS
+%mdvclans_tier%
+%mdvclans_tier_name%
+%mdvclans_max_members%
+%mdvclans_max_bases%
+%mdvclans_max_allies%
+%mdvclans_storage_slots%
+%mdvclans_storage_pages%
+%mdvclans_storage_display%
+%mdvclans_bases%
+%mdvclans_allies%

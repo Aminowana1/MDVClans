@@ -87,6 +87,10 @@ permission-labels:
     name: '&bAdministrar permisos'
     material: LIGHT_BLUE_WOOL
     description: ['&7Permite abrir el editor', '&7de permisos por rol.']
+  tier-upgrade:
+    name: '&dMejorar clan'
+    material: PURPLE_WOOL
+    description: ['&7Permite gastar dinero del banco', '&7para subir el tier del clan.']
   disband:
     name: '&4Disolver clan'
     material: RED_WOOL

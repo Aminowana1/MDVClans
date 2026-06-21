@@ -47,6 +47,7 @@ menus:
       name: '&8[&b{id}&8] &f{name}'
       lore:
       - '&7ID: &b{id}'
+      - '&7Tier: &d{clan_tier_name}'
       - '&7Miembros: &e{members}&7/&e{max_members}'
       - '&7Entrada: {entry}'
       - '&7Fuerza: &6{strength}'
@@ -73,6 +74,7 @@ menus:
       name: '{relation} &8[&b{id}&8]'
       lore:
       - '&7Clan: &f{name}'
+      - '&7Tier: &d{clan_tier_name}'
       - '&7Relación: {relation}'
       - ''
       - '&7Descripción:'
@@ -140,8 +142,9 @@ menus:
       name: '&e#{position} &8[&b{id}&8]'
       lore:
       - '&7Clan: &f{name}'
+      - '&7Tier: &d{clan_tier_name}'
       - '&7Valor: &6{value}'
-      - '&7Miembros: &e{members}'
+      - '&7Miembros: &e{members}&7/&e{max_members}'
       - '&7Descripción: &f{description_line_1}'
       - ''
       - '&eClick para abrir opciones.'
@@ -161,7 +164,8 @@ menus:
         slot: 4
         name: '&8[&b{id}&8] &f{name}'
         lore:
-        - '&7Miembros: &e{members}'
+        - '&7Tier: &d{clan_tier_name}'
+        - '&7Miembros: &e{members}&7/&e{max_members}'
         - '&7Entrada: {entry}'
         - '&7Fuerza: &6{strength}'
       join:

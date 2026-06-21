@@ -37,7 +37,52 @@ clan-description:
 
 limits:
   max-clans: 60
+  # Fallback viejo. Desde 1.10 el límite real de miembros sale de clan-tiers.<tier>.max-members.
   max-members: 20
+
+# Tiers de clan. Se compran usando dinero del banco del clan.
+# Tier 4 usa 3 páginas de almacén con 53 slots útiles cada una, porque 1 slot se reserva para la flecha de navegación.
+clan-tiers:
+  0:
+    name: 'Banda'
+    cost: 0
+    max-members: 8
+    max-bases: 1
+    storage-slots: 9
+    storage-pages: 1
+    max-allies: 2
+  1:
+    name: 'Hermandad'
+    cost: 5000
+    max-members: 12
+    max-bases: 1
+    storage-slots: 18
+    storage-pages: 1
+    max-allies: 3
+  2:
+    name: 'Compañía'
+    cost: 15000
+    max-members: 16
+    max-bases: 2
+    storage-slots: 27
+    storage-pages: 1
+    max-allies: 4
+  3:
+    name: 'Gremio'
+    cost: 50000
+    max-members: 24
+    max-bases: 2
+    storage-slots: 54
+    storage-pages: 1
+    max-allies: 6
+  4:
+    name: 'Reino'
+    cost: 250000
+    max-members: 55
+    max-bases: 2
+    storage-slots: 159
+    storage-pages: 3
+    max-allies: 8
 
 invites:
   expire-seconds: 120
@@ -77,6 +122,7 @@ rank-permissions:
   mail-delete: 3
   settings: 3
   permissions-edit: 4
+  tier-upgrade: 4
   rename-tag: 4
   rename-clan: 4
   join-requests: 2
@@ -108,7 +154,7 @@ bank:
 storage-chest:
   enabled: true
   size: 27
-  title: '&8Almacén de clan {id}'
+  title: '&8Almacén {id} &7{storage_page}/{storage_max_page}'
 
 clan-mail:
   # Los correos se cortan automáticamente para que no queden en una sola línea gigante.

@@ -80,7 +80,10 @@ menus:
         name: '&6&l{name}'
         lore:
         - '&7ID: &b{id}'
+        - '&7Tier: &d{clan_tier_name}'
         - '&7Miembros: &e{members}&7/&e{max_members}'
+        - '&7Bases: &e{bases}&7/&e{max_bases}'
+        - '&7Almacén: &e{storage_display}'
         - '&7Banco: &e{bank}'
         - '&7Fuerza: &6{strength}'
         - ''
@@ -93,6 +96,8 @@ menus:
         - ''
         - '&7Teletranspórtate a la base'
         - '&7definida por el clan.'
+        - '&7Comando: &f/clan base [n]'
+        - '&7Bases: &e{bases}&7/&e{max_bases}'
         - ''
         - '&eClick para viajar.'
       setbase:
@@ -103,6 +108,8 @@ menus:
         - ''
         - '&7Define la base del clan'
         - '&7en tu ubicación actual.'
+        - '&7Comando: &f/clan setbase [n]'
+        - '&7Bases: &e{bases}&7/&e{max_bases}'
         - ''
         - '&8Requiere rango configurado.'
       bank:
@@ -166,7 +173,8 @@ menus:
         name: '&6&l{name}'
         lore:
         - '&7ID: &b{id}'
-        - '&7Miembros: &e{members}'
+        - '&7Tier: &d{clan_tier_name}'
+        - '&7Miembros: &e{members}&7/&e{max_members}'
         - '&7Banco: &e{bank}'
         - '&7Fuerza: &6{strength}'
       members:
@@ -208,6 +216,7 @@ menus:
         - ''
         - '&7Acceso al almacén'
         - '&7y banco del clan.'
+        - '&7Capacidad: &e{storage_display}'
         - ''
         - '&eClick para abrir.'
       base:

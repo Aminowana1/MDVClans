@@ -83,6 +83,26 @@ menus:
         - '&7Usa el comando de confirmación.'
         - ''
         - '&eClick para instrucciones.'
+      tier-upgrade:
+        slot: 20
+        material: NETHER_STAR
+        name: '&d&lMejorar clan'
+        lore:
+        - ''
+        - '&7Tier actual: &d{clan_tier_name}'
+        - '&7Siguiente: &d{clan_next_tier_name}'
+        - ''
+        - '&7Costo: &e{clan_tier_cost} monedas'
+        - '&7Pago: &6Banco del clan'
+        - '&7Banco actual: &e{bank}'
+        - ''
+        - '&6&lMejoras actuales:'
+        - '&7Miembros: &e{members}&7/&e{max_members}'
+        - '&7Bases: &e{bases}&7/&e{max_bases}'
+        - '&7Almacén: &e{storage_display}'
+        - '&7Aliados: &e{allies}&7/&e{max_allies}'
+        - ''
+        - '&eClick para mejorar.'
     back:
       slot: 49
       action: NATIVE
