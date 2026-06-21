@@ -3739,12 +3739,26 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         Map<String, String> ph = memberPlaceholders(target, actor.clanId(), player);
         Inventory inv = Bukkit.createInventory(new ClanMenuHolder("memberaction", 1, actor.clanId(), target.uuid(), -1), 27, nativeTitle("member-action", "&8Miembro &b{player}", ph));
         fill(inv);
-        inv.setItem(nativeSlot("menus.member-action.items.member.slot", 4), memberHead(target, actor.clanId(), player));
-        inv.setItem(nativeSlot("menus.member-action.items.mail.slot", 10), nativeItem("menus.member-action.items.mail", Material.MAP, "&d&lCorreo personal", List.of("", "&7Abre/usa MDVSocial para", "&7mandarle una carta personal.", "", "&eClick para instrucciones."), ph));
-        inv.setItem(nativeSlot("menus.member-action.items.promote.slot", 11), canModifyMember(actor, target, "promote") ? nativeItem("menus.member-action.items.promote", Material.LIME_DYE, "&a&lPromover", List.of("", "&7Sube un rango al miembro.", "", "&eClick para promover."), ph) : lockedItem("&7Promover", "&cNo tienes rango para esta función."));
-        inv.setItem(nativeSlot("menus.member-action.items.demote.slot", 12), canModifyMember(actor, target, "demote") ? nativeItem("menus.member-action.items.demote", Material.YELLOW_DYE, "&e&lDegradar", List.of("", "&7Baja un rango al miembro.", "", "&eClick para degradar."), ph) : lockedItem("&7Degradar", "&cNo tienes rango para esta función."));
-        inv.setItem(nativeSlot("menus.member-action.items.kick.slot", 14), canModifyMember(actor, target, "kick") ? nativeItem("menus.member-action.items.kick", Material.RED_DYE, "&c&lExpulsar", List.of("", "&7Expulsa al miembro del clan.", "&cAcción delicada.", "", "&eClick para expulsar."), ph) : lockedItem("&7Expulsar", "&cNo tienes rango para esta función."));
-        inv.setItem(nativeSlot("menus.member-action.items.profile.slot", 16), nativeItem("menus.member-action.items.profile", Material.BOOK, "&b&lVer perfil", List.of("", "&7Información básica del jugador.", "&7Más perfil se puede conectar", "&7con MDVSocial/MMOCore luego."), ph));
+        if (nativeConfiguredItemEnabled("menus.member-action.items.member")) {
+            inv.setItem(nativeSlot("menus.member-action.items.member.slot", 4), memberHead(target, actor.clanId(), player));
+        }
+        if (nativeConfiguredItemEnabled("menus.member-action.items.mail")) {
+            inv.setItem(nativeSlot("menus.member-action.items.mail.slot", 10), nativeItem("menus.member-action.items.mail", Material.MAP, "&d&lCorreo personal", List.of("", "&7Abre/usa MDVSocial para", "&7mandarle una carta personal.", "", "&eClick para instrucciones."), ph));
+        }
+        if (nativeConfiguredItemEnabled("menus.member-action.items.promote")) {
+            inv.setItem(nativeSlot("menus.member-action.items.promote.slot", 11), canModifyMember(actor, target, "promote") ? nativeItem("menus.member-action.items.promote", Material.LIME_DYE, "&a&lPromover", List.of("", "&7Sube un rango al miembro.", "", "&eClick para promover."), ph) : lockedItem("&7Promover", "&cNo tienes rango para esta función."));
+        }
+        if (nativeConfiguredItemEnabled("menus.member-action.items.demote")) {
+            inv.setItem(nativeSlot("menus.member-action.items.demote.slot", 12), canModifyMember(actor, target, "demote") ? nativeItem("menus.member-action.items.demote", Material.YELLOW_DYE, "&e&lDegradar", List.of("", "&7Baja un rango al miembro.", "", "&eClick para degradar."), ph) : lockedItem("&7Degradar", "&cNo tienes rango para esta función."));
+        }
+        if (nativeConfiguredItemEnabled("menus.member-action.items.kick")) {
+            inv.setItem(nativeSlot("menus.member-action.items.kick.slot", 14), canModifyMember(actor, target, "kick") ? nativeItem("menus.member-action.items.kick", Material.RED_DYE, "&c&lExpulsar", List.of("", "&7Expulsa al miembro del clan.", "&cAcción delicada.", "", "&eClick para expulsar."), ph) : lockedItem("&7Expulsar", "&cNo tienes rango para esta función."));
+        }
+        // 1.10.2+: el botón de perfil queda totalmente opcional.
+        // Para mostrarlo, debe existir en YAML y tener enabled: true.
+        if (nativeOptionalItemEnabled("menus.member-action.items.profile", false)) {
+            inv.setItem(nativeSlot("menus.member-action.items.profile.slot", 16), nativeItem("menus.member-action.items.profile", Material.BOOK, "&b&lVer perfil", List.of("", "&7Información básica del jugador.", "&7Más perfil se puede conectar", "&7con MDVSocial/MMOCore luego."), ph));
+        }
         setBackItem(inv, "memberaction", 22, "&6&lVolver", List.of("&7Regresa a miembros."));
         openNativeInventory(player, inv);
     }
@@ -3759,22 +3773,38 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         ph.put("entry", target.open() ? "&aAbierta" : "&cInvitación");
         Inventory inv = Bukkit.createInventory(new ClanMenuHolder("clanaction", 1, target.id(), null, -1), 27, nativeTitle("clan-action", "&8Clan &b{id}", ph));
         fill(inv);
-        inv.setItem(nativeSlot("menus.clan-action.items.summary.slot", 4), clanBannerItem(target,
-                applyPlaceholders(configString("menus.clan-action.items.summary.name", "&8[&b{id}&8] &f{name}"), ph),
-                lines("menus.clan-action.items.summary.lore", List.of("&7Miembros: &e{members}", "&7Entrada: {entry}", "&7Fuerza: &6{strength}"), ph), ph));
+        if (nativeConfiguredItemEnabled("menus.clan-action.items.summary")) {
+            inv.setItem(nativeSlot("menus.clan-action.items.summary.slot", 4), clanBannerItem(target,
+                    applyPlaceholders(configString("menus.clan-action.items.summary.name", "&8[&b{id}&8] &f{name}"), ph),
+                    lines("menus.clan-action.items.summary.lore", List.of("&7Miembros: &e{members}", "&7Entrada: {entry}", "&7Fuerza: &6{strength}"), ph), ph));
+        }
         if (own.isEmpty()) {
-            inv.setItem(nativeSlot("menus.clan-action.items.join.slot", 13), target.open()
-                    ? nativeItem("menus.clan-action.items.join", Material.LIME_DYE, "&a&lUnirse", List.of("", "&7Este clan está abierto.", "", "&eClick para unirte."), ph)
-                    : nativeItem("menus.clan-action.items.request", Material.PAPER, "&e&lEnviar solicitud", List.of("", "&7Este clan es por invitación.", "&7Enviarás una solicitud de ingreso.", "", "&eClick para solicitar."), ph));
+            if (target.open() && nativeConfiguredItemEnabled("menus.clan-action.items.join")) {
+                inv.setItem(nativeSlot("menus.clan-action.items.join.slot", 13),
+                        nativeItem("menus.clan-action.items.join", Material.LIME_DYE, "&a&lUnirse", List.of("", "&7Este clan está abierto.", "", "&eClick para unirte."), ph));
+            } else if (!target.open() && nativeConfiguredItemEnabled("menus.clan-action.items.request")) {
+                inv.setItem(nativeSlot("menus.clan-action.items.request.slot", 13),
+                        nativeItem("menus.clan-action.items.request", Material.PAPER, "&e&lEnviar solicitud", List.of("", "&7Este clan es por invitación.", "&7Enviarás una solicitud de ingreso.", "", "&eClick para solicitar."), ph));
+            }
         } else {
             Member member = own.get();
             boolean canRel = can(member, "relation");
             boolean canMail = can(member, "mail-send");
-            inv.setItem(nativeSlot("menus.clan-action.items.info.slot", 10), nativeItem("menus.clan-action.items.info", Material.BOOK, "&b&lVer info", List.of("", "&eClick para ver información."), ph));
-            inv.setItem(nativeSlot("menus.clan-action.items.ally.slot", 11), canRel ? nativeItem("menus.clan-action.items.ally", Material.BLUE_DYE, "&9&lProponer alianza", List.of("", "&7Envía/acepta relación aliada.", "", "&eClick para establecer."), ph) : lockedItem("&7Proponer alianza", "&cRequiere rango alto."));
-            inv.setItem(nativeSlot("menus.clan-action.items.enemy.slot", 12), canRel ? nativeItem("menus.clan-action.items.enemy", Material.RED_DYE, "&c&lDeclarar enemigo", List.of("", "&7Marca este clan como enemigo.", "", "&eClick para establecer."), ph) : lockedItem("&7Declarar enemigo", "&cRequiere rango alto."));
-            inv.setItem(nativeSlot("menus.clan-action.items.neutral.slot", 14), canRel ? nativeItem("menus.clan-action.items.neutral", Material.GRAY_DYE, "&7&lVolver neutral", List.of("", "&7Quita alianza/enemistad.", "", "&eClick para establecer."), ph) : lockedItem("&7Volver neutral", "&cRequiere rango alto."));
-            inv.setItem(nativeSlot("menus.clan-action.items.mail.slot", 15), canMail ? nativeItem("menus.clan-action.items.mail", Material.WRITABLE_BOOK, "&d&lCorreo de clan", List.of("", "&7Escribe un correo formal", "&7al buzón de este clan.", "", "&eClick para escribir."), ph) : lockedItem("&7Correo de clan", "&cRequiere rango alto."));
+            if (nativeConfiguredItemEnabled("menus.clan-action.items.info")) {
+                inv.setItem(nativeSlot("menus.clan-action.items.info.slot", 10), nativeItem("menus.clan-action.items.info", Material.BOOK, "&b&lVer info", List.of("", "&eClick para ver información."), ph));
+            }
+            if (nativeConfiguredItemEnabled("menus.clan-action.items.ally")) {
+                inv.setItem(nativeSlot("menus.clan-action.items.ally.slot", 11), canRel ? nativeItem("menus.clan-action.items.ally", Material.BLUE_DYE, "&9&lProponer alianza", List.of("", "&7Envía/acepta relación aliada.", "", "&eClick para establecer."), ph) : lockedItem("&7Proponer alianza", "&cRequiere rango alto."));
+            }
+            if (nativeConfiguredItemEnabled("menus.clan-action.items.enemy")) {
+                inv.setItem(nativeSlot("menus.clan-action.items.enemy.slot", 12), canRel ? nativeItem("menus.clan-action.items.enemy", Material.RED_DYE, "&c&lDeclarar enemigo", List.of("", "&7Marca este clan como enemigo.", "", "&eClick para establecer."), ph) : lockedItem("&7Declarar enemigo", "&cRequiere rango alto."));
+            }
+            if (nativeConfiguredItemEnabled("menus.clan-action.items.neutral")) {
+                inv.setItem(nativeSlot("menus.clan-action.items.neutral.slot", 14), canRel ? nativeItem("menus.clan-action.items.neutral", Material.GRAY_DYE, "&7&lVolver neutral", List.of("", "&7Quita alianza/enemistad.", "", "&eClick para establecer."), ph) : lockedItem("&7Volver neutral", "&cRequiere rango alto."));
+            }
+            if (nativeConfiguredItemEnabled("menus.clan-action.items.mail")) {
+                inv.setItem(nativeSlot("menus.clan-action.items.mail.slot", 15), canMail ? nativeItem("menus.clan-action.items.mail", Material.WRITABLE_BOOK, "&d&lCorreo de clan", List.of("", "&7Escribe un correo formal", "&7al buzón de este clan.", "", "&eClick para escribir."), ph) : lockedItem("&7Correo de clan", "&cRequiere rango alto."));
+            }
         }
         setBackItem(inv, "clanaction", 22, "&6&lVolver", List.of("&7Regresa a la lista."));
         openNativeInventory(player, inv);
@@ -3812,16 +3842,26 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         Map<String, String> ph = mailPlaceholders(mail, fromOpt.orElse(null));
         Inventory inv = Bukkit.createInventory(new ClanMenuHolder("mailaction", 1, member.clanId(), null, mail.id()), 27, nativeTitle("mail-action", "&8Correo #{mail_id}", ph));
         fill(inv);
-        inv.setItem(nativeSlot("menus.mail-action.items.message.slot", 4), fromOpt.map(c -> clanBannerItem(c,
-                applyPlaceholders(configString("menus.mail-action.items.message.name", "&6&l#&f{mail_id} &8- &d{from_name}"), ph),
-                lines("menus.mail-action.items.message.lore", List.of("", "&7De: &d{from_name} &8[&6{from_id}&8]", "&7Mensajero: &e{sender}", "&7Fecha: &a{date}", "", "&6&lContenido:", "&f{message_line_1}", "&f{message_line_2}", "&f{message_line_3}", "&f{message_line_4}", "&f{message_line_5}", "&f{message_line_6}", "&f{message_line_7}", "&f{message_line_8}", "&f{message_line_9}", "&f{message_line_10}"), ph), ph))
-                .orElse(nativeItem("menus.mail-action.items.message", Material.PAPER, "&6&l#&f{mail_id}", List.of("&f{message_line_1}", "&f{message_line_2}", "&f{message_line_3}", "&f{message_line_4}", "&f{message_line_5}"), ph)));
-        if (isAllianceRequest(mail)) {
-            inv.setItem(nativeSlot("menus.mail-action.items.accept-ally.slot", 10), nativeItem("menus.mail-action.items.accept-ally", Material.LIME_DYE, "&a&lAceptar alianza", List.of("", "&7Acepta la alianza con", "&d{from_name} &8[&6{from_id}&8]&7.", "", "&eClick para aceptar."), ph));
-            inv.setItem(nativeSlot("menus.mail-action.items.reject-ally.slot", 12), nativeItem("menus.mail-action.items.reject-ally", Material.RED_DYE, "&c&lRechazar alianza", List.of("", "&7Rechaza esta solicitud", "&7de alianza.", "", "&eClick para rechazar."), ph));
+        if (nativeConfiguredItemEnabled("menus.mail-action.items.message")) {
+            inv.setItem(nativeSlot("menus.mail-action.items.message.slot", 4), fromOpt.map(c -> clanBannerItem(c,
+                    applyPlaceholders(configString("menus.mail-action.items.message.name", "&6&l#&f{mail_id} &8- &d{from_name}"), ph),
+                    lines("menus.mail-action.items.message.lore", List.of("", "&7De: &d{from_name} &8[&6{from_id}&8]", "&7Mensajero: &e{sender}", "&7Fecha: &a{date}", "", "&6&lContenido:", "&f{message_line_1}", "&f{message_line_2}", "&f{message_line_3}", "&f{message_line_4}", "&f{message_line_5}", "&f{message_line_6}", "&f{message_line_7}", "&f{message_line_8}", "&f{message_line_9}", "&f{message_line_10}"), ph), ph))
+                    .orElse(nativeItem("menus.mail-action.items.message", Material.PAPER, "&6&l#&f{mail_id}", List.of("&f{message_line_1}", "&f{message_line_2}", "&f{message_line_3}", "&f{message_line_4}", "&f{message_line_5}"), ph)));
         }
-        inv.setItem(nativeSlot("menus.mail-action.items.reply.slot", 14), can(member, "mail-send") && fromOpt.isPresent() ? nativeItem("menus.mail-action.items.reply", Material.WRITABLE_BOOK, "&d&lResponder", List.of("", "&7Escribe un correo al clan", "&d{from_name} &8[&6{from_id}&8]&7.", "", "&eClick para responder."), ph) : lockedItem("&7Responder", "&cRequiere rango alto."));
-        inv.setItem(nativeSlot("menus.mail-action.items.delete.slot", 16), can(member, "mail-delete") ? nativeItem("menus.mail-action.items.delete", Material.RED_DYE, "&c&lEliminar", List.of("", "&7Borra este correo del buzón.", "", "&eClick para eliminar."), ph) : lockedItem("&7Eliminar", "&cRequiere rango alto."));
+        if (isAllianceRequest(mail)) {
+            if (nativeConfiguredItemEnabled("menus.mail-action.items.accept-ally")) {
+                inv.setItem(nativeSlot("menus.mail-action.items.accept-ally.slot", 10), nativeItem("menus.mail-action.items.accept-ally", Material.LIME_DYE, "&a&lAceptar alianza", List.of("", "&7Acepta la alianza con", "&d{from_name} &8[&6{from_id}&8]&7.", "", "&eClick para aceptar."), ph));
+            }
+            if (nativeConfiguredItemEnabled("menus.mail-action.items.reject-ally")) {
+                inv.setItem(nativeSlot("menus.mail-action.items.reject-ally.slot", 12), nativeItem("menus.mail-action.items.reject-ally", Material.RED_DYE, "&c&lRechazar alianza", List.of("", "&7Rechaza esta solicitud", "&7de alianza.", "", "&eClick para rechazar."), ph));
+            }
+        }
+        if (nativeConfiguredItemEnabled("menus.mail-action.items.reply")) {
+            inv.setItem(nativeSlot("menus.mail-action.items.reply.slot", 14), can(member, "mail-send") && fromOpt.isPresent() ? nativeItem("menus.mail-action.items.reply", Material.WRITABLE_BOOK, "&d&lResponder", List.of("", "&7Escribe un correo al clan", "&d{from_name} &8[&6{from_id}&8]&7.", "", "&eClick para responder."), ph) : lockedItem("&7Responder", "&cRequiere rango alto."));
+        }
+        if (nativeConfiguredItemEnabled("menus.mail-action.items.delete")) {
+            inv.setItem(nativeSlot("menus.mail-action.items.delete.slot", 16), can(member, "mail-delete") ? nativeItem("menus.mail-action.items.delete", Material.RED_DYE, "&c&lEliminar", List.of("", "&7Borra este correo del buzón.", "", "&eClick para eliminar."), ph) : lockedItem("&7Eliminar", "&cRequiere rango alto."));
+        }
         setBackItem(inv, "mailaction", 22, "&6&lVolver", List.of("&7Regresa al buzón."));
         openNativeInventory(player, inv);
     }
@@ -4292,14 +4332,14 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         Optional<Member> targetOpt = getMember(targetUuid);
         if (targetOpt.isEmpty() || targetOpt.get().clanId() != actor.clanId()) { msg(player, "&cEse miembro ya no está en tu clan."); return; }
         Member target = targetOpt.get();
-        if (slot == nativeSlot("menus.member-action.items.mail.slot", 10)) {
+        if (nativeConfiguredItemClicked("menus.member-action.items.mail", slot, 10)) {
             player.closeInventory();
             pendingPersonalMail.put(player.getUniqueId(), target.name());
             msg(player, "&7Escribe el correo personal para &e" + target.name() + "&7. Escribe &ccancelar &7para cancelar.");
         }
-        else if (slot == nativeSlot("menus.member-action.items.promote.slot", 11)) { player.closeInventory(); player.performCommand("clan promover " + target.name()); }
-        else if (slot == nativeSlot("menus.member-action.items.demote.slot", 12)) { player.closeInventory(); player.performCommand("clan degradar " + target.name()); }
-        else if (slot == nativeSlot("menus.member-action.items.kick.slot", 14)) { player.closeInventory(); player.performCommand("clan expulsar " + target.name()); }
+        else if (nativeConfiguredItemClicked("menus.member-action.items.promote", slot, 11)) { player.closeInventory(); player.performCommand("clan promover " + target.name()); }
+        else if (nativeConfiguredItemClicked("menus.member-action.items.demote", slot, 12)) { player.closeInventory(); player.performCommand("clan degradar " + target.name()); }
+        else if (nativeConfiguredItemClicked("menus.member-action.items.kick", slot, 14)) { player.closeInventory(); player.performCommand("clan expulsar " + target.name()); }
     }
 
 
@@ -4309,17 +4349,18 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         Clan target = targetOpt.get();
         Optional<Member> own = getMember(player.getUniqueId());
         if (own.isEmpty()) {
-            if (slot == nativeSlot("menus.clan-action.items.join.slot", 13) || slot == nativeSlot("menus.clan-action.items.request.slot", 13)) {
+            if ((target.open() && nativeConfiguredItemClicked("menus.clan-action.items.join", slot, 13))
+                    || (!target.open() && nativeConfiguredItemClicked("menus.clan-action.items.request", slot, 13))) {
                 player.closeInventory();
                 player.performCommand("clan unirse " + target.tag());
             }
             return;
         }
-        if (slot == nativeSlot("menus.clan-action.items.info.slot", 10)) { player.closeInventory(); player.performCommand("clan info " + target.tag()); }
-        else if (slot == nativeSlot("menus.clan-action.items.ally.slot", 11)) { player.closeInventory(); player.performCommand("clan relacion " + target.tag() + " aliado"); }
-        else if (slot == nativeSlot("menus.clan-action.items.enemy.slot", 12)) { player.closeInventory(); player.performCommand("clan relacion " + target.tag() + " enemigo"); }
-        else if (slot == nativeSlot("menus.clan-action.items.neutral.slot", 14)) { player.closeInventory(); player.performCommand("clan relacion " + target.tag() + " neutral"); }
-        else if (slot == nativeSlot("menus.clan-action.items.mail.slot", 15)) { pendingClanMailReply.put(player.getUniqueId(), target.tag()); player.closeInventory(); msg(player, "&7Escribe el correo para el clan &e" + target.tag() + "&7. Escribe &ccancelar &7para cancelar."); }
+        if (nativeConfiguredItemClicked("menus.clan-action.items.info", slot, 10)) { player.closeInventory(); player.performCommand("clan info " + target.tag()); }
+        else if (nativeConfiguredItemClicked("menus.clan-action.items.ally", slot, 11)) { player.closeInventory(); player.performCommand("clan relacion " + target.tag() + " aliado"); }
+        else if (nativeConfiguredItemClicked("menus.clan-action.items.enemy", slot, 12)) { player.closeInventory(); player.performCommand("clan relacion " + target.tag() + " enemigo"); }
+        else if (nativeConfiguredItemClicked("menus.clan-action.items.neutral", slot, 14)) { player.closeInventory(); player.performCommand("clan relacion " + target.tag() + " neutral"); }
+        else if (nativeConfiguredItemClicked("menus.clan-action.items.mail", slot, 15)) { pendingClanMailReply.put(player.getUniqueId(), target.tag()); player.closeInventory(); msg(player, "&7Escribe el correo para el clan &e" + target.tag() + "&7. Escribe &ccancelar &7para cancelar."); }
     }
 
 
@@ -4328,7 +4369,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         Optional<ClanMail> mailOpt = getClanMail(member.clanId(), mailId);
         if (mailOpt.isEmpty()) { msg(player, "&cCorreo no encontrado."); return; }
         ClanMail mail = mailOpt.get();
-        if (slot == nativeSlot("menus.mail-action.items.accept-ally.slot", 10) && isAllianceRequest(mail)) {
+        if (nativeConfiguredItemClicked("menus.mail-action.items.accept-ally", slot, 10) && isAllianceRequest(mail)) {
             if (!hasRank(player, member, "relation")) return;
             Optional<Clan> requester = getClan(mail.relationClanId());
             Optional<Clan> ownClan = getClan(member.clanId());
@@ -4338,7 +4379,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             openMailboxMenu(player, 1);
             return;
         }
-        if (slot == nativeSlot("menus.mail-action.items.reject-ally.slot", 12) && isAllianceRequest(mail)) {
+        if (nativeConfiguredItemClicked("menus.mail-action.items.reject-ally", slot, 12) && isAllianceRequest(mail)) {
             if (!hasRank(player, member, "relation")) return;
             Optional<Clan> requester = getClan(mail.relationClanId());
             Optional<Clan> ownClan = getClan(member.clanId());
@@ -4348,14 +4389,14 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             openMailboxMenu(player, 1);
             return;
         }
-        if (slot == nativeSlot("menus.mail-action.items.reply.slot", 14)) {
+        if (nativeConfiguredItemClicked("menus.mail-action.items.reply", slot, 14)) {
             if (!hasRank(player, member, "mail-send")) return;
             Optional<Clan> from = getClan(mail.fromClanId());
             if (from.isEmpty()) return;
             pendingClanMailReply.put(player.getUniqueId(), from.get().tag());
             player.closeInventory();
             msg(player, "&7Escribe la respuesta para &e" + from.get().tag() + "&7. Escribe &ccancelar &7para cancelar.");
-        } else if (slot == nativeSlot("menus.mail-action.items.delete.slot", 16)) {
+        } else if (nativeConfiguredItemClicked("menus.mail-action.items.delete", slot, 16)) {
             if (!hasRank(player, member, "mail-delete")) return;
             deleteClanMail(member.clanId(), mail.id());
             msg(player, "&aCorreo eliminado.");
@@ -4975,6 +5016,25 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     private ConfigurationSection nativeSection(String path) {
         return nativeMenus == null ? null : nativeMenus.getConfigurationSection(path);
+    }
+
+    private boolean nativeOptionalItemEnabled(String path, boolean defaultIfMissing) {
+        ConfigurationSection sec = nativeSection(path);
+        if (sec == null) return defaultIfMissing;
+        return sec.getBoolean("enabled", defaultIfMissing);
+    }
+
+    // 1.10.3: items de menús nativos configurables.
+    // Si el bloque no existe, no se dibuja ni responde al click.
+    // Si existe, se muestra por defecto; agrega enabled: false para ocultarlo sin borrar el bloque.
+    private boolean nativeConfiguredItemEnabled(String path) {
+        ConfigurationSection sec = nativeSection(path);
+        if (sec == null) return false;
+        return sec.getBoolean("enabled", true);
+    }
+
+    private boolean nativeConfiguredItemClicked(String path, int clickedSlot, int defaultSlot) {
+        return nativeConfiguredItemEnabled(path) && clickedSlot == nativeSlot(path + ".slot", defaultSlot);
     }
 
     private String readTexture(ConfigurationSection sec) {

@@ -1,0 +1,27 @@
+MDVClans 1.10.3 - Menús de acción configurables
+
+Qué cambia:
+- Los botones de member-action, clan-action y mail-action ahora respetan el YAML.
+- Si borras un bloque de item, ya no aparece.
+- Si agregas enabled: false, tampoco aparece.
+- Si el item está oculto, el click en ese slot no ejecuta la acción.
+- El item profile sigue necesitando enabled: true para mostrarse.
+
+No requiere cambios en config.yml ni base de datos.
+
+Ejemplo para ocultar Ver info en clan-action:
+
+menus:
+  clan-action:
+    items:
+      info:
+        enabled: false
+        slot: 10
+        material: BOOK
+        name: '&b&lVer info'
+
+También puedes borrar directamente todo el bloque info.
+
+Recomendado:
+- Mantén member-action solo en NativeMenus/60-actions.yml.
+- Mantén 30-members.yml solo para la lista de miembros.

@@ -22,6 +22,20 @@ mvn clean package
 El jar queda en `target/MDVClans-1.10.0.jar`.
 
 
+
+## 1.10.3
+
+- Los items de menús de acción nativos ahora respetan el YAML:
+  - si el bloque del item no existe, no se dibuja;
+  - si el bloque tiene `enabled: false`, no se dibuja;
+  - si se oculta, tampoco responde al click.
+- Afecta `member-action`, `clan-action` y `mail-action`.
+- `profile` sigue siendo especial: para mostrarse debe tener `enabled: true`.
+
+## 1.10.2
+- El botón de perfil en el menú de acciones de miembro ahora es opcional por YAML.
+- `menus.member-action.items.profile` solo aparece si tiene `enabled: true`.
+
 ## 1.10.1
 
 Añade menú nativo de bases: `/clan abrir bases`, botones de TP y botones para establecer bases, con estado desbloqueado/no establecido/bloqueado por tier.

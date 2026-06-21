@@ -1,0 +1,5 @@
+-proc:none
+-Xlint:none
+-Xmaxerrs
+10000
+src/main/java/com/mdvcraft/mdvclans/MDVClansPlugin.java

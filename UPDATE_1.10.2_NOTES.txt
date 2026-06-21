@@ -1,0 +1,13 @@
+MDVClans 1.10.2
+
+Cambio pequeño de menú:
+- El botón member-action.items.profile ahora es opcional.
+- Ya no se dibuja por defecto desde el código.
+- Para mostrarlo de nuevo, agrega enabled: true dentro de menus.member-action.items.profile.
+- Si quieres ocultarlo, basta con borrar el bloque profile o poner enabled: false.
+
+Para actualizar sin borrar carpeta:
+1. Compila y cambia solo el jar.
+2. No hace falta tocar config.yml ni la base de datos.
+3. Revisa que no tengas profile duplicado en NativeMenus/30-members.yml y NativeMenus/60-actions.yml.
+   Aunque quede duplicado, sin enabled: true ya no debería aparecer.

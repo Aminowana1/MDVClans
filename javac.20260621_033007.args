@@ -1,0 +1,3 @@
+-proc:none
+-Xlint:none
+src/main/java/com/mdvcraft/mdvclans/MDVClansPlugin.java

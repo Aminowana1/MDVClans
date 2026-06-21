@@ -42,15 +42,6 @@ menus:
           - '&cAcción delicada.'
           - ''
           - '&eClick para expulsar.'
-      profile:
-        slot: 16
-        material: BOOK
-        name: '&b&lVer perfil'
-        lore:
-          - ''
-          - '&7Información básica del jugador.'
-          - '&7Más perfil se puede conectar'
-          - '&7con MDVSocial/MMOCore luego.'
     back:
       slot: 22
       action: NATIVE
