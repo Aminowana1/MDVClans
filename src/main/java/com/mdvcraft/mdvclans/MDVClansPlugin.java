@@ -3737,6 +3737,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         if (targetOpt.isEmpty() || targetOpt.get().clanId() != actor.clanId()) { msg(player, "&cEse jugador ya no está en tu clan."); return; }
         Member target = targetOpt.get();
         Map<String, String> ph = memberPlaceholders(target, actor.clanId(), player);
+        OfflinePlayer off = Bukkit.getOfflinePlayer(member.uuid());
         Inventory inv = Bukkit.createInventory(new ClanMenuHolder("memberaction", 1, actor.clanId(), target.uuid(), -1), 27, nativeTitle("member-action", "&8Miembro &b{player}", ph));
         fill(inv);
         if (nativeConfiguredItemEnabled("menus.member-action.items.member")) {
@@ -4479,6 +4480,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         SkullMeta meta = (SkullMeta) item.getItemMeta();
         meta.setOwningPlayer(Bukkit.getOfflinePlayer(member.uuid()));
         Map<String, String> ph = memberPlaceholders(member, clanId, viewer);
+        OfflinePlayer off = Bukkit.getOfflinePlayer(member.uuid());
         String name = nativeMenus == null ? "&e{player} &8(&b{role_name}&8)" : nativeMenus.getString("menus.members.member-head.name", "&e{player} &8(&b{role_name}&8)");
         meta.setDisplayName(color(applyPlaceholdersAndPapi(name, ph, off)));
         List<String> configured = lines("menus.members.member-head.lore", List.of(
