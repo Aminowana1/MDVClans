@@ -159,7 +159,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.10.0 habilitado.");
+        getLogger().info("MDVClans 1.10.1 habilitado.");
     }
 
     @Override
@@ -1179,6 +1179,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "relaciones", "relation", "relations" -> openRelationsMenu(player);
             case "relaciones_lista", "lista_relaciones", "aliados_enemigos" -> openRelationsListMenu(player, page);
             case "almacen", "almacen_banco", "banco_almacen", "recursos" -> openStorageHubMenu(player);
+            case "base", "bases", "bases_clan", "base_clan" -> openBasesMenu(player);
             case "lista", "clanes", "lista_clanes", "lista_con_clan", "lista_sinclan", "lista_sin_clan" -> openClanListMenu(player, page);
             case "correo", "correos", "buzon", "buzon_clan" -> openMailboxMenu(player, page);
             case "top", "ranking", "fuerza" -> openTopGui(player, "fuerza");
@@ -3069,6 +3070,127 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         return ph;
     }
 
+
+    private int visibleBaseSlots(Clan clan) {
+        int configured = nativeMenus == null ? 0 : nativeMenus.getInt("menus.bases.max-visible-bases", 0);
+        int max = Math.max(2, maxBasesForClan(clan));
+        if (configured > 0) max = Math.max(max, configured);
+        return Math.max(1, Math.min(4, max));
+    }
+
+    private int baseTeleportSlot(int baseNumber) {
+        int[] defaults = {10, 19, 28, 37};
+        int index = Math.max(1, baseNumber) - 1;
+        int def = index >= 0 && index < defaults.length ? defaults[index] : -1;
+        return nativeSlot("menus.bases.teleport.slot-" + baseNumber, def);
+    }
+
+    private int baseSetSlot(int baseNumber) {
+        int[] defaults = {16, 25, 34, 43};
+        int index = Math.max(1, baseNumber) - 1;
+        int def = index >= 0 && index < defaults.length ? defaults[index] : -1;
+        return nativeSlot("menus.bases.set.slot-" + baseNumber, def);
+    }
+
+    private String tierRequiredForBaseName(int baseNumber) {
+        return tierName(tierRequiredForBase(baseNumber));
+    }
+
+    private int tierRequiredForBase(int baseNumber) {
+        int maxTier = maxClanTier();
+        for (int tier = 0; tier <= maxTier; tier++) {
+            if (tierDefinition(tier).maxBases() >= baseNumber) return tier;
+        }
+        return maxTier;
+    }
+
+    private Map<String, String> basePlaceholders(Clan clan, int baseNumber, Optional<ClanBase> baseOpt) throws SQLException {
+        Map<String, String> ph = clanPlaceholders(clan);
+        ph.put("base_number", String.valueOf(baseNumber));
+        ph.put("base_required_tier", String.valueOf(tierRequiredForBase(baseNumber)));
+        ph.put("base_required_tier_name", tierRequiredForBaseName(baseNumber));
+        ph.put("base_unlocked", baseNumber <= maxBasesForClan(clan) ? "true" : "false");
+        if (baseOpt.isPresent()) {
+            ClanBase base = baseOpt.get();
+            ph.put("base_status", "&aEstablecida");
+            ph.put("base_world", base.world());
+            ph.put("base_x", String.valueOf((int) Math.floor(base.x())));
+            ph.put("base_y", String.valueOf((int) Math.floor(base.y())));
+            ph.put("base_z", String.valueOf((int) Math.floor(base.z())));
+        } else {
+            ph.put("base_status", "&cNo establecida");
+            ph.put("base_world", "-");
+            ph.put("base_x", "-");
+            ph.put("base_y", "-");
+            ph.put("base_z", "-");
+        }
+        return ph;
+    }
+
+    private ItemStack baseTeleportItem(Clan clan, int baseNumber) throws SQLException {
+        Optional<ClanBase> baseOpt = getClanBase(clan.id(), baseNumber);
+        Map<String, String> ph = basePlaceholders(clan, baseNumber, baseOpt);
+        if (baseNumber > maxBasesForClan(clan)) {
+            return nativeItem("menus.bases.teleport.locked", Material.BARRIER, "&8&lBase {base_number} bloqueada", List.of(
+                    "",
+                    "&7Estado: &cBloqueada por tier",
+                    "&7Requiere: &d{base_required_tier_name}",
+                    "&7Tu clan: &e{clan_tier_name}",
+                    "",
+                    "&8Sube el tier del clan para desbloquearla."
+            ), ph);
+        }
+        if (baseOpt.isEmpty()) {
+            return nativeItem("menus.bases.teleport.missing", Material.GRAY_DYE, "&7&lBase {base_number}", List.of(
+                    "",
+                    "&7Estado: &cNo establecida",
+                    "",
+                    "&8Un rango con permiso debe",
+                    "&8establecer esta base primero."
+            ), ph);
+        }
+        return nativeItem("menus.bases.teleport.available", Material.ENDER_PEARL, "&b&lIr a Base {base_number}", List.of(
+                "",
+                "&7Estado: {base_status}",
+                "&7Mundo: &f{base_world}",
+                "&7Coordenadas: &e{base_x}&7, &e{base_y}&7, &e{base_z}",
+                "",
+                "&eClick para teletransportarte."
+        ), ph);
+    }
+
+    private ItemStack baseSetItem(Member member, Clan clan, int baseNumber) throws SQLException {
+        Optional<ClanBase> baseOpt = getClanBase(clan.id(), baseNumber);
+        Map<String, String> ph = basePlaceholders(clan, baseNumber, baseOpt);
+        if (baseNumber > maxBasesForClan(clan)) {
+            return nativeItem("menus.bases.set.locked", Material.BARRIER, "&8&lEstablecer Base {base_number}", List.of(
+                    "",
+                    "&7Estado: &cBloqueada por tier",
+                    "&7Requiere: &d{base_required_tier_name}",
+                    "&7Tu clan: &e{clan_tier_name}",
+                    "",
+                    "&8Todavía no puedes fijar esta base."
+            ), ph);
+        }
+        if (!can(member, "setbase")) {
+            return nativeItem("menus.bases.set.no-permission", Material.GRAY_DYE, "&7&lEstablecer Base {base_number}", List.of(
+                    "",
+                    "&cNo tienes permiso para cambiar bases.",
+                    "&8Permiso requerido: setbase"
+            ), ph);
+        }
+        return nativeItem("menus.bases.set.available", Material.COMPASS, "&6&lEstablecer Base {base_number}", List.of(
+                "",
+                "&7Guarda tu ubicación actual",
+                "&7como Base {base_number} del clan.",
+                "",
+                "&7Estado actual: {base_status}",
+                "&7Base guardada: &e{base_x}&7, &e{base_y}&7, &e{base_z}",
+                "",
+                "&eClick para establecer/cambiar."
+        ), ph);
+    }
+
     private String formatNumber(double value) {
         if (Math.abs(value - Math.rint(value)) < 0.0001) return String.valueOf((long) Math.rint(value));
         return String.format(Locale.US, "%.2f", value);
@@ -3257,6 +3379,39 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         openNativeInventory(player, inv);
     }
 
+
+
+    private void openBasesMenu(Player player) throws SQLException {
+        Member member = requireMember(player); if (member == null) return;
+        Clan clan = getClan(member.clanId()).orElseThrow();
+        Map<String, String> ph = clanPlaceholders(clan);
+        int visibleBases = visibleBaseSlots(clan);
+        ph.put("base_visible_count", String.valueOf(visibleBases));
+        Inventory inv = Bukkit.createInventory(new ClanMenuHolder("bases", 1, clan.id(), null, -1), 54, nativeTitle("bases", "&8Bases del clan &b{id}", ph));
+        fill(inv);
+
+        inv.setItem(nativeSlot("menus.bases.items.info.slot", 13), nativeItem("menus.bases.items.info", Material.LODESTONE, "&b&lBases del clan", List.of(
+                "",
+                "&7Tier actual: &d{clan_tier_name}",
+                "&7Bases establecidas: &e{bases}&7/&e{max_bases}",
+                "&7Bases visibles: &e{base_visible_count}",
+                "",
+                "&7Izquierda: &bteletransportarse&7.",
+                "&7Derecha: &6establecer/cambiar&7.",
+                "",
+                "&8Las bases bloqueadas dependen del tier."
+        ), ph));
+
+        for (int baseNumber = 1; baseNumber <= visibleBases; baseNumber++) {
+            int tpSlot = baseTeleportSlot(baseNumber);
+            if (tpSlot >= 0 && tpSlot < inv.getSize()) inv.setItem(tpSlot, baseTeleportItem(clan, baseNumber));
+            int setSlot = baseSetSlot(baseNumber);
+            if (setSlot >= 0 && setSlot < inv.getSize()) inv.setItem(setSlot, baseSetItem(member, clan, baseNumber));
+        }
+
+        setBackItem(inv, "bases", 49, "&6&lVolver", List.of("&7Regresa a gestión del clan."));
+        openNativeInventory(player, inv);
+    }
 
     private void openClanListMenu(Player player, int page) throws SQLException {
         List<Clan> clans = listClans();
@@ -3762,6 +3917,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "createclan" -> "create";
             case "gestion" -> "management";
             case "storagehub" -> "storage";
+            case "bases" -> "bases";
             case "clanlist" -> "clan-list";
             case "relationslist" -> "relations-list";
             case "mailbox" -> "mailbox";
@@ -3787,6 +3943,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "info" -> "info";
             case "relations" -> "relaciones";
             case "storagehub" -> "almacen";
+            case "bases" -> "bases";
             case "clanlist" -> "lista";
             case "relationslist" -> "relaciones_lista";
             case "mailbox" -> "correo";
@@ -3810,7 +3967,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         return switch (holderMenu) {
             case "createclan" -> "sinclan";
             case "hub" -> "gestion";
-            case "members", "info", "relations", "storagehub", "settings", "clanlist" -> "gestion";
+            case "members", "info", "relations", "storagehub", "bases", "settings", "clanlist" -> "gestion";
             case "relationslist", "bajas" -> "relaciones";
             case "mailbox", "logs", "joinrequests" -> "info";
             case "rolesettings", "permissionsedit" -> "ajustes";
@@ -3842,6 +3999,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "mailaction" -> handleMailActionClick(player, holder.mailId(), slot);
             case "relations" -> handleRelationsMenuClick(player, slot);
             case "storagehub" -> handleStorageHubClick(player, slot);
+            case "bases" -> handleBasesClick(player, slot);
             case "clanlist" -> handleClanListClick(player, holder.page(), slot, click);
             case "relationslist" -> handleRelationsListClick(player, holder.page(), slot);
             case "mailbox" -> handleMailboxClick(player, holder.page(), slot, click);
@@ -3861,6 +4019,38 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private void handleStorageHubClick(Player player, int slot) throws SQLException {
         if (slot == nativeSlot("menus.storage.items.storage.slot", 11)) { player.closeInventory(); handleStorage(player); }
         else if (slot == nativeSlot("menus.storage.items.bank.slot", 15)) { player.closeInventory(); handleBank(player, new String[]{"banco"}); }
+    }
+
+
+    private void handleBasesClick(Player player, int slot) throws SQLException {
+        Member member = requireMember(player); if (member == null) return;
+        Clan clan = getClan(member.clanId()).orElseThrow();
+        int visibleBases = visibleBaseSlots(clan);
+        for (int baseNumber = 1; baseNumber <= visibleBases; baseNumber++) {
+            if (slot == baseTeleportSlot(baseNumber)) {
+                if (baseNumber > maxBasesForClan(clan)) {
+                    msg(player, "&cLa base &e#" + baseNumber + " &cestá bloqueada. Requiere tier &d" + tierRequiredForBaseName(baseNumber) + "&c.");
+                    return;
+                }
+                if (getClanBase(clan.id(), baseNumber).isEmpty()) {
+                    msg(player, "&cLa base &e#" + baseNumber + " &cno está establecida.");
+                    return;
+                }
+                player.closeInventory();
+                handleBase(player, new String[]{"base", String.valueOf(baseNumber)});
+                return;
+            }
+            if (slot == baseSetSlot(baseNumber)) {
+                if (baseNumber > maxBasesForClan(clan)) {
+                    msg(player, "&cLa base &e#" + baseNumber + " &cestá bloqueada. Requiere tier &d" + tierRequiredForBaseName(baseNumber) + "&c.");
+                    return;
+                }
+                if (!hasRank(player, member, "setbase")) return;
+                player.closeInventory();
+                handleSetBase(player, new String[]{"setbase", String.valueOf(baseNumber)});
+                return;
+            }
+        }
     }
 
     private void handleCreateClanMenuClick(Player player, int slot) throws SQLException {
@@ -3886,8 +4076,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
         if (menu.equals("gestion")) {
             if (slot == nativeSlot("menus.management.items.summary.slot", 4)) openFullClanHub(player);
-            else if (slot == nativeSlot("menus.management.items.base.slot", 10)) { player.closeInventory(); player.performCommand("clan base"); }
-            else if (slot == nativeSlot("menus.management.items.setbase.slot", 11)) { player.closeInventory(); player.performCommand("clan setbase"); }
+            else if (slot == nativeSlot("menus.management.items.base.slot", 10)) openBasesMenu(player);
+            else if (slot == nativeSlot("menus.management.items.setbase.slot", 11)) openBasesMenu(player);
             else if (slot == nativeSlot("menus.management.items.bank.slot", 13)) { player.closeInventory(); player.performCommand("clan banco"); }
             else if (slot == nativeSlot("menus.management.items.storage.slot", 14)) { player.closeInventory(); handleStorage(player); }
             else if (slot == nativeSlot("menus.management.items.banner.slot", 15)) { player.closeInventory(); player.performCommand("clan estandarte ver"); }
@@ -3899,7 +4089,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         else if (slot == nativeSlot("menus.hub.items.info.slot", 11)) openClanInfoMenu(player);
         else if (slot == nativeSlot("menus.hub.items.relations.slot", 12)) openRelationsMenu(player);
         else if (slot == nativeSlot("menus.hub.items.storage.slot", 13)) openStorageHubMenu(player);
-        else if (slot == nativeSlot("menus.hub.items.base.slot", 14)) { player.closeInventory(); player.performCommand("clan base"); }
+        else if (slot == nativeSlot("menus.hub.items.base.slot", 14)) openBasesMenu(player);
         else if (slot == nativeSlot("menus.hub.items.clan-list.slot", 15)) openClanListMenu(player, 1);
         else if (slot == nativeSlot("menus.hub.items.leave.slot", 16)) { player.closeInventory(); player.performCommand("clan salir"); }
         else if (slot == nativeSlot("menus.hub.items.settings.slot", 17)) openSettingsMenu(player);
@@ -4224,6 +4414,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         else if (menu.equals("joinrequests")) openJoinRequestsMenu(player, page);
         else if (menu.equals("permissions")) openPermissionsMenu(player, page);
         else if (menu.equals("permissionsedit")) openPermissionsEditMenu(player, page);
+        else if (menu.equals("bases")) openBasesMenu(player);
         else openMainMenu(player);
     }
 
@@ -4900,7 +5091,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 "NativeMenus/40-relations.yml",
                 "NativeMenus/50-settings.yml",
                 "NativeMenus/60-actions.yml",
-                "NativeMenus/70-permission-labels.yml"
+                "NativeMenus/70-permission-labels.yml",
+                "NativeMenus/80-bases.yml"
         };
         for (String resource : resources) saveResourceIfMissing(resource);
     }

@@ -1,0 +1,18 @@
+MDVClans 1.10.1 - Menú de bases
+
+Añade un menú nativo para administrar bases del clan.
+
+Cambios:
+- /clan abrir bases abre el nuevo menú.
+- Los botones de Base/Fijar Base del menú de gestión ahora abren el menú de bases.
+- Izquierda: teletransportarse a Base 1/2/etc.
+- Derecha: establecer/cambiar Base 1/2/etc si el jugador tiene permiso setbase.
+- Si una base está desbloqueada pero no establecida aparece como GRAY_DYE.
+- Si una base está bloqueada por tier aparece como BARRIER.
+- Respeta max-bases de clan-tiers y el permiso custom setbase.
+- No requiere cambios en base de datos ni config.yml.
+
+Para actualizar sin borrar carpeta:
+1) Compila y reemplaza el jar.
+2) Opcional: copia NativeMenus/80-bases.yml si quieres personalizar el menú sin borrar NativeMenus.
+3) Opcional: actualiza los textos de Base/Fijar Base en NativeMenus/10-main.yml para que digan que abren el menú de bases.

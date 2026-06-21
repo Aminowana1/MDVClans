@@ -20,3 +20,8 @@ mvn clean package
 ```
 
 El jar queda en `target/MDVClans-1.10.0.jar`.
+
+
+## 1.10.1
+
+Añade menú nativo de bases: `/clan abrir bases`, botones de TP y botones para establecer bases, con estado desbloqueado/no establecido/bloqueado por tier.
