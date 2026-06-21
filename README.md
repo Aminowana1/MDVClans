@@ -1,4 +1,4 @@
-# MDVClans 1.10.0
+# MDVClans 1.10.5
 
 Actualización de tiers/progreso de clanes para MDVCRAFT.
 
@@ -19,7 +19,7 @@ Actualización de tiers/progreso de clanes para MDVCRAFT.
 mvn clean package
 ```
 
-El jar queda en `target/MDVClans-1.10.0.jar`.
+El jar queda en `target/MDVClans-1.10.5.jar`.
 
 
 
@@ -55,3 +55,13 @@ También se parsea PlaceholderAPI en las cabezas de miembros después de reempla
 ```yaml
 - '&7Título: &r%mdvsocial_title_colored_of_{player}%'
 ```
+
+
+## 1.10.5
+
+- Enemigos ahora son relación simétrica real: si A declara enemigo a B, B también registra a A como enemigo.
+- Declarar enemigo cancela solicitudes diplomáticas pendientes entre ambos clanes.
+- Si dos clanes son enemigos, volver a neutral ya no es instantáneo: envía una solicitud de paz al buzón del otro clan.
+- Si dos clanes son enemigos, pedir alianza mantiene la enemistad activa hasta que el otro clan acepte.
+- Las solicitudes de paz usan correo de clan con tipo `NEUTRAL_REQUEST`.
+- El menú de correo puede mostrar botones `accept-neutral` y `reject-neutral` para aceptar o rechazar tratados de paz.

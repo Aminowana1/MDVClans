@@ -105,6 +105,8 @@ menus:
           - ''
           - '&7Envía una solicitud formal'
           - '&7al buzón de este clan.'
+          - '&8Si son enemigos, la enemistad'
+          - '&8seguirá hasta que acepten.'
           - ''
           - '&eClick para enviar.'
       enemy:
@@ -122,7 +124,9 @@ menus:
         name: '&7&lVolver neutral'
         lore:
           - ''
-          - '&7Quita alianza/enemistad.'
+          - '&7Quita una relación normal.'
+          - '&7Si son enemigos, envía'
+          - '&7una solicitud de paz.'
           - ''
           - '&eClick para establecer.'
       mail:
@@ -187,6 +191,27 @@ menus:
           - ''
           - '&7Rechaza esta solicitud.'
           - '&8El correo se marcará como eliminado.'
+          - ''
+          - '&eClick para rechazar.'
+      accept-neutral:
+        slot: 10
+        material: LIME_DYE
+        name: '&a&lAceptar paz'
+        lore:
+          - ''
+          - '&7Acepta el tratado de paz'
+          - '&7con &d{from_name}&7.'
+          - '&8Ambos clanes volverán a neutral.'
+          - ''
+          - '&eClick para aceptar.'
+      reject-neutral:
+        slot: 12
+        material: RED_DYE
+        name: '&c&lRechazar paz'
+        lore:
+          - ''
+          - '&7Rechaza el tratado de paz.'
+          - '&8La enemistad continuará activa.'
           - ''
           - '&eClick para rechazar.'
       reply:

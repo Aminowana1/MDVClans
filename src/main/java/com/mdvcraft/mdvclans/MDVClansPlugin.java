@@ -87,6 +87,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private static final String REL_ENEMY = "ENEMY";
     private static final String REL_ALLY_REQUEST = "ALLY_REQUEST";
     private static final String REL_NEUTRAL = "NEUTRAL";
+    private static final String MAIL_ALLY_REQUEST = "ALLY_REQUEST";
+    private static final String MAIL_NEUTRAL_REQUEST = "NEUTRAL_REQUEST";
 
     private Connection connection;
     private Economy economy;
@@ -1042,29 +1044,73 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             return;
         }
         String mode = args[2].toLowerCase(Locale.ROOT);
+        boolean enemies = REL_ENEMY.equals(getRelationBetween(own.id(), target.id()));
+
         if (equalsAny(mode, "neutral", "neutro")) {
+            if (enemies) {
+                if (hasPendingRelationMail(own.id(), target.id(), MAIL_NEUTRAL_REQUEST)) {
+                    acceptNeutrality(own, target, player);
+                    return;
+                }
+                if (hasPendingRelationMail(target.id(), own.id(), MAIL_NEUTRAL_REQUEST)) {
+                    msg(player, "&eYa enviaste una solicitud de paz a &6" + target.tag() + "&e. Espera su respuesta.");
+                    return;
+                }
+                createNeutralityRequestMail(own, target, player);
+                logAction(own.id(), player, "DIPLOMACIA", "Solicitud de paz a " + target.tag());
+                msg(player, "&aSolicitud de paz enviada al buzón del clan &e" + target.tag() + "&a.");
+                notifyClan(target.id(), "&7El clan &e" + own.tag() + " &7les envió una solicitud de paz al buzón del clan.");
+                return;
+            }
             removeRelation(own.id(), target.id());
             removeRelation(target.id(), own.id());
+            cleanupAllRelationRequestMails(own.id(), target.id());
             logAction(own.id(), player, "RELACION", "Neutral con " + target.tag());
+            logAction(target.id(), player == null ? null : player.getUniqueId(), player == null ? "Sistema" : player.getName(), "RELACION", "Neutral con " + own.tag());
             msg(player, "&7Relación con &e" + target.tag() + " &7establecida como neutral.");
             notifyClan(target.id(), "&7El clan &e" + own.tag() + " &7estableció relación neutral con ustedes.");
             return;
         }
         if (equalsAny(mode, "enemigo", "enemy")) {
             setRelation(own.id(), target.id(), REL_ENEMY);
-            removeRelation(target.id(), own.id(), REL_ALLY);
-            removeRelation(target.id(), own.id(), REL_ALLY_REQUEST);
+            setRelation(target.id(), own.id(), REL_ENEMY);
+            cleanupAllRelationRequestMails(own.id(), target.id());
             logAction(own.id(), player, "RELACION", "Enemigo: " + target.tag());
+            logAction(target.id(), player == null ? null : player.getUniqueId(), player == null ? "Sistema" : player.getName(), "RELACION", "Enemigo: " + own.tag());
             broadcastToClan(own.id(), "&cTu clan declaró enemigo a &e" + target.tag() + "&c.");
-            notifyClan(target.id(), "&cEl clan &e" + own.tag() + " &clos declaró enemigos.");
+            notifyClan(target.id(), "&cEl clan &e" + own.tag() + " &clos declaró enemigos. La enemistad quedó registrada en ambos clanes.");
             return;
         }
         if (equalsAny(mode, "aliado", "ally")) {
+            if (enemies) {
+                if (hasPendingRelationMail(own.id(), target.id(), MAIL_ALLY_REQUEST)) {
+                    acceptAlliance(own, target, player);
+                    return;
+                }
+                if (hasPendingRelationMail(target.id(), own.id(), MAIL_ALLY_REQUEST)) {
+                    msg(player, "&eYa enviaste una solicitud de alianza a &6" + target.tag() + "&e. Espera su respuesta.");
+                    return;
+                }
+                if (!canAcceptNewAlly(own, target.id())) {
+                    msg(player, "&cTu clan alcanzó el máximo de aliados para su tier (&e" + countAllies(own.id()) + "&c/&e" + maxAlliesForClan(own) + "&c). Mejora el clan para tener más alianzas.");
+                    return;
+                }
+                if (!canAcceptNewAlly(target, own.id())) {
+                    msg(player, "&cEse clan ya alcanzó el máximo de aliados de su tier.");
+                    return;
+                }
+                createAllianceRequestMail(own, target, player);
+                logAction(own.id(), player, "DIPLOMACIA", "Solicitud de alianza a " + target.tag() + " desde enemistad");
+                msg(player, "&aSolicitud de alianza enviada al buzón del clan &e" + target.tag() + "&a. La enemistad seguirá activa hasta que acepten.");
+                notifyClan(target.id(), "&dEl clan &e" + own.tag() + " &dles envió una solicitud de alianza al buzón del clan. La enemistad seguirá activa hasta aceptar.");
+                return;
+            }
+
             boolean needsAccept = getConfig().getBoolean("relations.ally-requires-accept", true);
             if (!needsAccept || getRelation(target.id(), own.id()).equals(REL_ALLY_REQUEST)) {
                 acceptAlliance(own, target, player);
             } else {
-                if (REL_ALLY_REQUEST.equals(getRelation(own.id(), target.id()))) {
+                if (REL_ALLY_REQUEST.equals(getRelation(own.id(), target.id())) || hasPendingRelationMail(target.id(), own.id(), MAIL_ALLY_REQUEST)) {
                     msg(player, "&eYa tienes una solicitud de alianza pendiente con &6" + target.tag() + "&e.");
                     return;
                 }
@@ -1094,7 +1140,16 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 .replace("{from_id}", from.tag())
                 .replace("{to_name}", to.name())
                 .replace("{to_id}", to.tag());
-        createClanMail(from.id(), to.id(), actor == null ? null : actor.getUniqueId(), actor == null ? "Sistema" : actor.getName(), message, "ALLY_REQUEST", from.id());
+        createClanMail(from.id(), to.id(), actor == null ? null : actor.getUniqueId(), actor == null ? "Sistema" : actor.getName(), message, MAIL_ALLY_REQUEST, from.id());
+    }
+
+    private void createNeutralityRequestMail(Clan from, Clan to, Player actor) throws SQLException {
+        String message = getConfig().getString("relations.neutral-request-mail-message", "El clan {from_name} [{from_id}] solicita un tratado de paz para volver a neutralidad.")
+                .replace("{from_name}", from.name())
+                .replace("{from_id}", from.tag())
+                .replace("{to_name}", to.name())
+                .replace("{to_id}", to.tag());
+        createClanMail(from.id(), to.id(), actor == null ? null : actor.getUniqueId(), actor == null ? "Sistema" : actor.getName(), message, MAIL_NEUTRAL_REQUEST, from.id());
     }
 
     private void acceptAlliance(Clan own, Clan target, Player actor) throws SQLException {
@@ -1110,7 +1165,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         setRelation(target.id(), own.id(), REL_ALLY);
         requestNametagSync(5L);
         requestNametagSync(30L);
-        cleanupAllianceMails(own.id(), target.id());
+        cleanupAllRelationRequestMails(own.id(), target.id());
         logAction(own.id(), actor, "DIPLOMACIA", "Alianza aceptada con " + target.tag());
         logAction(target.id(), actor == null ? null : actor.getUniqueId(), actor == null ? "Sistema" : actor.getName(), "DIPLOMACIA", "Alianza aceptada con " + own.tag());
         broadcastToClan(own.id(), "&9Ahora son aliados del clan &e" + target.tag() + "&9.");
@@ -1124,6 +1179,26 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         logAction(requester.id(), actor == null ? null : actor.getUniqueId(), actor == null ? "Sistema" : actor.getName(), "DIPLOMACIA", "Solicitud de alianza rechazada por " + own.tag());
         broadcastToClan(own.id(), "&cSolicitud de alianza de &e" + requester.tag() + " &crechazada.");
         notifyClan(requester.id(), "&cEl clan &e" + own.tag() + " &crechazó la solicitud de alianza.");
+    }
+
+    private void acceptNeutrality(Clan own, Clan requester, Player actor) throws SQLException {
+        removeRelation(own.id(), requester.id());
+        removeRelation(requester.id(), own.id());
+        cleanupAllRelationRequestMails(own.id(), requester.id());
+        requestNametagSync(5L);
+        requestNametagSync(30L);
+        logAction(own.id(), actor, "DIPLOMACIA", "Tratado de paz aceptado con " + requester.tag());
+        logAction(requester.id(), actor == null ? null : actor.getUniqueId(), actor == null ? "Sistema" : actor.getName(), "DIPLOMACIA", "Tratado de paz aceptado con " + own.tag());
+        broadcastToClan(own.id(), "&7Tu clan aceptó el tratado de paz con &e" + requester.tag() + "&7. Ahora son neutrales.");
+        notifyClan(requester.id(), "&7El clan &e" + own.tag() + " &7aceptó el tratado de paz. Ahora son neutrales.");
+    }
+
+    private void rejectNeutralityRequest(Clan own, Clan requester, Player actor) throws SQLException {
+        cleanupNeutralityMails(own.id(), requester.id());
+        logAction(own.id(), actor, "DIPLOMACIA", "Rechazó paz de " + requester.tag());
+        logAction(requester.id(), actor == null ? null : actor.getUniqueId(), actor == null ? "Sistema" : actor.getName(), "DIPLOMACIA", "Solicitud de paz rechazada por " + own.tag());
+        broadcastToClan(own.id(), "&cSolicitud de paz de &e" + requester.tag() + " &crechazada.");
+        notifyClan(requester.id(), "&cEl clan &e" + own.tag() + " &crechazó la solicitud de paz. La enemistad continúa.");
     }
 
 
@@ -2518,12 +2593,37 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private synchronized void cleanupAllianceMails(int clanA, int clanB) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement("UPDATE clan_mails SET deleted=1 WHERE mail_type='ALLY_REQUEST' AND ((to_clan_id=? AND relation_clan_id=?) OR (to_clan_id=? AND relation_clan_id=?))")) {
-            ps.setInt(1, clanA);
-            ps.setInt(2, clanB);
+        cleanupRelationMails(clanA, clanB, MAIL_ALLY_REQUEST);
+    }
+
+    private synchronized void cleanupNeutralityMails(int clanA, int clanB) throws SQLException {
+        cleanupRelationMails(clanA, clanB, MAIL_NEUTRAL_REQUEST);
+    }
+
+    private synchronized void cleanupAllRelationRequestMails(int clanA, int clanB) throws SQLException {
+        cleanupRelationMails(clanA, clanB, MAIL_ALLY_REQUEST);
+        cleanupRelationMails(clanA, clanB, MAIL_NEUTRAL_REQUEST);
+    }
+
+    private synchronized void cleanupRelationMails(int clanA, int clanB, String mailType) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("UPDATE clan_mails SET deleted=1 WHERE mail_type=? AND ((to_clan_id=? AND relation_clan_id=?) OR (to_clan_id=? AND relation_clan_id=?))")) {
+            ps.setString(1, mailType);
+            ps.setInt(2, clanA);
             ps.setInt(3, clanB);
-            ps.setInt(4, clanA);
+            ps.setInt(4, clanB);
+            ps.setInt(5, clanA);
             ps.executeUpdate();
+        }
+    }
+
+    private synchronized boolean hasPendingRelationMail(int toClanId, int fromClanId, String mailType) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement("SELECT 1 FROM clan_mails WHERE to_clan_id=? AND relation_clan_id=? AND mail_type=? AND deleted=0 LIMIT 1")) {
+            ps.setInt(1, toClanId);
+            ps.setInt(2, fromClanId);
+            ps.setString(3, mailType);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
         }
     }
 
@@ -3794,13 +3894,13 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 inv.setItem(nativeSlot("menus.clan-action.items.info.slot", 10), nativeItem("menus.clan-action.items.info", Material.BOOK, "&b&lVer info", List.of("", "&eClick para ver información."), ph));
             }
             if (nativeConfiguredItemEnabled("menus.clan-action.items.ally")) {
-                inv.setItem(nativeSlot("menus.clan-action.items.ally.slot", 11), canRel ? nativeItem("menus.clan-action.items.ally", Material.BLUE_DYE, "&9&lProponer alianza", List.of("", "&7Envía/acepta relación aliada.", "", "&eClick para establecer."), ph) : lockedItem("&7Proponer alianza", "&cRequiere rango alto."));
+                inv.setItem(nativeSlot("menus.clan-action.items.ally.slot", 11), canRel ? nativeItem("menus.clan-action.items.ally", Material.BLUE_DYE, "&9&lProponer alianza", List.of("", "&7Envía o acepta una solicitud", "&7de alianza diplomática.", "&8Si son enemigos, requiere aceptación.", "", "&eClick para establecer."), ph) : lockedItem("&7Proponer alianza", "&cRequiere rango alto."));
             }
             if (nativeConfiguredItemEnabled("menus.clan-action.items.enemy")) {
                 inv.setItem(nativeSlot("menus.clan-action.items.enemy.slot", 12), canRel ? nativeItem("menus.clan-action.items.enemy", Material.RED_DYE, "&c&lDeclarar enemigo", List.of("", "&7Marca este clan como enemigo.", "", "&eClick para establecer."), ph) : lockedItem("&7Declarar enemigo", "&cRequiere rango alto."));
             }
             if (nativeConfiguredItemEnabled("menus.clan-action.items.neutral")) {
-                inv.setItem(nativeSlot("menus.clan-action.items.neutral.slot", 14), canRel ? nativeItem("menus.clan-action.items.neutral", Material.GRAY_DYE, "&7&lVolver neutral", List.of("", "&7Quita alianza/enemistad.", "", "&eClick para establecer."), ph) : lockedItem("&7Volver neutral", "&cRequiere rango alto."));
+                inv.setItem(nativeSlot("menus.clan-action.items.neutral.slot", 14), canRel ? nativeItem("menus.clan-action.items.neutral", Material.GRAY_DYE, "&7&lVolver neutral", List.of("", "&7Quita alianza o solicita paz", "&7si ambos clanes son enemigos.", "&8La paz enemiga requiere aceptación.", "", "&eClick para establecer."), ph) : lockedItem("&7Volver neutral", "&cRequiere rango alto."));
             }
             if (nativeConfiguredItemEnabled("menus.clan-action.items.mail")) {
                 inv.setItem(nativeSlot("menus.clan-action.items.mail.slot", 15), canMail ? nativeItem("menus.clan-action.items.mail", Material.WRITABLE_BOOK, "&d&lCorreo de clan", List.of("", "&7Escribe un correo formal", "&7al buzón de este clan.", "", "&eClick para escribir."), ph) : lockedItem("&7Correo de clan", "&cRequiere rango alto."));
@@ -3830,7 +3930,11 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private boolean isAllianceRequest(ClanMail mail) {
-        return mail != null && "ALLY_REQUEST".equalsIgnoreCase(mail.mailType()) && mail.relationClanId() > 0;
+        return mail != null && MAIL_ALLY_REQUEST.equalsIgnoreCase(mail.mailType()) && mail.relationClanId() > 0;
+    }
+
+    private boolean isNeutralityRequest(ClanMail mail) {
+        return mail != null && MAIL_NEUTRAL_REQUEST.equalsIgnoreCase(mail.mailType()) && mail.relationClanId() > 0;
     }
 
     private void openMailActionMenu(Player player, int mailId) throws SQLException {
@@ -3854,6 +3958,14 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             }
             if (nativeConfiguredItemEnabled("menus.mail-action.items.reject-ally")) {
                 inv.setItem(nativeSlot("menus.mail-action.items.reject-ally.slot", 12), nativeItem("menus.mail-action.items.reject-ally", Material.RED_DYE, "&c&lRechazar alianza", List.of("", "&7Rechaza esta solicitud", "&7de alianza.", "", "&eClick para rechazar."), ph));
+            }
+        }
+        if (isNeutralityRequest(mail)) {
+            if (nativeConfiguredItemEnabled("menus.mail-action.items.accept-neutral")) {
+                inv.setItem(nativeSlot("menus.mail-action.items.accept-neutral.slot", 10), nativeItem("menus.mail-action.items.accept-neutral", Material.LIME_DYE, "&a&lAceptar paz", List.of("", "&7Acepta volver a neutralidad", "&7con &d{from_name} &8[&6{from_id}&8]&7.", "", "&eClick para aceptar."), ph));
+            }
+            if (nativeConfiguredItemEnabled("menus.mail-action.items.reject-neutral")) {
+                inv.setItem(nativeSlot("menus.mail-action.items.reject-neutral.slot", 12), nativeItem("menus.mail-action.items.reject-neutral", Material.RED_DYE, "&c&lRechazar paz", List.of("", "&7Rechaza esta solicitud", "&7de neutralidad.", "", "&eClick para rechazar."), ph));
             }
         }
         if (nativeConfiguredItemEnabled("menus.mail-action.items.reply")) {
@@ -4385,6 +4497,26 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             Optional<Clan> ownClan = getClan(member.clanId());
             if (requester.isEmpty() || ownClan.isEmpty()) { msg(player, "&cNo se pudo encontrar el clan solicitante."); return; }
             rejectAllianceRequest(ownClan.get(), requester.get(), player);
+            deleteClanMail(member.clanId(), mail.id());
+            openMailboxMenu(player, 1);
+            return;
+        }
+        if (nativeConfiguredItemClicked("menus.mail-action.items.accept-neutral", slot, 10) && isNeutralityRequest(mail)) {
+            if (!hasRank(player, member, "relation")) return;
+            Optional<Clan> requester = getClan(mail.relationClanId());
+            Optional<Clan> ownClan = getClan(member.clanId());
+            if (requester.isEmpty() || ownClan.isEmpty()) { msg(player, "&cNo se pudo encontrar el clan solicitante."); return; }
+            acceptNeutrality(ownClan.get(), requester.get(), player);
+            deleteClanMail(member.clanId(), mail.id());
+            openMailboxMenu(player, 1);
+            return;
+        }
+        if (nativeConfiguredItemClicked("menus.mail-action.items.reject-neutral", slot, 12) && isNeutralityRequest(mail)) {
+            if (!hasRank(player, member, "relation")) return;
+            Optional<Clan> requester = getClan(mail.relationClanId());
+            Optional<Clan> ownClan = getClan(member.clanId());
+            if (requester.isEmpty() || ownClan.isEmpty()) { msg(player, "&cNo se pudo encontrar el clan solicitante."); return; }
+            rejectNeutralityRequest(ownClan.get(), requester.get(), player);
             deleteClanMail(member.clanId(), mail.id());
             openMailboxMenu(player, 1);
             return;

@@ -147,6 +147,8 @@ relations:
   ally-requires-accept: true
   # Mensaje que llega al buzón del clan cuando otro clan solicita alianza.
   ally-request-mail-message: 'El clan {from_name} [{from_id}] solicita una alianza con tu clan.'
+  # Mensaje que llega al buzón del clan cuando un enemigo solicita paz/neutralidad.
+  neutral-request-mail-message: 'El clan {from_name} [{from_id}] solicita un tratado de paz para volver a neutralidad.'
 
 bank:
   enabled: true

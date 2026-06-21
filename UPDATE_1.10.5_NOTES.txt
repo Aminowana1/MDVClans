@@ -1,0 +1,24 @@
+MDVClans 1.10.5 - Diplomacia simétrica y tratados de paz
+
+Cambios principales:
+- Declarar enemigo ahora escribe ENEMY en ambos sentidos: A->B y B->A.
+- Ambos clanes ven la enemistad en su registro de relaciones.
+- Declarar enemigo cancela solicitudes diplomáticas pendientes entre esos clanes.
+- Si dos clanes son enemigos, /clan relacion <clan> neutral ya no cambia directo: envía solicitud de paz NEUTRAL_REQUEST al buzón del otro clan.
+- Si el otro clan ya había enviado una solicitud de paz, usar neutral la acepta.
+- Si dos clanes son enemigos, /clan relacion <clan> aliado envía solicitud de alianza pero mantiene la enemistad hasta aceptar.
+- Si el otro clan ya había enviado solicitud de alianza desde enemistad, usar aliado la acepta.
+- Se agregan botones opcionales accept-neutral y reject-neutral en NativeMenus/60-actions.yml.
+- Se agrega config relations.neutral-request-mail-message.
+
+No cambia:
+- Permisos de rango. Se sigue usando el permiso custom relation.
+- Friendly fire.
+- Kills, banco, almacenamiento, bases, tiers, títulos MDVSocial.
+- La forma vieja de alianza entre clanes neutrales sigue funcionando.
+
+Instrucciones de actualización:
+1) Compilar con mvn clean package.
+2) Reemplazar el jar por MDVClans-1.10.5.jar.
+3) Agregar en config.yml el mensaje relations.neutral-request-mail-message si no existe.
+4) Agregar en NativeMenus/60-actions.yml los bloques accept-neutral y reject-neutral dentro de menus.mail-action.items si quieres botones visuales para solicitudes de paz.
