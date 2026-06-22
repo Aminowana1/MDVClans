@@ -35,6 +35,17 @@ clan-description:
   lines: 5
   default-text: 'Este clan aún no tiene descripción.'
 
+
+# Menús raíz legacy de MDVClans.
+# MDVCRAFT usa MDVSocial como raíz: clan_con_clan / clan_sin_clan.
+# Si enabled=false, /clan menu, /clan menu gestion, /clan menu hub, /clan menu sinclan y /clan menu crear
+# redirigen al menú social correspondiente en vez de abrir los menús viejos internos.
+native-menus:
+  legacy-main:
+    enabled: false
+    with-clan-target: 'clan_con_clan'
+    without-clan-target: 'clan_sin_clan'
+
 limits:
   max-clans: 60
   # Fallback viejo. Desde 1.10 el límite real de miembros sale de clan-tiers.<tier>.max-members.

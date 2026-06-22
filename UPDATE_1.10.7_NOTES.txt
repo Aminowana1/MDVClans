@@ -1,0 +1,39 @@
+MDVClans 1.10.7 - Legacy main menus / MDVSocial root
+
+Cambios principales:
+- Los menús raíz legacy de MDVClans quedan desactivados por defecto.
+- /clan menu, /clan menu gestion, /clan menu hub, /clan menu sinclan, /clan menu crear y alias similares redirigen a MDVSocial:
+  - jugador con clan: /social clan_con_clan
+  - jugador sin clan: /social clan_sin_clan
+- El archivo default NativeMenus/10-main.yml ahora viene como `menus: {}` para que no se regeneren visualmente los menús viejos.
+- Se agrega guardia de comandos para jugadores sin clan.
+
+Jugadores sin clan pueden usar:
+- /clan crear
+- /clan lista
+- /clan info <ID>
+- /clan unirse <ID>
+- /clan aceptar [ID]
+- /clan menu lista / lista_sinclan
+- /clan menu sinclan / clan_sin_clan, que redirige a MDVSocial
+
+Jugadores sin clan ya no pueden abrir ni usar menús/comandos de gestión:
+- gestion / hub / relaciones / almacen / bases / ajustes / miembros / banco / logs / correo / etc.
+
+Config nueva sugerida:
+
+native-menus:
+  legacy-main:
+    enabled: false
+    with-clan-target: 'clan_con_clan'
+    without-clan-target: 'clan_sin_clan'
+
+Actualización manual recomendada:
+- Reemplazar plugins/MDVClans/NativeMenus/10-main.yml por:
+
+menus: {}
+
+- Revisar otros NativeMenus y evitar targets legacy como `target: gestion`.
+- Usar PREVIOUS con fallback MDVSOCIAL o directamente MDVSOCIAL clan_con_clan.
+
+No requiere borrar Data/clans.db.

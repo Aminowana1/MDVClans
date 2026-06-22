@@ -440,6 +440,10 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
         String sub = args[0].toLowerCase(Locale.ROOT);
         try {
+            if (!canUseClanCommand(player, sub, args)) {
+                msg(player, msgConfig("menu.requires-clan", "&cNo perteneces a ningún clan. Solo puedes abrir la lista de clanes, ver información pública, enviar solicitudes, aceptar invitaciones o crear un clan."));
+                return true;
+            }
             switch (sub) {
                 case "crear", "create" -> handleCreate(player, args);
                 case "menu", "gui", "menú", "abrir", "ui", "interfaz" -> handleClanMenuCommand(player, args);
@@ -485,6 +489,17 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             msg(player, "&cOcurrió un error interno de base de datos.");
         }
         return true;
+    }
+
+    private boolean canUseClanCommand(Player player, String sub, String[] args) throws SQLException {
+        if (getMember(player.getUniqueId()).isPresent()) return true;
+        String normalized = normalizeUiName(sub);
+        if (equalsAny(normalized, "ayuda", "help", "?", "crear", "create", "lista", "list", "info", "unirse", "join", "aceptar", "accept")) return true;
+        if (equalsAny(normalized, "menu", "gui", "menu", "abrir", "ui", "interfaz")) {
+            if (args.length <= 1) return true;
+            return isUiAllowedWithoutClan(args[1]);
+        }
+        return false;
     }
 
     private boolean handleAdminCommand(CommandSender sender, String[] args) {
@@ -1253,10 +1268,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
 
         switch (ui) {
-            case "principal", "completo", "panel", "hub" -> openFullClanHub(player);
-            case "gestion", "conclan", "con_clan", "clan_con_clan" -> openClanManagementMenu(player);
-            case "sinclan", "sin_clan", "clan_sin_clan" -> openNoClanMenu(player);
-            case "crear", "creacion", "crear_clan", "nuevo_clan" -> openCreateClanMenu(player);
+            case "principal", "completo", "panel", "hub", "gestion", "conclan", "con_clan", "clan_con_clan", "sinclan", "sin_clan", "clan_sin_clan", "crear", "creacion", "crear_clan", "nuevo_clan" -> openLegacyMainOrRedirect(player, ui);
             case "miembros", "miembro", "members" -> openMembersMenu(player, page);
             case "info", "tablero", "informacion", "informacion_clan" -> openClanInfoMenu(player);
             case "relaciones", "relation", "relations" -> openRelationsMenu(player);
@@ -3350,9 +3362,37 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
     private void openMainMenu(Player player) throws SQLException {
+        if (!legacyMainMenusEnabled()) {
+            openMDVSocialClanRoot(player);
+            return;
+        }
         Optional<Member> memberOpt = getMember(player.getUniqueId());
         if (memberOpt.isEmpty()) openNoClanMenu(player);
         else openClanManagementMenu(player);
+    }
+
+    private void openLegacyMainOrRedirect(Player player, String ui) throws SQLException {
+        String normalized = normalizeUiName(ui);
+        if (!legacyMainMenusEnabled()) {
+            openMDVSocialClanRoot(player);
+            return;
+        }
+        switch (normalized) {
+            case "principal", "completo", "panel", "hub" -> openFullClanHub(player);
+            case "gestion", "conclan", "con_clan", "clan_con_clan" -> openClanManagementMenu(player);
+            case "sinclan", "sin_clan", "clan_sin_clan" -> openNoClanMenu(player);
+            case "crear", "creacion", "crear_clan", "nuevo_clan" -> openCreateClanMenu(player);
+            default -> openMainMenu(player);
+        }
+    }
+
+    private boolean legacyMainMenusEnabled() {
+        return getConfig().getBoolean("native-menus.legacy-main.enabled", false);
+    }
+
+    private void openMDVSocialClanRoot(Player player) {
+        player.closeInventory();
+        player.performCommand("social " + defaultSocialBackTarget(player));
     }
 
     private void openFullClanHub(Player player) throws SQLException {
@@ -4076,10 +4116,12 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private String defaultSocialBackTarget(Player player) {
+        String withClan = getConfig().getString("native-menus.legacy-main.with-clan-target", "clan_con_clan");
+        String withoutClan = getConfig().getString("native-menus.legacy-main.without-clan-target", "clan_sin_clan");
         try {
-            return getMember(player.getUniqueId()).isPresent() ? "clan_con_clan" : "clan_sin_clan";
+            return getMember(player.getUniqueId()).isPresent() ? withClan : withoutClan;
         } catch (SQLException ignored) {
-            return "clan_sin_clan";
+            return withoutClan;
         }
     }
 
@@ -4179,8 +4221,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         if (holderMenu.startsWith("top:")) return "relaciones";
         return switch (holderMenu) {
             case "createclan" -> "sinclan";
-            case "hub" -> "gestion";
-            case "members", "info", "relations", "storagehub", "bases", "settings", "clanlist" -> "gestion";
+            case "hub" -> "auto";
+            case "members", "info", "relations", "storagehub", "bases", "settings", "clanlist" -> "auto";
             case "relationslist", "bajas" -> "relaciones";
             case "mailbox", "logs", "joinrequests" -> "info";
             case "rolesettings", "permissionsedit" -> "ajustes";
