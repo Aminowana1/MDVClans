@@ -198,7 +198,7 @@ top:
 
 nametags:
   enabled: true
-  update-interval-ticks: 100
+  update-interval-ticks: 200
   # Necesario cuando el scoreboard principal es compartido; evita que los colores se mezclen entre jugadores.
   force-personal-scoreboard-if-main: true
   # Más fuerte: fuerza scoreboard personal siempre. Úsalo solo si otro plugin no te rompe el sidebar.

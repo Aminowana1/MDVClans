@@ -83,6 +83,22 @@ menus:
         - '&7Usa el comando de confirmación.'
         - ''
         - '&eClick para instrucciones.'
+      leave:
+        slot: 24
+        material: OAK_DOOR
+        name: '&c&lSalir del clan'
+        lore:
+        - ''
+        - '&5&l● &7&lAbandonar clan'
+        - '&7Te permite salir de tu clan'
+        - '&7actual usando &f/clan salir&7.'
+        - ''
+        - '&8Si eres líder y hay miembros,'
+        - '&8no podrás salir hasta transferir'
+        - '&8el liderazgo o disolver el clan.'
+        - ''
+        - '&cAcción delicada.'
+        - '&eClick para salir.'
       tier-upgrade:
         slot: 20
         material: NETHER_STAR
@@ -105,9 +121,10 @@ menus:
         - '&eClick para mejorar.'
     back:
       slot: 49
-      action: NATIVE
-      target: gestion
-      material: ARROW
+      action: MDVSOCIAL
+      target: clan_con_clan
+      material: PLAYER_HEAD
+      texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
       name: '&6&lVolver'
   role-settings:
     title: '&8Rangos &b{id}'

@@ -1,0 +1,38 @@
+MDVClans 1.10.12 - UI, banco por chat, invitaciones offline y nametags optimizados
+
+Cambios principales:
+
+1) Ajustes accesible para todos los miembros
+- El menú de Ajustes puede abrirse por cualquier miembro.
+- Las acciones sensibles siguen bloqueadas por permisos de rol como antes.
+- Se añadió botón opcional `leave` en Ajustes para ejecutar `/clan salir`.
+
+2) Invitaciones a jugadores desconectados
+- `/clan invitar <jugador>` ahora puede crear invitación aunque el jugador no esté conectado.
+- Si MDVSocial está disponible, intenta dejar carta personal de invitación en el buzón del jugador offline.
+- Si el jugador está online, conserva aviso por chat y carta personal.
+
+3) Banco desde UI de almacén
+- En el menú `storage`/almacén:
+  - Click izquierdo en banco: pedir cantidad para depositar por chat.
+  - Click derecho en banco: pedir cantidad para retirar por chat.
+- Respeta permisos `bank-deposit` y `bank-withdraw`.
+- Se puede escribir `cancelar` para cancelar la operación.
+
+4) UI nativa de almacén mejorada
+- Nuevo recurso `NativeMenus/90-storage.yml` con lore premium.
+- El back vuelve a MDVSocial `clan_con_clan` por defecto.
+
+5) Nametags optimizados
+- Antes cada refresh hacía muchas consultas por jugador contra jugador y removía/reagregaba teams constantemente.
+- Ahora cada refresh crea caché temporal de miembros, clanes y relaciones.
+- Las relaciones se calculan por par de clanes, no por cada par de jugadores.
+- Solo cambia el team del jugador si realmente cambió.
+- Se agregó caché `nametagAppliedTeams` para evitar remover/reagregar entradas sin necesidad.
+- Default recomendado en config: `nametags.update-interval-ticks: 200`.
+
+Config/YAML sugerido:
+- Agregar `menus.settings.items.leave` en NativeMenus/50-settings.yml si quieres mostrar el botón Salir del clan.
+- Agregar/usar `NativeMenus/90-storage.yml` para la nueva UI de almacén.
+
+No requiere resetear Data/clans.db.
