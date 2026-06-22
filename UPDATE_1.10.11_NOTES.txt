@@ -1,0 +1,22 @@
+MDVClans 1.10.11 - Placeholder fixes
+
+Cambios:
+- Agregado placeholder PlaceholderAPI %mdvclans_members%.
+- Agregado alias %mdvclans_clan_members%.
+- %mdvclans_member_count% sigue funcionando igual.
+- Corregido join-requests para que procese PlaceholderAPI despues de reemplazar {player}.
+- Ahora en solicitudes de ingreso funciona:
+  %mdvsocial_title_colored_of_{player}%
+- Tambien se agregan placeholders internos de titulo al request-head:
+  {title}, {title_colored}, {title_prefix}, {title_id}, {active_title}
+
+Uso recomendado en MDVSocial clan_con_clan:
+  '&7Miembros: &e%mdvclans_members%&7/&e%mdvclans_max_members%'
+
+Uso recomendado en join-requests:
+  '&7Titulo: &r%mdvsocial_title_colored_of_{player}%'
+  o tambien:
+  '&7Titulo: &r{title_colored}'
+
+No requiere cambios en base de datos.
+No requiere resetear clanes.

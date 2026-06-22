@@ -4062,9 +4062,11 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             PlayerProfileSnapshot profile = resolvePlayerProfile(req.uuid(), req.name());
             ph.put("level", profile.level());
             ph.put("race", profile.race());
+            ph.putAll(resolveMDVSocialTitlePlaceholders(req.uuid()));
             ph.put("manage_hint", canManage ? "&aClick izquierdo: aceptar|&cClick derecho: borrar" : "&8No tienes rango para gestionar.");
 
-            ItemStack head = nativeItem("menus.join-requests.request-head", Material.PLAYER_HEAD, "&e{player}", List.of("&7Estado: {status}", "&7Solicitud: &f{requested}", "&7Nivel: &e{level}", "&7Raza: &d{race}", "", "{manage_hint}"), ph);
+            OfflinePlayer requestPlayer = Bukkit.getOfflinePlayer(req.uuid());
+            ItemStack head = nativeItem("menus.join-requests.request-head", Material.PLAYER_HEAD, "&e{player}", List.of("&7Estado: {status}", "&7Título: &r{title_colored}", "&7Solicitud: &f{requested}", "&7Nivel: &e{level}", "&7Raza: &d{race}", "", "{manage_hint}"), ph, requestPlayer);
             if (head.getItemMeta() instanceof SkullMeta meta) {
                 meta.setOwningPlayer(Bukkit.getOfflinePlayer(req.uuid()));
                 head.setItemMeta(meta);
@@ -5463,6 +5465,10 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private ItemStack nativeItem(String path, Material defMaterial, String defName, List<String> defLore, Map<String, String> placeholders) {
+        return nativeItem(path, defMaterial, defName, defLore, placeholders, null);
+    }
+
+    private ItemStack nativeItem(String path, Material defMaterial, String defName, List<String> defLore, Map<String, String> placeholders, OfflinePlayer papiPlayer) {
         ConfigurationSection sec = nativeSection(path);
         Material material = materialFrom(sec == null ? null : sec.getString("material"), defMaterial);
         String name = sec == null ? defName : sec.getString("name", defName);
@@ -5474,19 +5480,28 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         if (meta == null) return item;
 
         if (material == Material.PLAYER_HEAD && meta instanceof SkullMeta skull) {
-            String texture = applyPlaceholders(readTexture(sec), placeholders);
+            String texture = applyPlaceholdersAndPapi(readTexture(sec), placeholders, papiPlayer);
             if (texture != null && !texture.isBlank()) {
                 applySkullTexture(skull, texture);
             } else if (sec != null) {
                 String owner = sec.getString("head-owner", sec.getString("owner", ""));
-                owner = applyPlaceholders(owner == null ? "" : owner, placeholders);
+                owner = applyPlaceholdersAndPapi(owner == null ? "" : owner, placeholders, papiPlayer);
                 if (owner != null && !owner.isBlank()) skull.setOwningPlayer(Bukkit.getOfflinePlayer(owner));
             }
             meta = skull;
         }
 
-        meta.setDisplayName(color(applyPlaceholders(name, placeholders)));
-        if (lore != null) meta.setLore(expandLore(lore, placeholders).stream().map(this::color).collect(Collectors.toList()));
+        meta.setDisplayName(color(applyPlaceholdersAndPapi(name, placeholders, papiPlayer)));
+        if (lore != null) {
+            List<String> expandedLore = expandLore(lore, placeholders);
+            if (papiPlayer != null && Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+                expandedLore = expandedLore.stream().map(line -> {
+                    try { return PlaceholderAPI.setPlaceholders(papiPlayer, line); }
+                    catch (Throwable ignored) { return line; }
+                }).collect(Collectors.toList());
+            }
+            meta.setLore(expandedLore.stream().map(this::color).collect(Collectors.toList()));
+        }
         if (material.name().endsWith("_BANNER")) hideBannerTooltip(meta);
         item.setItemMeta(meta);
         return item;
@@ -6087,7 +6102,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 String noClan = getConfig().getString("placeholders.no-clan", "");
                 if (memberOpt.isEmpty()) {
                     return switch (params.toLowerCase(Locale.ROOT)) {
-                        case "id", "name", "tag", "lpc_tag", "role", "role_number", "member_count", "bank", "kills", "deaths", "strength", "tier", "tier_name", "max_members", "max_bases", "max_allies", "storage_slots", "storage_pages", "storage_display", "allies", "bases", "description", "description_plain", "description_line_1", "description_line_2", "description_line_3", "description_line_4", "description_line_5", "board", "board_plain", "board_line_1", "board_line_2", "board_line_3", "board_line_4", "board_line_5", "board_line_6", "board_line_7", "board_line_8", "board_line_9", "board_line_10", "is_in_clan" -> params.equalsIgnoreCase("is_in_clan") ? "false" : noClan;
+                        case "id", "name", "tag", "lpc_tag", "role", "role_number", "members", "member_count", "clan_members", "bank", "kills", "deaths", "strength", "tier", "tier_name", "max_members", "max_bases", "max_allies", "storage_slots", "storage_pages", "storage_display", "allies", "bases", "description", "description_plain", "description_line_1", "description_line_2", "description_line_3", "description_line_4", "description_line_5", "board", "board_plain", "board_line_1", "board_line_2", "board_line_3", "board_line_4", "board_line_5", "board_line_6", "board_line_7", "board_line_8", "board_line_9", "board_line_10", "is_in_clan" -> params.equalsIgnoreCase("is_in_clan") ? "false" : noClan;
                         default -> noClan;
                     };
                 }
@@ -6102,7 +6117,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     case "lpc_tag" -> color(getConfig().getString("placeholders.lpc-tag-format", "&8[&b{id}&8]&r ").replace("{id}", clan.tag()).replace("{name}", clan.name()));
                     case "role" -> getRoleName(clan.id(), member.role());
                     case "role_number" -> String.valueOf(member.role());
-                    case "member_count" -> String.valueOf(countMembers(clan.id()));
+                    case "members", "member_count", "clan_members" -> String.valueOf(countMembers(clan.id()));
                     case "tier" -> String.valueOf(clan.tier());
                     case "tier_name" -> tierName(clan.tier());
                     case "max_members" -> String.valueOf(maxMembersForClan(clan));
