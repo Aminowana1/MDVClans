@@ -62,6 +62,7 @@ menus:
           - ''
           - '&7Miembros: &e{members}'
           - '&7Entrada: {entry}'
+          - '&7Relación: {relation}'
           - '&7Fuerza: &6{strength}'
           - ''
           - '&7Descripción:'

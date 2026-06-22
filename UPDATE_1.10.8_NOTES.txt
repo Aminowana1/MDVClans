@@ -1,0 +1,41 @@
+MDVClans 1.10.8 - Clan action relation + MDVSocial personal invite mail
+
+Cambios principales:
+- clan-action ahora soporta placeholders de relación:
+  {relation}
+  {relation_raw}
+  {relation_line}
+- clan-list también soporta {relation_line}; si el jugador no tiene clan, la línea se oculta usando un marcador interno.
+- /clan invitar <jugador> mantiene el permiso configurable por roles de clan: invite.
+- Al invitar a un jugador, MDVClans intenta enviar una carta personal en MDVSocial con botones de aceptar/rechazar.
+- Si MDVSocial no está instalado o no tiene la API nueva, el sistema vuelve al flujo clásico por chat: /clan aceptar <ID>.
+- Nuevo comando para rechazar invitaciones:
+  /clan rechazar [ID]
+  /clan declinar [ID]
+- El comando /clan aceptar ahora solo borra la invitación si el jugador realmente entra al clan.
+  Si el clan se llenó antes de aceptar, el jugador no entra y la invitación no se borra.
+
+Flujo de cupos revisado:
+- Si un clan tiene 7/8 miembros e invita a un jugador.
+- Antes de que acepte, entra otra persona y el clan queda 8/8.
+- Cuando el invitado intenta aceptar, joinClan vuelve a comprobar maxMembersForClan.
+- Resultado: no entra y recibe mensaje de clan lleno.
+
+Config nueva sugerida en config.yml:
+integrations:
+  mdvsocial:
+    unknown-title-text: 'Sin título'
+    clan-invite-mail:
+      enabled: true
+      debug: false
+      from-name: 'MDVClans'
+      message: 'El clan {clan_name} [{clan_id}] te invitó a unirte. Abre esta carta para aceptar o rechazar.'
+
+NativeMenus sugerido:
+En clan-action summary puedes usar:
+- '&7Relación: {relation}'
+
+En clan-list puedes usar:
+- '{relation_line}'
+
+{relation_line} se muestra solo si el jugador tiene clan. Para jugadores sin clan se oculta.
