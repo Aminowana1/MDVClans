@@ -2312,6 +2312,32 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
     }
 
+    private synchronized Optional<Member> getMemberByName(String name) throws SQLException {
+        if (name == null || name.isBlank()) return Optional.empty();
+        try (PreparedStatement ps = connection.prepareStatement("SELECT * FROM members WHERE lower(name)=lower(?) LIMIT 1")) {
+            ps.setString(1, name);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? Optional.of(readMember(rs)) : Optional.empty();
+            }
+        }
+    }
+
+    private Optional<Member> resolveMemberByNameOrUuid(String value) throws SQLException {
+        if (value == null || value.isBlank()) return Optional.empty();
+        String clean = value.trim();
+        try {
+            return getMember(UUID.fromString(clean));
+        } catch (IllegalArgumentException ignored) {
+            // Not a UUID, continue with player name lookup.
+        }
+        Player online = Bukkit.getPlayerExact(clean);
+        if (online != null) {
+            Optional<Member> byUuid = getMember(online.getUniqueId());
+            if (byUuid.isPresent()) return byUuid;
+        }
+        return getMemberByName(clean);
+    }
+
     private synchronized Optional<Member> getMemberByNameInClan(int clanId, String name) throws SQLException {
         try (PreparedStatement ps = connection.prepareStatement("SELECT * FROM members WHERE clan_id=? AND lower(name)=lower(?)")) {
             ps.setInt(1, clanId);
@@ -6205,10 +6231,144 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             return true;
         }
 
+        private String targetClanPlaceholder(String params) throws SQLException {
+            if (params == null || params.isBlank()) return null;
+            String lower = params.toLowerCase(Locale.ROOT);
+
+            String target;
+            if (lower.startsWith("clan_line_of_")) {
+                target = params.substring("clan_line_of_".length());
+                return targetClanLine(target);
+            }
+            if (lower.startsWith("clan_name_of_")) {
+                target = params.substring("clan_name_of_".length());
+                return targetClanValue(target, "name");
+            }
+            if (lower.startsWith("clan_id_of_")) {
+                target = params.substring("clan_id_of_".length());
+                return targetClanValue(target, "id");
+            }
+            if (lower.startsWith("clan_tag_of_")) {
+                target = params.substring("clan_tag_of_".length());
+                return targetClanValue(target, "tag");
+            }
+            if (lower.startsWith("clan_lpc_tag_of_")) {
+                target = params.substring("clan_lpc_tag_of_".length());
+                return targetClanValue(target, "lpc_tag");
+            }
+            if (lower.startsWith("clan_tier_name_of_")) {
+                target = params.substring("clan_tier_name_of_".length());
+                return targetClanValue(target, "tier_name");
+            }
+            if (lower.startsWith("clan_tier_of_")) {
+                target = params.substring("clan_tier_of_".length());
+                return targetClanValue(target, "tier");
+            }
+            if (lower.startsWith("clan_role_of_")) {
+                target = params.substring("clan_role_of_".length());
+                return targetClanValue(target, "role");
+            }
+            if (lower.startsWith("clan_role_number_of_")) {
+                target = params.substring("clan_role_number_of_".length());
+                return targetClanValue(target, "role_number");
+            }
+            if (lower.startsWith("clan_members_of_")) {
+                target = params.substring("clan_members_of_".length());
+                return targetClanValue(target, "members");
+            }
+            if (lower.startsWith("clan_max_members_of_")) {
+                target = params.substring("clan_max_members_of_".length());
+                return targetClanValue(target, "max_members");
+            }
+            if (lower.startsWith("clan_is_in_clan_of_")) {
+                target = params.substring("clan_is_in_clan_of_".length());
+                return targetClanIsInClan(target);
+            }
+
+            // Aliases shorter for convenience.
+            if (lower.startsWith("name_of_")) {
+                target = params.substring("name_of_".length());
+                return targetClanValue(target, "name");
+            }
+            if (lower.startsWith("id_of_")) {
+                target = params.substring("id_of_".length());
+                return targetClanValue(target, "id");
+            }
+            if (lower.startsWith("tier_name_of_")) {
+                target = params.substring("tier_name_of_".length());
+                return targetClanValue(target, "tier_name");
+            }
+            if (lower.startsWith("is_in_clan_of_")) {
+                target = params.substring("is_in_clan_of_".length());
+                return targetClanIsInClan(target);
+            }
+
+            return null;
+        }
+
+        private String targetClanIsInClan(String target) throws SQLException {
+            Optional<Member> member = resolveMemberByNameOrUuid(target);
+            if (member.isEmpty()) return "false";
+            return getClan(member.get().clanId()).isPresent() ? "true" : "false";
+        }
+
+        private String targetNoClanText() {
+            return color(getConfig().getString("placeholders.other-no-clan", "&8Sin clan"));
+        }
+
+        private Optional<Clan> targetClan(String target) throws SQLException {
+            Optional<Member> member = resolveMemberByNameOrUuid(target);
+            if (member.isEmpty()) return Optional.empty();
+            return getClan(member.get().clanId());
+        }
+
+        private String targetClanLine(String target) throws SQLException {
+            Optional<Member> memberOpt = resolveMemberByNameOrUuid(target);
+            if (memberOpt.isEmpty()) return targetNoClanText();
+            Optional<Clan> clanOpt = getClan(memberOpt.get().clanId());
+            if (clanOpt.isEmpty()) return targetNoClanText();
+            Clan clan = clanOpt.get();
+            String format = getConfig().getString("placeholders.clan-line-format", "&5{tier_name} &8- &f{name} &8[&6{id}&8]");
+            return color(format
+                    .replace("{id}", clan.tag())
+                    .replace("{tag}", clan.tag())
+                    .replace("{name}", clan.name())
+                    .replace("{tier}", String.valueOf(clan.tier()))
+                    .replace("{tier_name}", tierName(clan.tier()))
+                    .replace("{role}", getRoleName(clan.id(), memberOpt.get().role()))
+                    .replace("{role_number}", String.valueOf(memberOpt.get().role()))
+                    .replace("{members}", String.valueOf(countMembers(clan.id())))
+                    .replace("{max_members}", String.valueOf(maxMembersForClan(clan))));
+        }
+
+        private String targetClanValue(String target, String key) throws SQLException {
+            Optional<Member> memberOpt = resolveMemberByNameOrUuid(target);
+            if (memberOpt.isEmpty()) return targetNoClanText();
+            Optional<Clan> clanOpt = getClan(memberOpt.get().clanId());
+            if (clanOpt.isEmpty()) return targetNoClanText();
+            Member member = memberOpt.get();
+            Clan clan = clanOpt.get();
+            return switch (key) {
+                case "id" -> clan.tag();
+                case "name" -> clan.name();
+                case "tag" -> color(getConfig().getString("placeholders.tag-format", "&8[&b{id}&8]&r").replace("{id}", clan.tag()).replace("{name}", clan.name()));
+                case "lpc_tag" -> color(getConfig().getString("placeholders.lpc-tag-format", "&8[&b{id}&8]&r ").replace("{id}", clan.tag()).replace("{name}", clan.name()));
+                case "tier" -> String.valueOf(clan.tier());
+                case "tier_name" -> tierName(clan.tier());
+                case "role" -> getRoleName(clan.id(), member.role());
+                case "role_number" -> String.valueOf(member.role());
+                case "members" -> String.valueOf(countMembers(clan.id()));
+                case "max_members" -> String.valueOf(maxMembersForClan(clan));
+                default -> targetNoClanText();
+            };
+        }
+
         @Override
         public String onPlaceholderRequest(Player player, String params) {
-            if (player == null) return "";
             try {
+                String targetValue = targetClanPlaceholder(params);
+                if (targetValue != null) return targetValue;
+                if (player == null) return "";
                 Optional<Member> memberOpt = getMember(player.getUniqueId());
                 String noClan = getConfig().getString("placeholders.no-clan", "");
                 if (memberOpt.isEmpty()) {

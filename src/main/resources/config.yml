@@ -211,6 +211,11 @@ nametags:
 
 placeholders:
   no-clan: ''
+  # Texto usado para placeholders de otro jugador, por ejemplo %mdvclans_clan_line_of_Jugador%.
+  other-no-clan: '&8Sin clan'
+  # Formato para %mdvclans_clan_line_of_<jugador>%.
+  # Placeholders disponibles: {id}, {tag}, {name}, {tier}, {tier_name}, {role}, {role_number}, {members}, {max_members}
+  clan-line-format: '&5{tier_name} &8- &f{name} &8[&6{id}&8]'
   tag-format: '&8[&b{id}&8]&r'
   lpc-tag-format: '&8[&b{id}&8]&r '
 

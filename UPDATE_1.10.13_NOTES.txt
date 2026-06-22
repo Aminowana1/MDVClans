@@ -1,0 +1,40 @@
+MDVClans 1.10.13 - Placeholders de clan por jugador
+
+Cambios:
+- Agregados placeholders PlaceholderAPI para consultar el clan de otro jugador por nombre o UUID.
+- Útil para menús externos como la lista de amigos de MMOCore.
+- Si el jugador no pertenece a ningún clan, el placeholder devuelve el texto configurable placeholders.other-no-clan.
+
+Placeholders nuevos principales:
+- %mdvclans_clan_line_of_<jugador>%
+- %mdvclans_clan_name_of_<jugador>%
+- %mdvclans_clan_id_of_<jugador>%
+- %mdvclans_clan_tag_of_<jugador>%
+- %mdvclans_clan_tier_name_of_<jugador>%
+- %mdvclans_clan_tier_of_<jugador>%
+- %mdvclans_clan_role_of_<jugador>%
+- %mdvclans_clan_role_number_of_<jugador>%
+- %mdvclans_clan_members_of_<jugador>%
+- %mdvclans_clan_max_members_of_<jugador>%
+- %mdvclans_clan_is_in_clan_of_<jugador>%
+
+Aliases cortos:
+- %mdvclans_name_of_<jugador>%
+- %mdvclans_id_of_<jugador>%
+- %mdvclans_tier_name_of_<jugador>%
+- %mdvclans_is_in_clan_of_<jugador>%
+
+Config nueva en config.yml:
+placeholders:
+  other-no-clan: '&8Sin clan'
+  clan-line-format: '&5{tier_name} &8- &f{name} &8[&6{id}&8]'
+
+Placeholders disponibles dentro de clan-line-format:
+{id}, {tag}, {name}, {tier}, {tier_name}, {role}, {role_number}, {members}, {max_members}
+
+Ejemplo para lista de amigos de MMOCore:
+- '&7Clan: &r%mdvclans_clan_line_of_{name}%'
+
+Nota:
+- No requiere borrar Data/clans.db ni NativeMenus.
+- Si ya tienes config.yml creado, agrega manualmente placeholders.other-no-clan y placeholders.clan-line-format.
