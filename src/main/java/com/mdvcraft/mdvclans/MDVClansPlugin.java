@@ -756,22 +756,46 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         if (Bukkit.getPluginManager().getPlugin("MDVSocial") == null || !Bukkit.getPluginManager().isPluginEnabled("MDVSocial")) return false;
         try {
             Class<?> api = Class.forName("com.mdvcraft.mdvsocial.MDVSocialAPI");
-            java.lang.reflect.Method method = api.getMethod("sendClanInviteMail", UUID.class, String.class, UUID.class, String.class, String.class, String.class, String.class, long.class);
-            String fromName = getConfig().getString("integrations.mdvsocial.clan-invite-mail.from-name", "MDVClans");
-            String message = getConfig().getString("integrations.mdvsocial.clan-invite-mail.message", "El clan {clan_name} [{clan_id}] te invitó a unirte. Abre esta carta para aceptar o rechazar.")
-                    .replace("{clan_name}", clan.name())
-                    .replace("{clan_id}", clan.tag())
-                    .replace("{clan_tag}", clan.tag())
-                    .replace("{inviter}", inviter.getName())
-                    .replace("{player}", target.getName());
-            Object result = method.invoke(null, target.getUniqueId(), target.getName(), inviter.getUniqueId(), fromName, clan.tag(), clan.name(), message, expiresAt);
-            return Boolean.TRUE.equals(result);
+            String fromName = applyClanInvitePlaceholders(
+                    getConfig().getString("integrations.mdvsocial.clan-invite-mail.from-name", "{inviter}"),
+                    inviter, target, clan
+            );
+            String message = applyClanInvitePlaceholders(
+                    getConfig().getString("integrations.mdvsocial.clan-invite-mail.message", "{inviter} te invitó al clan {clan_name} [{clan_id}]. Abre esta carta para aceptar o rechazar."),
+                    inviter, target, clan
+            );
+            String bannerData = clan.banner() == null ? "" : clan.banner();
+            try {
+                java.lang.reflect.Method method = api.getMethod("sendClanInviteMail", UUID.class, String.class, UUID.class, String.class, String.class, String.class, String.class, String.class, long.class);
+                Object result = method.invoke(null, target.getUniqueId(), target.getName(), inviter.getUniqueId(), fromName, clan.tag(), clan.name(), message, bannerData, expiresAt);
+                return Boolean.TRUE.equals(result);
+            } catch (NoSuchMethodException ignored) {
+                java.lang.reflect.Method method = api.getMethod("sendClanInviteMail", UUID.class, String.class, UUID.class, String.class, String.class, String.class, String.class, long.class);
+                Object result = method.invoke(null, target.getUniqueId(), target.getName(), inviter.getUniqueId(), fromName, clan.tag(), clan.name(), message, expiresAt);
+                return Boolean.TRUE.equals(result);
+            }
         } catch (Throwable ex) {
             if (getConfig().getBoolean("integrations.mdvsocial.clan-invite-mail.debug", false)) {
                 getLogger().warning("No se pudo enviar invitación a MDVSocial: " + ex.getClass().getSimpleName() + " - " + ex.getMessage());
             }
             return false;
         }
+    }
+
+    private String applyClanInvitePlaceholders(String input, Player inviter, Player target, Clan clan) {
+        String out = input == null ? "" : input;
+        return out
+                .replace("{clan_name}", clan.name())
+                .replace("{clan_id}", clan.tag())
+                .replace("{clan_tag}", clan.tag())
+                .replace("{inviter}", inviter.getName())
+                .replace("{inviter_name}", inviter.getName())
+                .replace("{inviter_uuid}", inviter.getUniqueId().toString())
+                .replace("{player}", target.getName())
+                .replace("{player_name}", target.getName())
+                .replace("{target}", target.getName())
+                .replace("{target_name}", target.getName())
+                .replace("{target_uuid}", target.getUniqueId().toString());
     }
 
     private void handleAccept(Player player, String[] args) throws SQLException {
@@ -5841,6 +5865,35 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             }
         }
         return tags;
+    }
+
+    public boolean isPlayerInClan(UUID playerUuid) {
+        if (playerUuid == null) return false;
+        try {
+            return getMember(playerUuid).isPresent();
+        } catch (SQLException ignored) {
+            return false;
+        }
+    }
+
+    /**
+     * Devuelve el banner serializado del clan del jugador.
+     * - null: el jugador no tiene clan.
+     * - "": el jugador tiene clan pero no tiene banner configurado.
+     * - texto base64: banner serializado del clan.
+     */
+    public String getPlayerClanBannerData(UUID playerUuid) {
+        if (playerUuid == null) return null;
+        try {
+            Optional<Member> member = getMember(playerUuid);
+            if (member.isEmpty()) return null;
+            Optional<Clan> clan = getClan(member.get().clanId());
+            if (clan.isEmpty()) return null;
+            String banner = clan.get().banner();
+            return banner == null ? "" : banner;
+        } catch (SQLException ignored) {
+            return null;
+        }
     }
 
     private List<String> memberNamesOfSenderClan(Player player) throws SQLException {

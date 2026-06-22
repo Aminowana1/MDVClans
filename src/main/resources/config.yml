@@ -217,8 +217,8 @@ integrations:
     clan-invite-mail:
       enabled: true
       debug: false
-      from-name: 'MDVClans'
-      message: 'El clan {clan_name} [{clan_id}] te invitó a unirte. Abre esta carta para aceptar o rechazar.'
+      from-name: '{inviter}'
+      message: '{inviter} te invitó al clan {clan_name} [{clan_id}]. Abre esta carta para aceptar o rechazar.'
   mmocore:
     # Intenta leer PlayerData de MMOCore por reflexión. Sirve para datos offline si MMOCore los tiene cargados.
     use-direct-api: true
