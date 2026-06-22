@@ -1,0 +1,25 @@
+MDVClans 1.10.6 - Fix navegación PREVIOUS / MDVSocial
+
+Cambios:
+- Corrige el bug donde clan-action abierto desde Ranking volvía a Gestión del clan en vez de volver al Top.
+- Ahora los holders top:fuerza/top:kills/top:banco vuelven correctamente con PREVIOUS.
+- Al abrir menús nativos desde /clan menu <ui> se limpia el historial interno viejo, evitando que un back use un menú anterior stale.
+- PREVIOUS ahora consume el menú anterior al usarlo, evitando loops como Lista -> Clan Action -> Lista -> Lista.
+- PREVIOUS soporta fallback-action/fallback-target para volver a MDVSocial o ejecutar comando cuando no hay historial nativo.
+- clan-list puede usar fallback dinámico hacia clan_con_clan o clan_sin_clan según si el jugador tiene clan.
+
+Config recomendada para NativeMenus/40-relations.yml en menus.clan-list.back:
+
+back:
+  slot: 49
+  action: PREVIOUS
+  fallback-action: MDVSOCIAL
+  fallback-target-with-clan: clan_con_clan
+  fallback-target-without-clan: clan_sin_clan
+  material: PLAYER_HEAD
+  texture: <tu textura>
+  name: '&6&lVolver'
+  lore:
+  - '&7Regresa al menú anterior.'
+
+No requiere cambios en config.yml ni base de datos.

@@ -1215,7 +1215,15 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         if (args.length >= 3) {
             try { page = Math.max(1, Integer.parseInt(args[2])); } catch (NumberFormatException ignored) { }
         }
+        resetNativeHistoryForExternalOpen(player);
         openDynamicClanUi(player, sub, page);
+    }
+
+    private void resetNativeHistoryForExternalOpen(Player player) {
+        UUID uuid = player.getUniqueId();
+        currentNativeMenu.remove(uuid);
+        previousNativeMenu.remove(uuid);
+        suppressHistoryOnce.remove(uuid);
     }
 
     private String normalizeUiName(String raw) {
@@ -1257,7 +1265,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             case "base", "bases", "bases_clan", "base_clan" -> openBasesMenu(player);
             case "lista", "clanes", "lista_clanes", "lista_con_clan", "lista_sinclan", "lista_sin_clan" -> openClanListMenu(player, page);
             case "correo", "correos", "buzon", "buzon_clan" -> openMailboxMenu(player, page);
-            case "top", "ranking", "fuerza" -> openTopGui(player, "fuerza");
+            case "top", "ranking", "fuerza", "top_fuerza", "ranking_fuerza" -> openTopGui(player, "fuerza");
             case "top_kills", "ranking_kills" -> openTopGui(player, "kills");
             case "top_banco", "ranking_banco" -> openTopGui(player, "banco");
             case "bajas", "kills", "estadisticas" -> openKillStatsGui(player);
@@ -3603,7 +3611,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     applyPlaceholders(configString("menus.top.entry.name", "&e#{position} &8[&b{id}&8]"), ph),
                     lines("menus.top.entry.lore", List.of("&7Clan: &f{name}", "&7Valor: &6{value}", "&7Miembros: &e{members}"), ph), ph));
         }
-        setBackItem(inv, "top:fuerza", 49, "&6&lVolver", List.of("&7Regresa a Relaciones."));
+        setBackItem(inv, "top:" + mode, 49, "&6&lVolver", List.of("&7Regresa a Relaciones."));
         openNativeInventory(player, inv);
     }
 
@@ -3990,7 +3998,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         ConfigurationSection sec = backSection(key);
         String action = sec == null ? "NATIVE" : sec.getString("action", "NATIVE");
         action = action == null ? "NATIVE" : action.trim().toUpperCase(Locale.ROOT);
-        String target = sec == null ? "" : sec.getString("target", sec.getString("target-menu", sec.getString("menu", "")));
+        String target = backTargetForPlayer(player, sec, "target");
         String command = sec == null ? "" : sec.getString("command", "");
 
         if (action.equals("CLOSE") || action.equals("CERRAR")) {
@@ -4010,16 +4018,69 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             return;
         }
         if (action.equals("PREVIOUS") || action.equals("ANTERIOR")) {
-            String previous = previousNativeMenu.get(player.getUniqueId());
-            if (previous != null && !previous.isBlank()) {
-                suppressHistoryOnce.add(player.getUniqueId());
+            UUID uuid = player.getUniqueId();
+            String previous = previousNativeMenu.remove(uuid);
+            if (previous != null && !previous.isBlank() && !previous.equals(holderMenu)) {
+                suppressHistoryOnce.add(uuid);
                 openDynamicClanUi(player, uiNameFromHolder(previous), 1);
-            } else openDynamicClanUi(player, defaultBackTarget(holderMenu), 1);
+            } else {
+                executeBackFallback(player, holderMenu, sec);
+            }
             return;
         }
 
         if (target == null || target.isBlank()) target = defaultBackTarget(holderMenu);
         openDynamicClanUi(player, target, 1);
+    }
+
+    private void executeBackFallback(Player player, String holderMenu, ConfigurationSection sec) throws SQLException {
+        String fallbackAction = sec == null ? "" : sec.getString("fallback-action", sec.getString("fallback", ""));
+        fallbackAction = fallbackAction == null ? "" : fallbackAction.trim().toUpperCase(Locale.ROOT);
+        String fallbackTarget = backTargetForPlayer(player, sec, "fallback-target");
+        String fallbackCommand = sec == null ? "" : sec.getString("fallback-command", sec.getString("command", ""));
+
+        if (fallbackAction.equals("MDVSOCIAL") || fallbackAction.equals("SOCIAL") || fallbackAction.equals("OPEN_MENU")) {
+            player.closeInventory();
+            if (fallbackTarget == null || fallbackTarget.isBlank()) fallbackTarget = defaultSocialBackTarget(player);
+            player.performCommand("social " + fallbackTarget);
+            return;
+        }
+        if (fallbackAction.equals("COMMAND") || fallbackAction.equals("COMANDO")) {
+            player.closeInventory();
+            if (fallbackCommand != null && !fallbackCommand.isBlank()) player.performCommand(stripSlash(fallbackCommand));
+            return;
+        }
+        if (fallbackAction.equals("CLOSE") || fallbackAction.equals("CERRAR")) {
+            player.closeInventory();
+            return;
+        }
+
+        if ("clanlist".equals(holderMenu)) {
+            player.closeInventory();
+            player.performCommand("social " + defaultSocialBackTarget(player));
+            return;
+        }
+
+        openDynamicClanUi(player, defaultBackTarget(holderMenu), 1);
+    }
+
+    private String backTargetForPlayer(Player player, ConfigurationSection sec, String baseKey) {
+        if (sec == null) return "";
+        boolean hasClan = false;
+        try { hasClan = getMember(player.getUniqueId()).isPresent(); } catch (SQLException ignored) { }
+        String specific = hasClan
+                ? sec.getString(baseKey + "-with-clan", sec.getString(baseKey + "-con-clan", ""))
+                : sec.getString(baseKey + "-without-clan", sec.getString(baseKey + "-sin-clan", ""));
+        if (specific != null && !specific.isBlank()) return specific;
+        return sec.getString(baseKey, sec.getString("target", ""));
+    }
+
+    private String defaultSocialBackTarget(Player player) {
+        try {
+            return getMember(player.getUniqueId()).isPresent() ? "clan_con_clan" : "clan_sin_clan";
+        } catch (SQLException ignored) {
+            return "clan_sin_clan";
+        }
     }
 
     private String stripSlash(String command) {
