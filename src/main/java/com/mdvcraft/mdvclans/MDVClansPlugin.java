@@ -409,6 +409,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         migrateRolesToV19();
         migrateBasesToV110();
         ensureRoleNamesForAllClans();
+        ensureSingleLeaderForAllClans();
+        ensureSingleLeaderIndex();
     }
 
     private synchronized void addColumnIfMissing(String table, String column, String definition) {
@@ -460,6 +462,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 case "promover", "promote" -> handlePromote(player, args);
                 case "degradar", "demote" -> handleDemote(player, args);
                 case "setrango", "setrank" -> handleSetRank(player, args);
+                case "lider", "líder", "leader", "transferirlider", "transferir-lider", "transferleader" -> handleLeaderTransfer(player, args);
                 case "rol", "rango", "rolnombre" -> handleRoleName(player, args);
                 case "chat" -> handleClanChatCommand(player, args, 1);
                 case "c" -> handleClanChatCommand(player, args, 1);
@@ -558,6 +561,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         player.sendMessage(color("&e/clan setbase &7/ &e/clan base &7- Base del clan."));
         player.sendMessage(color("&e/clan relacion <ID> <neutral|aliado|enemigo>"));
         player.sendMessage(color("&e/clan rol <0-4> <nombre> &7- Nombra un rango."));
+        player.sendMessage(color("&e/clan lider <jugador> &7- Transfiere el liderazgo."));
         player.sendMessage(color("&e/clan editar <nombre|id> <valor> &7- Ajustes del clan."));
         player.sendMessage(color("&e/clan solicitudes &7- Solicitudes pendientes."));
         player.sendMessage(color("&e/clan banco &7- Banco del clan."));
@@ -731,7 +735,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             msg(player, "&cEse jugador ya pertenece a un clan.");
             return;
         }
-        long expires = System.currentTimeMillis() + getConfig().getLong("invites.expire-seconds", 120) * 1000L;
+        long expires = System.currentTimeMillis() + inviteExpireMillis();
         synchronized (this) {
             try (PreparedStatement ps = connection.prepareStatement("INSERT OR REPLACE INTO invites(clan_id,target_uuid,inviter_uuid,expires_at) VALUES(?,?,?,?)")) {
                 ps.setInt(1, clan.id());
@@ -749,6 +753,15 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         } else {
             target.sendMessage(color("&7Usa &e/clan aceptar " + clan.tag() + " &7para entrar."));
         }
+    }
+
+    private long inviteExpireMillis() {
+        if (getConfig().isSet("invites.expire-days")) {
+            double days = Math.max(0.01D, getConfig().getDouble("invites.expire-days", 3.0D));
+            return (long) (days * 86_400_000L);
+        }
+        long seconds = getConfig().getLong("invites.expire-seconds", 259200L);
+        return Math.max(1L, seconds) * 1000L;
     }
 
     private boolean sendMDVSocialClanInviteMail(Player inviter, Player target, Clan clan, long expiresAt) {
@@ -974,7 +987,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     private void handleSetRank(Player player, String[] args) throws SQLException {
         if (args.length < 3) {
-            msg(player, "&cUso: &e/clan setrango <jugador> <0-4>");
+            msg(player, "&cUso: &e/clan setrango <jugador> <0-" + (maxRole() - 1) + ">");
+            msg(player, "&7Para transferir líder usa &e/clan lider <jugador>&7.");
             return;
         }
         Member actor = requireMember(player);
@@ -994,7 +1008,17 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             msg(player, "&cRango inválido. Usa " + minRole() + "-" + maxRole() + ".");
             return;
         }
+        if (role >= maxRole()) {
+            msg(player, "&cNo puedes asignar el rango de líder con /clan setrango.");
+            msg(player, "&7Para mantener un único líder usa &e/clan lider <jugador>&7.");
+            return;
+        }
         Member target = targetOpt.get();
+        if (target.role() >= maxRole()) {
+            msg(player, "&cNo puedes cambiar el rango del líder con /clan setrango.");
+            msg(player, "&7Primero transfiere el liderazgo con &e/clan lider <jugador>&7.");
+            return;
+        }
         if (!target.uuid().equals(player.getUniqueId()) && target.role() >= actor.role()) {
             msg(player, "&cNo puedes modificar a alguien de rango igual o mayor.");
             return;
@@ -1002,6 +1026,32 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         setMemberRole(target.uuid(), role);
         logAction(actor.clanId(), player, "SETRANGO", target.name() + " a rango " + role);
         broadcastToClan(actor.clanId(), "&e" + target.name() + " &7ahora es &b" + getRoleName(actor.clanId(), role) + "&7.");
+    }
+
+    private void handleLeaderTransfer(Player player, String[] args) throws SQLException {
+        if (args.length < 2) {
+            msg(player, "&cUso: &e/clan lider <jugador>");
+            return;
+        }
+        Member actor = requireMember(player);
+        if (actor == null) return;
+        if (actor.role() < maxRole()) {
+            msg(player, "&cSolo el líder actual puede transferir el liderazgo.");
+            return;
+        }
+        Optional<Member> targetOpt = getMemberByNameInClan(actor.clanId(), args[1]);
+        if (targetOpt.isEmpty()) {
+            msg(player, "&cEse jugador no está en tu clan.");
+            return;
+        }
+        Member target = targetOpt.get();
+        if (target.uuid().equals(player.getUniqueId())) {
+            msg(player, "&cYa eres el líder de este clan.");
+            return;
+        }
+        transferLeadership(actor.clanId(), target.uuid());
+        logAction(actor.clanId(), player, "LIDER", "Transfirió el liderazgo a " + target.name());
+        broadcastToClan(actor.clanId(), "&6" + target.name() + " &ees ahora el líder del clan.");
     }
 
     private void handleRoleName(Player player, String[] args) throws SQLException {
@@ -2291,9 +2341,43 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private synchronized void setMemberRole(UUID uuid, int role) throws SQLException {
+        if (role >= maxRole()) {
+            Optional<Member> target = getMember(uuid);
+            if (target.isPresent()) {
+                transferLeadershipUnsafe(target.get().clanId(), uuid);
+                return;
+            }
+        }
         try (PreparedStatement ps = connection.prepareStatement("UPDATE members SET role=? WHERE uuid=?")) {
             ps.setInt(1, role);
             ps.setString(2, uuid.toString());
+            ps.executeUpdate();
+        }
+    }
+
+    private synchronized void transferLeadership(int clanId, UUID newLeaderUuid) throws SQLException {
+        if (maxRole() <= minRole()) throw new SQLException("roles.max debe ser mayor que roles.min para transferir liderazgo");
+        transferLeadershipUnsafe(clanId, newLeaderUuid);
+    }
+
+    private synchronized void transferLeadershipUnsafe(int clanId, UUID newLeaderUuid) throws SQLException {
+        int demotedRole = Math.max(minRole(), maxRole() - 1);
+        try (PreparedStatement ps = connection.prepareStatement("UPDATE members SET role=? WHERE clan_id=? AND role>=? AND uuid<>?")) {
+            ps.setInt(1, demotedRole);
+            ps.setInt(2, clanId);
+            ps.setInt(3, maxRole());
+            ps.setString(4, newLeaderUuid.toString());
+            ps.executeUpdate();
+        }
+        try (PreparedStatement ps = connection.prepareStatement("UPDATE members SET role=? WHERE clan_id=? AND uuid=?")) {
+            ps.setInt(1, maxRole());
+            ps.setInt(2, clanId);
+            ps.setString(3, newLeaderUuid.toString());
+            ps.executeUpdate();
+        }
+        try (PreparedStatement ps = connection.prepareStatement("UPDATE clans SET owner_uuid=? WHERE id=?")) {
+            ps.setString(1, newLeaderUuid.toString());
+            ps.setInt(2, clanId);
             ps.executeUpdate();
         }
     }
@@ -2444,6 +2528,40 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     ps.setString(3, getConfig().getString("roles.defaults." + role, "Rango " + role));
                     ps.executeUpdate();
                 }
+            }
+        }
+    }
+
+    private synchronized void ensureSingleLeaderForAllClans() throws SQLException {
+        List<Clan> clans = getAllClans();
+        for (Clan clan : clans) {
+            List<Member> members = getMembers(clan.id());
+            if (members.isEmpty()) continue;
+            Member chosen = null;
+            for (Member member : members) {
+                if (member.uuid().equals(clan.ownerUuid())) {
+                    chosen = member;
+                    break;
+                }
+            }
+            if (chosen == null) {
+                chosen = members.stream()
+                        .sorted(Comparator.comparingInt(Member::role).reversed().thenComparingLong(Member::joinedAt))
+                        .findFirst()
+                        .orElse(members.get(0));
+            }
+            transferLeadershipUnsafe(clan.id(), chosen.uuid());
+        }
+    }
+
+    private synchronized void ensureSingleLeaderIndex() throws SQLException {
+        try (Statement st = connection.createStatement()) {
+            st.executeUpdate("CREATE UNIQUE INDEX IF NOT EXISTS idx_members_single_leader ON members(clan_id) WHERE role >= 4");
+        } catch (SQLException e) {
+            getLogger().warning("No se pudo crear índice de líder único. Se reintentará tras reparar liderazgos: " + e.getMessage());
+            ensureSingleLeaderForAllClans();
+            try (Statement st = connection.createStatement()) {
+                st.executeUpdate("CREATE UNIQUE INDEX IF NOT EXISTS idx_members_single_leader ON members(clan_id) WHERE role >= 4");
             }
         }
     }
@@ -5817,7 +5935,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
         if (!(sender instanceof Player)) return Collections.emptyList();
         if (args.length == 1) {
-            return filter(List.of("ayuda", "crear", "info", "lista", "invitar", "aceptar", "rechazar", "unirse", "abierto", "salir", "expulsar", "promover", "degradar", "setrango", "rol", "chat", "c", "setbase", "base", "relacion", "banco", "depositar", "retirar", "almacen", "mejorar", "tier", "upgrade", "estandarte", "logs", "top", "bajas", "tablero", "correo", "editar", "solicitudes", "menu", "abrir", "ui", "interfaz", "disolver"), args[0]);
+            return filter(List.of("ayuda", "crear", "info", "lista", "invitar", "aceptar", "rechazar", "unirse", "abierto", "salir", "expulsar", "promover", "degradar", "setrango", "lider", "rol", "chat", "c", "setbase", "base", "relacion", "banco", "depositar", "retirar", "almacen", "mejorar", "tier", "upgrade", "estandarte", "logs", "top", "bajas", "tablero", "correo", "editar", "solicitudes", "menu", "abrir", "ui", "interfaz", "disolver"), args[0]);
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         try {
@@ -5826,8 +5944,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 if (equalsAny(sub, "invitar")) return null;
                 if (equalsAny(sub, "aceptar", "rechazar", "declinar")) return filter(listInviteTags(((Player) sender).getUniqueId()), args[1]);
                 if (equalsAny(sub, "abierto")) return filter(List.of("on", "off"), args[1]);
-                if (equalsAny(sub, "expulsar", "promover", "degradar", "setrango")) return filter(memberNamesOfSenderClan((Player) sender), args[1]);
-                if (equalsAny(sub, "rol")) return filter(List.of("0", "1", "2", "3", "4", "5"), args[1]);
+                if (equalsAny(sub, "expulsar", "promover", "degradar", "setrango", "lider", "líder", "leader", "transferirlider", "transferir-lider", "transferleader")) return filter(memberNamesOfSenderClan((Player) sender), args[1]);
+                if (equalsAny(sub, "rol")) return filter(List.of("0", "1", "2", "3", "4"), args[1]);
                 if (equalsAny(sub, "banco")) return filter(List.of("depositar", "retirar", "log"), args[1]);
                 if (equalsAny(sub, "estandarte", "banner")) return filter(List.of("set", "ver", "quitar"), args[1]);
                 if (equalsAny(sub, "top")) return filter(List.of("fuerza", "kills", "banco"), args[1]);
@@ -5839,7 +5957,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 if (equalsAny(sub, "disolver")) return filter(List.of("confirmar"), args[1]);
             }
             if (args.length == 3 && equalsAny(sub, "relacion")) return filter(List.of("neutral", "aliado", "enemigo"), args[2]);
-            if (args.length == 3 && equalsAny(sub, "setrango")) return filter(List.of("0", "1", "2", "3", "4", "5"), args[2]);
+            if (args.length == 3 && equalsAny(sub, "setrango")) return filter(List.of("0", "1", "2", "3"), args[2]);
         } catch (SQLException ignored) {
         }
         return Collections.emptyList();

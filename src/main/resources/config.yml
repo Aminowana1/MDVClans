@@ -96,7 +96,10 @@ clan-tiers:
     max-allies: 8
 
 invites:
-  expire-seconds: 120
+  # Duración de invitaciones de clan y cartas personales de invitación.
+  # 3 días por defecto. Si prefieres segundos exactos, borra expire-days y usa expire-seconds.
+  expire-days: 3
+  expire-seconds: 259200
 
 roles:
   min: 0
