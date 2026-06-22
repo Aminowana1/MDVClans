@@ -2533,7 +2533,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private synchronized void ensureSingleLeaderForAllClans() throws SQLException {
-        List<Clan> clans = getAllClans();
+        List<Clan> clans = listClans();
         for (Clan clan : clans) {
             List<Member> members = getMembers(clan.id());
             if (members.isEmpty()) continue;
