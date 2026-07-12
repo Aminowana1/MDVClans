@@ -1,0 +1,30 @@
+MDVClans 1.10.14 - Prefijo de clan para el chat
+
+Cambios:
+- Agregado el placeholder %mdvclans_chat_prefix%.
+- Si el jugador pertenece a un clan, devuelve el prefijo completo configurable con corchetes, colores y espacio final.
+- Si el jugador no pertenece a ningún clan, siempre devuelve una cadena vacía, aunque placeholders.no-clan esté configurado como "Sin clan".
+- No requiere cambios en MDVSocial ni en la base de datos.
+
+Configuración nueva:
+placeholders:
+  chat-prefix-format: '&8[&6{id}&8]&r '
+
+Placeholders disponibles dentro del formato:
+- {id}
+- {tag}
+- {name}
+
+Formato recomendado para LPC:
+%mdvsocial_title_prefix%%mdvclans_chat_prefix%&6&l{name}{suffix} &r&e» &f{message}
+
+Resultado con clan:
+[TAG] Nombre » mensaje
+
+Resultado sin clan:
+Nombre » mensaje
+
+Actualización:
+- Reemplaza únicamente el JAR de MDVClans.
+- Conserva la carpeta plugins/MDVClans y Data/clans.db.
+- Reinicia el servidor o usa /mdvclans reload después de actualizar.

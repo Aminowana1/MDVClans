@@ -218,6 +218,9 @@ placeholders:
   clan-line-format: '&5{tier_name} &8- &f{name} &8[&6{id}&8]'
   tag-format: '&8[&b{id}&8]&r'
   lpc-tag-format: '&8[&b{id}&8]&r '
+  # %mdvclans_chat_prefix% devuelve este bloque si tiene clan y siempre queda vacío si no tiene clan.
+  # Pensado para LPC y otros formatos de chat; incluye el espacio final.
+  chat-prefix-format: '&8[&6{id}&8]&r '
 
 integrations:
   mdvsocial:

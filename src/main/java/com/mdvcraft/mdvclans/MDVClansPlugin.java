@@ -32,6 +32,7 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -103,6 +104,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private static final int GUI_PAGE_SIZE = PAGE_CONTENT_SLOTS.length;
     private static final int STORAGE_NAV_SLOT = 53;
     private static final int STORAGE_PAGE_ITEM_SLOTS = 53;
+    private static final int BANNER_EDITOR_CANCEL_SLOT = 2;
+    private static final int BANNER_EDITOR_INPUT_SLOT = 4;
+    private static final int BANNER_EDITOR_CONFIRM_SLOT = 6;
 
     private final Map<UUID, PendingTeleport> pendingTeleports = new ConcurrentHashMap<>();
     private final Map<UUID, Long> baseCooldowns = new ConcurrentHashMap<>();
@@ -164,11 +168,19 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.10.12 habilitado.");
+        getLogger().info("MDVClans 1.10.16 habilitado.");
     }
 
     @Override
     public void onDisable() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            InventoryHolder holder = player.getOpenInventory().getTopInventory().getHolder();
+            if (holder instanceof BannerEditorHolder bannerHolder && !bannerHolder.completed) {
+                returnSubmittedBanner(player, bannerHolder);
+                bannerHolder.completed = true;
+                player.closeInventory();
+            }
+        }
         for (PendingTeleport pending : pendingTeleports.values()) {
             Bukkit.getScheduler().cancelTask(pending.taskId());
         }
@@ -1667,20 +1679,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         String action = args[1].toLowerCase(Locale.ROOT);
         if (equalsAny(action, "set", "poner", "guardar")) {
             if (!hasRank(player, member, "banner-set")) return;
-            ItemStack item = player.getInventory().getItemInMainHand();
-            if (item == null || item.getType() == Material.AIR || !item.getType().name().endsWith("BANNER")) {
-                msg(player, "&cDebes tener un banner/estandarte en la mano.");
-                return;
-            }
-            ItemStack copy = item.clone();
-            copy.setAmount(1);
-            try {
-                setClanBanner(member.clanId(), itemToBase64(copy));
-                logAction(member.clanId(), player, "ESTANDARTE", "Estandarte oficial actualizado");
-                broadcastToClan(member.clanId(), "&aEl estandarte oficial del clan fue actualizado por &e" + player.getName() + "&a.");
-            } catch (IOException e) {
-                msg(player, "&cNo se pudo guardar el estandarte.");
-            }
+            openBannerEditor(player);
             return;
         }
         if (equalsAny(action, "ver", "view")) {
@@ -1689,8 +1688,24 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 return;
             }
             try {
-                Inventory inv = Bukkit.createInventory(player, 9, color("&8Estandarte " + clan.tag()));
-                inv.setItem(4, itemFromBase64(clan.banner()));
+                ItemStack bannerTemplate = singleItem(itemFromBase64(clan.banner()));
+                BannerViewHolder holder = new BannerViewHolder(clan.id(), bannerTemplate);
+                Inventory inv = Bukkit.createInventory(holder, 9, color("&8Estandarte " + clan.tag()));
+                fill(inv);
+
+                ItemStack preview = bannerTemplate.clone();
+                ItemMeta previewMeta = preview.getItemMeta();
+                if (previewMeta != null) {
+                    List<String> lore = previewMeta.hasLore() && previewMeta.getLore() != null
+                            ? new ArrayList<>(previewMeta.getLore())
+                            : new ArrayList<>();
+                    lore.add("");
+                    lore.add(color("&eHaz clic para obtener una copia."));
+                    lore.add(color("&7Puedes sacar todas las que necesites."));
+                    previewMeta.setLore(lore);
+                    preview.setItemMeta(previewMeta);
+                }
+                inv.setItem(BANNER_EDITOR_INPUT_SLOT, preview);
                 openNativeInventory(player, inv);
             } catch (Exception e) {
                 msg(player, "&cNo se pudo cargar el estandarte guardado.");
@@ -1705,6 +1720,164 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             return;
         }
         msg(player, "&cUso: &e/clan estandarte <set|ver|quitar>");
+    }
+
+    private void openBannerEditor(Player player) throws SQLException {
+        Member member = requireMember(player);
+        if (member == null) return;
+        if (!hasRank(player, member, "banner-set")) return;
+        Clan clan = getClan(member.clanId()).orElseThrow();
+        Map<String, String> ph = clanPlaceholders(clan);
+        String title = nativeTitle("banner-editor", "&8Cambiar estandarte &b{id}", ph);
+        BannerEditorHolder holder = new BannerEditorHolder(clan.id(), clan.banner());
+        Inventory inv = Bukkit.createInventory(holder, 9, title);
+        fill(inv);
+
+        int inputSlot = bannerEditorInputSlot();
+        inv.setItem(inputSlot, null);
+        if (clan.hasBanner()) {
+            try {
+                ItemStack current = itemFromBase64(clan.banner());
+                current.setAmount(1);
+                inv.setItem(inputSlot, current);
+            } catch (Exception e) {
+                getLogger().warning("No se pudo mostrar el banner actual del clan " + clan.id() + ": " + e.getMessage());
+            }
+        }
+
+        inv.setItem(bannerEditorCancelSlot(), nativeItem(
+                "menus.banner-editor.items.cancel",
+                Material.RED_STAINED_GLASS_PANE,
+                "&c&lRechazar cambio",
+                List.of("", "&7No modifica el estandarte", "&7actual del clan.", "", "&eClick para volver."),
+                ph));
+        inv.setItem(bannerEditorConfirmSlot(), nativeItem(
+                "menus.banner-editor.items.confirm",
+                Material.LIME_STAINED_GLASS_PANE,
+                "&a&lConfirmar estandarte",
+                List.of("", "&7Coloca un estandarte en", "&7el espacio central.", "", "&eClick para confirmar."),
+                ph));
+        player.openInventory(inv);
+    }
+
+    private int bannerEditorCancelSlot() {
+        return Math.max(0, Math.min(8, nativeSlot("menus.banner-editor.items.cancel.slot", BANNER_EDITOR_CANCEL_SLOT)));
+    }
+
+    private int bannerEditorInputSlot() {
+        return Math.max(0, Math.min(8, nativeSlot("menus.banner-editor.items.input.slot", BANNER_EDITOR_INPUT_SLOT)));
+    }
+
+    private int bannerEditorConfirmSlot() {
+        return Math.max(0, Math.min(8, nativeSlot("menus.banner-editor.items.confirm.slot", BANNER_EDITOR_CONFIRM_SLOT)));
+    }
+
+    private boolean isBanner(ItemStack item) {
+        return item != null && item.getType() != Material.AIR && item.getType().name().endsWith("_BANNER") && !item.getType().name().endsWith("_WALL_BANNER");
+    }
+
+    private ItemStack singleItem(ItemStack item) {
+        if (item == null) return null;
+        ItemStack copy = item.clone();
+        copy.setAmount(1);
+        return copy;
+    }
+
+    private void showOriginalBanner(Inventory inv, BannerEditorHolder holder) {
+        int inputSlot = bannerEditorInputSlot();
+        inv.setItem(inputSlot, null);
+        if (holder.originalBannerData == null || holder.originalBannerData.isBlank()) return;
+        try {
+            inv.setItem(inputSlot, singleItem(itemFromBase64(holder.originalBannerData)));
+        } catch (Exception e) {
+            getLogger().warning("No se pudo restaurar la vista previa del estandarte: " + e.getMessage());
+        }
+    }
+
+    private void giveItemSafely(Player player, ItemStack item) {
+        if (item == null || item.getType() == Material.AIR || item.getAmount() <= 0) return;
+        Map<Integer, ItemStack> leftovers = player.getInventory().addItem(item);
+        for (ItemStack leftover : leftovers.values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        }
+    }
+
+    private void returnSubmittedBanner(Player player, BannerEditorHolder holder) {
+        if (holder.submittedBanner == null) return;
+        giveItemSafely(player, holder.submittedBanner.clone());
+        holder.submittedBanner = null;
+    }
+
+    private void placeBannerInEditor(Player player, Inventory inv, BannerEditorHolder holder, ItemStack source) {
+        if (!isBanner(source)) {
+            msg(player, "&cEse espacio solo acepta estandartes.");
+            return;
+        }
+        returnSubmittedBanner(player, holder);
+        holder.submittedBanner = singleItem(source);
+        inv.setItem(bannerEditorInputSlot(), holder.submittedBanner.clone());
+    }
+
+    private void removeSubmittedBannerToCursor(Player player, Inventory inv, BannerEditorHolder holder) {
+        if (holder.submittedBanner == null) return;
+        ItemStack returned = holder.submittedBanner.clone();
+        holder.submittedBanner = null;
+        showOriginalBanner(inv, holder);
+        ItemStack cursor = player.getItemOnCursor();
+        if (cursor == null || cursor.getType() == Material.AIR) player.setItemOnCursor(returned);
+        else giveItemSafely(player, returned);
+    }
+
+    private void finishBannerEditor(Player player, BannerEditorHolder holder, boolean reopenSettings) {
+        holder.completed = true;
+        player.closeInventory();
+        if (!reopenSettings) return;
+        Bukkit.getScheduler().runTask(this, () -> {
+            if (!player.isOnline()) return;
+            try { openSettingsMenu(player); }
+            catch (SQLException e) {
+                getLogger().warning("No se pudo volver a Ajustes después de editar banner: " + e.getMessage());
+            }
+        });
+    }
+
+    private void confirmBannerEditor(Player player, BannerEditorHolder holder) {
+        try {
+            Member member = requireMember(player);
+            if (member == null) return;
+            if (member.clanId() != holder.clanId) {
+                msg(player, "&cYa no perteneces al clan que abrió este editor.");
+                returnSubmittedBanner(player, holder);
+                finishBannerEditor(player, holder, false);
+                return;
+            }
+            if (!hasRank(player, member, "banner-set")) return;
+            if (holder.submittedBanner == null) {
+                if (holder.originalBannerData == null || holder.originalBannerData.isBlank()) {
+                    msg(player, "&cColoca un estandarte en el espacio central antes de confirmar.");
+                    return;
+                }
+                msg(player, "&7El estandarte del clan no fue modificado.");
+                finishBannerEditor(player, holder, true);
+                return;
+            }
+
+            ItemStack selected = singleItem(holder.submittedBanner);
+            setClanBanner(holder.clanId, itemToBase64(selected));
+            holder.submittedBanner = null;
+            logAction(holder.clanId, player, "ESTANDARTE", "Estandarte oficial actualizado mediante la interfaz");
+            broadcastToClan(holder.clanId, "&aEl estandarte oficial del clan fue actualizado por &e" + player.getName() + "&a.");
+            finishBannerEditor(player, holder, true);
+        } catch (SQLException | IOException e) {
+            getLogger().warning("No se pudo confirmar el estandarte del clan: " + e.getMessage());
+            msg(player, "&cNo se pudo guardar el estandarte.");
+        }
+    }
+
+    private void cancelBannerEditor(Player player, BannerEditorHolder holder) {
+        returnSubmittedBanner(player, holder);
+        msg(player, "&7Cambio de estandarte cancelado.");
+        finishBannerEditor(player, holder, true);
     }
 
     private void handleLogs(Player player, String[] args) throws SQLException {
@@ -1920,6 +2093,26 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     @EventHandler(ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (event.getInventory().getHolder() instanceof BannerEditorHolder bannerHolder) {
+            handleBannerEditorClick(event, player, bannerHolder);
+            return;
+        }
+        if (event.getInventory().getHolder() instanceof BannerViewHolder bannerHolder) {
+            int rawSlot = event.getRawSlot();
+            int topSize = event.getView().getTopInventory().getSize();
+            boolean clickedTop = rawSlot >= 0 && rawSlot < topSize;
+
+            // La vista funciona como dispensador seguro: nunca se mueve la vista previa,
+            // pero cada clic en el estandarte entrega una copia limpia e ilimitada.
+            if (clickedTop || event.isShiftClick() || event.getClick() == ClickType.DOUBLE_CLICK) {
+                event.setCancelled(true);
+            }
+            if (clickedTop && event.getSlot() == BANNER_EDITOR_INPUT_SLOT) {
+                giveItemSafely(player, bannerHolder.newCopy());
+                player.updateInventory();
+            }
+            return;
+        }
         if (event.getInventory().getHolder() instanceof StorageInventoryHolder storageHolder) {
             if (event.getClickedInventory() == null || !event.getClickedInventory().equals(event.getView().getTopInventory())) return;
             if (event.getSlot() != STORAGE_NAV_SLOT || storagePagesForSlots(storageHolder.totalSlots()) <= 1) return;
@@ -1948,9 +2141,85 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
     }
 
+    private void handleBannerEditorClick(InventoryClickEvent event, Player player, BannerEditorHolder holder) {
+        Inventory top = event.getView().getTopInventory();
+        int rawSlot = event.getRawSlot();
+        int topSize = top.getSize();
+
+        if (event.getClick() == ClickType.DOUBLE_CLICK) {
+            event.setCancelled(true);
+            return;
+        }
+
+        if (rawSlot >= 0 && rawSlot < topSize) {
+            event.setCancelled(true);
+            int slot = event.getSlot();
+            if (slot == bannerEditorCancelSlot()) {
+                cancelBannerEditor(player, holder);
+                return;
+            }
+            if (slot == bannerEditorConfirmSlot()) {
+                confirmBannerEditor(player, holder);
+                return;
+            }
+            if (slot != bannerEditorInputSlot()) return;
+
+            ItemStack cursor = event.getCursor();
+            if (cursor == null || cursor.getType() == Material.AIR) {
+                removeSubmittedBannerToCursor(player, top, holder);
+                return;
+            }
+            if (!isBanner(cursor)) {
+                msg(player, "&cEse espacio solo acepta estandartes.");
+                return;
+            }
+
+            placeBannerInEditor(player, top, holder, cursor);
+            ItemStack remainder = cursor.clone();
+            remainder.setAmount(cursor.getAmount() - 1);
+            player.setItemOnCursor(remainder.getAmount() <= 0 ? null : remainder);
+            player.updateInventory();
+            return;
+        }
+
+        if (event.isShiftClick()) {
+            event.setCancelled(true);
+            ItemStack clicked = event.getCurrentItem();
+            if (!isBanner(clicked)) {
+                if (clicked != null && clicked.getType() != Material.AIR) msg(player, "&cEl editor solo acepta estandartes.");
+                return;
+            }
+            placeBannerInEditor(player, top, holder, clicked);
+            ItemStack remainder = clicked.clone();
+            remainder.setAmount(clicked.getAmount() - 1);
+            event.setCurrentItem(remainder.getAmount() <= 0 ? null : remainder);
+            player.updateInventory();
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onInventoryDrag(InventoryDragEvent event) {
+        InventoryHolder holder = event.getInventory().getHolder();
+        if (!(holder instanceof BannerEditorHolder) && !(holder instanceof BannerViewHolder)) return;
+        int topSize = event.getView().getTopInventory().getSize();
+        for (int rawSlot : event.getRawSlots()) {
+            if (rawSlot >= 0 && rawSlot < topSize) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+    }
+
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
         if (!(event.getPlayer() instanceof Player player)) return;
+        if (event.getInventory().getHolder() instanceof BannerEditorHolder bannerHolder) {
+            if (!bannerHolder.completed) {
+                returnSubmittedBanner(player, bannerHolder);
+                bannerHolder.completed = true;
+            }
+            return;
+        }
         if (!(event.getInventory().getHolder() instanceof StorageInventoryHolder holder)) return;
         try {
             saveStoragePage(holder.clanId(), event.getInventory(), holder.page(), holder.totalSlots());
@@ -2137,7 +2406,13 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        PendingTeleport pending = pendingTeleports.remove(event.getPlayer().getUniqueId());
+        Player player = event.getPlayer();
+        InventoryHolder holder = player.getOpenInventory().getTopInventory().getHolder();
+        if (holder instanceof BannerEditorHolder bannerHolder && !bannerHolder.completed) {
+            returnSubmittedBanner(player, bannerHolder);
+            bannerHolder.completed = true;
+        }
+        PendingTeleport pending = pendingTeleports.remove(player.getUniqueId());
         if (pending != null) Bukkit.getScheduler().cancelTask(pending.taskId());
     }
 
@@ -4000,7 +4275,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         if (nativeSection("menus.settings.items.description") != null) {
             inv.setItem(nativeSlot("menus.settings.items.description.slot", 18), can(member, "description-edit") ? nativeItem("menus.settings.items.description", Material.MAP, "&6&lDescripción pública", List.of("", "&7Descripción actual:", "&f{description}", "", "&eClick para editar.", "&cClick derecho para limpiar."), ph) : lockedItem("&7Descripción pública", "&cRequiere rango alto."));
         }
-        inv.setItem(nativeSlot("menus.settings.items.banner.slot", 13), can(member, "banner-set") ? clanBannerItem(clan, applyPlaceholders(configString("menus.settings.items.banner.name", "&f&lCambiar banner"), ph), lines("menus.settings.items.banner.lore", List.of("", "&7Usa el banner en tu mano.", "", "&eClick: guardar banner en mano", "&cClick derecho: quitar banner"), ph), ph) : lockedItem("&7Cambiar banner", "&cRequiere rango alto."));
+        inv.setItem(nativeSlot("menus.settings.items.banner.slot", 13), can(member, "banner-set") ? clanBannerItem(clan, applyPlaceholders(configString("menus.settings.items.banner.name", "&f&lCambiar banner"), ph), bannerSettingsLore(ph), ph) : lockedItem("&7Cambiar banner", "&cRequiere rango alto."));
         inv.setItem(nativeSlot("menus.settings.items.permissions.slot", 14), can(member, "permissions-edit") ? nativeItem("menus.settings.items.permissions", Material.KNOWLEDGE_BOOK, "&b&lConfigurar permisos", List.of("", "&7Edita qué acciones puede usar", "&7cada rango del clan.", "", "&eClick para abrir el editor."), ph) : lockedItem("&7Configurar permisos", "&cRequiere permiso de administrar permisos."));
         inv.setItem(nativeSlot("menus.settings.items.open.slot", 15), can(member, "open") ? nativeItem("menus.settings.items.open", Material.OAK_DOOR, "&a&lEntrada del clan", List.of("", "&7Estado actual: {entry}", "", "&eClick para alternar."), ph) : lockedItem("&7Entrada del clan", "&cRequiere rango alto."));
         inv.setItem(nativeSlot("menus.settings.items.disband.slot", 16), can(member, "disband") ? nativeItem("menus.settings.items.disband", Material.TNT, "&4&lDisolver clan", List.of("", "&cAcción peligrosa.", "&7Usa el comando de confirmación.", "", "&eClick para instrucciones."), ph) : lockedItem("&7Disolver clan", "&cSolo el rango máximo."));
@@ -4722,6 +4997,22 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
 
+    private List<String> bannerSettingsLore(Map<String, String> ph) {
+        List<String> modern = List.of(
+                "",
+                "&7Abre el editor de estandarte",
+                "&7oficial del clan.",
+                "",
+                "&eClick para abrir."
+        );
+        List<String> configured = lines("menus.settings.items.banner.lore", modern, ph);
+        String joined = configured.stream().map(ChatColor::stripColor).collect(Collectors.joining(" ")).toLowerCase(Locale.ROOT);
+        if (joined.contains("banner en tu mano") || joined.contains("guardar banner en mano") || joined.contains("click derecho: quitar")) {
+            return modern.stream().map(line -> applyPlaceholders(line, ph)).collect(Collectors.toList());
+        }
+        return configured;
+    }
+
     private void handleSettingsClick(Player player, int slot, ClickType click) throws SQLException {
         Member member = requireMember(player); if (member == null) return;
         if (slot == nativeSlot("menus.settings.items.rename-name.slot", 10)) {
@@ -4744,7 +5035,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 beginDescriptionEdit(player);
             }
         }
-        else if (slot == nativeSlot("menus.settings.items.banner.slot", 13)) { player.closeInventory(); player.performCommand(click == ClickType.RIGHT ? "clan estandarte quitar" : "clan estandarte set"); }
+        else if (slot == nativeSlot("menus.settings.items.banner.slot", 13)) openBannerEditor(player);
         else if (slot == nativeSlot("menus.settings.items.permissions.slot", 14)) openPermissionsEditMenu(player, 1);
         else if (slot == nativeSlot("menus.settings.items.open.slot", 15)) { player.closeInventory(); Clan clan = getPlayerClan(player.getUniqueId()).orElseThrow(); player.performCommand("clan abierto " + (clan.open() ? "off" : "on")); }
         else if (slot == nativeSlot("menus.settings.items.disband.slot", 16)) { player.closeInventory(); msg(player, "&cPara disolver usa: &e/clan disolver confirmar"); }
@@ -6206,6 +6497,38 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         @Override public Inventory getInventory() { return null; }
     }
 
+    private static final class BannerEditorHolder implements InventoryHolder {
+        private final int clanId;
+        private final String originalBannerData;
+        private ItemStack submittedBanner;
+        private boolean completed;
+
+        private BannerEditorHolder(int clanId, String originalBannerData) {
+            this.clanId = clanId;
+            this.originalBannerData = originalBannerData;
+        }
+
+        @Override public Inventory getInventory() { return null; }
+    }
+
+    private static final class BannerViewHolder implements InventoryHolder {
+        private final int clanId;
+        private final ItemStack bannerTemplate;
+
+        private BannerViewHolder(int clanId, ItemStack bannerTemplate) {
+            this.clanId = clanId;
+            this.bannerTemplate = bannerTemplate.clone();
+        }
+
+        private ItemStack newCopy() {
+            ItemStack copy = bannerTemplate.clone();
+            copy.setAmount(1);
+            return copy;
+        }
+
+        @Override public Inventory getInventory() { return null; }
+    }
+
     public record Member(int clanId, UUID uuid, String name, int role, long joinedAt, boolean chatToggle) {}
 
     private record PendingTeleport(int taskId, Location start) {}
@@ -6373,19 +6696,22 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 String noClan = getConfig().getString("placeholders.no-clan", "");
                 if (memberOpt.isEmpty()) {
                     return switch (params.toLowerCase(Locale.ROOT)) {
+                        // Placeholder dedicado al chat: nunca muestra textos como "Sin clan".
+                        case "chat_prefix" -> "";
                         case "id", "name", "tag", "lpc_tag", "role", "role_number", "members", "member_count", "clan_members", "bank", "kills", "deaths", "strength", "tier", "tier_name", "max_members", "max_bases", "max_allies", "storage_slots", "storage_pages", "storage_display", "allies", "bases", "description", "description_plain", "description_line_1", "description_line_2", "description_line_3", "description_line_4", "description_line_5", "board", "board_plain", "board_line_1", "board_line_2", "board_line_3", "board_line_4", "board_line_5", "board_line_6", "board_line_7", "board_line_8", "board_line_9", "board_line_10", "is_in_clan" -> params.equalsIgnoreCase("is_in_clan") ? "false" : noClan;
                         default -> noClan;
                     };
                 }
                 Member member = memberOpt.get();
                 Optional<Clan> clanOpt = getClan(member.clanId());
-                if (clanOpt.isEmpty()) return noClan;
+                if (clanOpt.isEmpty()) return params.equalsIgnoreCase("chat_prefix") ? "" : noClan;
                 Clan clan = clanOpt.get();
                 return switch (params.toLowerCase(Locale.ROOT)) {
                     case "id" -> clan.tag();
                     case "name" -> clan.name();
                     case "tag" -> color(getConfig().getString("placeholders.tag-format", "&8[&b{id}&8]&r").replace("{id}", clan.tag()).replace("{name}", clan.name()));
                     case "lpc_tag" -> color(getConfig().getString("placeholders.lpc-tag-format", "&8[&b{id}&8]&r ").replace("{id}", clan.tag()).replace("{name}", clan.name()));
+                    case "chat_prefix" -> color(getConfig().getString("placeholders.chat-prefix-format", "&8[&6{id}&8]&r ").replace("{id}", clan.tag()).replace("{tag}", clan.tag()).replace("{name}", clan.name()));
                     case "role" -> getRoleName(clan.id(), member.role());
                     case "role_number" -> String.valueOf(member.role());
                     case "members", "member_count", "clan_members" -> String.valueOf(countMembers(clan.id()));

@@ -1,0 +1,12 @@
+MDVClans 1.10.16 - Copias ilimitadas del estandarte
+
+CAMBIOS
+- /clan banner ver y /clan estandarte ver vuelven a permitir obtener copias ilimitadas del estandarte oficial.
+- La vista ahora funciona como un dispensador seguro: cada clic en el banner central entrega una copia limpia y mantiene la vista previa.
+- Se bloquea introducir objetos, mover paneles o retirar físicamente la vista previa, evitando pérdidas y usos accidentales del inventario temporal.
+- Si el inventario del jugador está lleno, la copia cae de forma segura junto al jugador.
+- El editor /clan banner set conserva todas las protecciones de la 1.10.15.
+
+COMPATIBILIDAD
+- No modifica la base de datos ni la configuración existente.
+- No borres la carpeta plugins/MDVClans ni Data/clans.db al actualizar.

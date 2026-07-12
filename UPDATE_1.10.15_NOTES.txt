@@ -1,0 +1,18 @@
+MDVClans 1.10.15 - Editor seguro de estandarte
+
+- /clan banner set y /clan estandarte set ahora abren una UI de 9 slots.
+- El slot central acepta únicamente banners.
+- Si el clan ya tiene banner, se muestra como vista previa protegida.
+- El jugador puede colocar un banner desde el cursor o con shift-click.
+- Confirmar guarda el nuevo banner; cancelar devuelve el banner aportado y no cambia nada.
+- Cerrar la UI también devuelve cualquier banner aportado, evitando pérdidas.
+- El menú vuelve a Ajustes al confirmar o cancelar.
+- El botón de Ajustes ya no depende de llevar un banner en la mano.
+- /clan banner ver ahora usa una vista protegida para impedir duplicaciones.
+- /clan banner quitar se conserva para eliminar el estandarte oficial.
+- Incluye el placeholder de chat de 1.10.14 sin cambios.
+
+Actualización segura:
+- Reemplazar el JAR.
+- No borrar plugins/MDVClans ni Data/clans.db.
+- Los valores del nuevo menú tienen defaults internos, por lo que funciona incluso si NativeMenus/50-settings.yml existente no se reemplaza.

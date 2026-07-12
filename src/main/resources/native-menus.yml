@@ -1052,10 +1052,10 @@ menus:
         name: '&f&lCambiar banner'
         lore:
         - ''
-        - '&7Usa el banner en tu mano.'
+        - '&7Abre el editor de estandarte'
+        - '&7oficial del clan.'
         - ''
-        - '&eClick: guardar banner en mano'
-        - '&cClick derecho: quitar banner'
+        - '&eClick para abrir.'
       permissions:
         slot: 14
         material: KNOWLEDGE_BOOK
@@ -1104,6 +1104,32 @@ menus:
       target: gestion
       material: ARROW
       name: '&6&lVolver'
+  banner-editor:
+    title: '&8Cambiar estandarte &b{id}'
+    items:
+      cancel:
+        slot: 2
+        material: RED_STAINED_GLASS_PANE
+        name: '&c&lRechazar cambio'
+        lore:
+        - ''
+        - '&7No modifica el estandarte'
+        - '&7actual del clan.'
+        - ''
+        - '&eClick para volver.'
+      input:
+        slot: 4
+      confirm:
+        slot: 6
+        material: LIME_STAINED_GLASS_PANE
+        name: '&a&lConfirmar estandarte'
+        lore:
+        - ''
+        - '&7Coloca un estandarte en'
+        - '&7el espacio central.'
+        - ''
+        - '&eClick para confirmar.'
+
   role-settings:
     title: '&8Rangos &b{id}'
     role-item:

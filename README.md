@@ -65,3 +65,23 @@ También se parsea PlaceholderAPI en las cabezas de miembros después de reempla
 - Si dos clanes son enemigos, pedir alianza mantiene la enemistad activa hasta que el otro clan acepte.
 - Las solicitudes de paz usan correo de clan con tipo `NEUTRAL_REQUEST`.
 - El menú de correo puede mostrar botones `accept-neutral` y `reject-neutral` para aceptar o rechazar tratados de paz.
+
+## Placeholder de chat para LPC
+
+`%mdvclans_chat_prefix%` devuelve el bloque completo del clan usando `placeholders.chat-prefix-format`. Si el jugador no tiene clan, devuelve siempre una cadena vacía.
+
+Ejemplo LPC:
+
+```text
+%mdvsocial_title_prefix%%mdvclans_chat_prefix%&6&l{name}{suffix} &r&e» &f{message}
+```
+
+
+## 1.10.16 - Copias ilimitadas del estandarte
+- `/clan banner ver` funciona como dispensador seguro de copias del banner oficial.
+- Cada clic entrega una copia limpia y mantiene la vista previa en el menú.
+- El editor seguro de la 1.10.15 permanece sin cambios.
+
+## 1.10.15 - Editor seguro de estandarte
+
+`/clan banner set` abre una interfaz de 9 slots con entrada central exclusiva para banners, confirmación, cancelación y devolución segura del objeto si se cierra sin guardar.
