@@ -1,0 +1,5 @@
+MDVClans 1.10.19
+- El sufijo de nivel se aplica también a jugadores sin clan.
+- Los jugadores sin clan usan prefijo vacío configurable en nametags.formats.no-clan.
+- Nuevo nametags.skip-main-scoreboard para no reemplazar el scoreboard principal y evitar apagar AnimatedScoreboard durante el ingreso.
+- La lógica de relaciones y colores de clan se conserva.

@@ -6096,6 +6096,12 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         boolean forceIfMain = getConfig().getBoolean("nametags.force-personal-scoreboard-if-main", true);
         Scoreboard main = Bukkit.getScoreboardManager().getMainScoreboard();
 
+        boolean skipMain = getConfig().getBoolean("nametags.skip-main-scoreboard", true);
+        if ((current == null || current == main) && skipMain && !forcePersonal) {
+            // No reemplazar el scoreboard principal: plugins como AnimatedScoreboard
+            // todavía pueden estar preparando/asignando su scoreboard al jugador.
+            return null;
+        }
         if (forcePersonal || (forceIfMain && (current == null || current == main))) {
             Scoreboard personal = personalNametagBoards.computeIfAbsent(viewer.getUniqueId(), ignored -> Bukkit.getScoreboardManager().getNewScoreboard());
             if (current != personal) viewer.setScoreboard(personal);
@@ -6130,6 +6136,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         for (Player viewer : players) {
             try {
                 Scoreboard board = getViewerNametagScoreboard(viewer);
+                if (board == null) continue;
                 for (Player target : players) {
                     updateNametagFor(viewer, target, board, memberSnapshot, clanSnapshot, relationSnapshot, levelSnapshot);
                 }
@@ -6171,30 +6178,25 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private void updateNametagFor(Player viewer, Player target, Scoreboard board, Map<UUID, Member> memberSnapshot, Map<Integer, Clan> clanSnapshot, Map<String, String> relationSnapshot, Map<UUID, String> levelSnapshot) throws SQLException {
         String entry = target.getName();
         Member targetMember = memberSnapshot.get(target.getUniqueId());
-        if (targetMember == null) {
-            removeAppliedNametagTeam(viewer, board, entry);
-            return;
-        }
-        Clan targetClan = clanSnapshot.get(targetMember.clanId());
-        if (targetClan == null) {
-            removeAppliedNametagTeam(viewer, board, entry);
-            return;
-        }
+        Clan targetClan = targetMember == null ? null : clanSnapshot.get(targetMember.clanId());
 
-        Member viewerMember = memberSnapshot.get(viewer.getUniqueId());
-        int viewerClanId = viewerMember == null ? -1 : viewerMember.clanId();
-        String relationKey = viewerClanId + ":" + targetClan.id();
-        String relation = relationSnapshot.get(relationKey);
-        if (relation == null) {
-            relation = getRelationBetween(viewerClanId, targetClan.id());
-            relationSnapshot.put(relationKey, relation);
+        String formatKey = "no-clan";
+        if (targetClan != null) {
+            Member viewerMember = memberSnapshot.get(viewer.getUniqueId());
+            int viewerClanId = viewerMember == null ? -1 : viewerMember.clanId();
+            String relationKey = viewerClanId + ":" + targetClan.id();
+            String relation = relationSnapshot.get(relationKey);
+            if (relation == null) {
+                relation = getRelationBetween(viewerClanId, targetClan.id());
+                relationSnapshot.put(relationKey, relation);
+            }
+            formatKey = switch (relation) {
+                case "SAME" -> "same";
+                case REL_ALLY -> "ally";
+                case REL_ENEMY -> "enemy";
+                default -> "neutral";
+            };
         }
-        String formatKey = switch (relation) {
-            case "SAME" -> "same";
-            case REL_ALLY -> "ally";
-            case REL_ENEMY -> "enemy";
-            default -> "neutral";
-        };
 
         String compactUuid = target.getUniqueId().toString().replace("-", "");
         String teamName = "mdvc_" + formatKey.substring(0, Math.min(2, formatKey.length())) + "_" + compactUuid.substring(0, 8);
@@ -6226,9 +6228,14 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void ensureNametagTeam(Team team, String formatKey, Clan targetClan, String targetLevel) {
-        String prefix = color(getConfig().getString("nametags.formats." + formatKey, "&7[{id}] ")
-                .replace("{id}", targetClan.tag())
-                .replace("{name}", targetClan.name()));
+        String prefix = "";
+        if (targetClan != null) {
+            prefix = color(getConfig().getString("nametags.formats." + formatKey, "&7[{id}] ")
+                    .replace("{id}", targetClan.tag())
+                    .replace("{name}", targetClan.name()));
+        } else {
+            prefix = color(getConfig().getString("nametags.formats.no-clan", ""));
+        }
         String suffix = "";
         if (getConfig().getBoolean("nametags.level-suffix.enabled", true)) {
             String level = targetLevel == null ? "" : targetLevel.trim();

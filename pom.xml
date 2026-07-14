@@ -5,7 +5,7 @@
 
     <groupId>com.mdvcraft</groupId>
     <artifactId>MDVClans</artifactId>
-    <version>1.10.18</version>
+    <version>1.10.19</version>
     <packaging>jar</packaging>
 
     <name>MDVClans</name>
