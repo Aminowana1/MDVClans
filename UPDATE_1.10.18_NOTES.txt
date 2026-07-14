@@ -1,0 +1,14 @@
+MDVClans 1.10.18 - Salida de clan verificada y regreso a MDVSocial
+
+Cambios:
+- El botón Salir del clan en Ajustes llama directamente a la lógica interna.
+- Tras salir o disolver correctamente un clan de un único miembro, verifica en SQLite que el jugador ya no pertenezca al clan.
+- Solo después de confirmar el cambio abre directamente /social.
+- Si la eliminación falla, no redirige y muestra error; además deja detalle en consola.
+- El botón de salir del menú hub usa la misma ruta segura.
+- Todos los miembros siguen pudiendo abrir Ajustes; las acciones administrativas continúan limitadas por rango.
+
+Actualización:
+- Reemplazar únicamente el JAR.
+- No borrar Data/clans.db, config.yml, messages.yml ni NativeMenus.
+- No requiere claves nuevas en config.yml.

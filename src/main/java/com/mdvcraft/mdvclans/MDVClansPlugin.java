@@ -933,23 +933,33 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         logAction(member.clanId(), player, "ABIERTO", "Entrada " + (open ? "abierta" : "cerrada"));
     }
 
-    private void handleLeave(Player player) throws SQLException {
+    private boolean handleLeave(Player player) throws SQLException {
         Member member = requireMember(player);
-        if (member == null) return;
+        if (member == null) return false;
         Clan clan = getClan(member.clanId()).orElseThrow();
+
         if (member.role() >= maxRole()) {
             if (countMembers(clan.id()) > 1) {
                 msg(player, "&cEres líder. Pasa el liderazgo o disuelve el clan antes de salir.");
-                return;
+                return false;
             }
+
             disbandClan(clan.id());
+            if (getMember(player.getUniqueId()).isPresent() || getClan(clan.id()).isPresent()) {
+                throw new SQLException("El clan o su miembro líder siguen presentes después de disolver el clan " + clan.id());
+            }
             msg(player, "&cDisolviste tu clan al salir.");
-            return;
+            return true;
         }
+
         logAction(clan.id(), player, "SALIR", player.getName() + " salió del clan.");
         removeMember(player.getUniqueId());
+        if (getMember(player.getUniqueId()).isPresent()) {
+            throw new SQLException("El miembro sigue presente después de salir del clan " + clan.id());
+        }
         msg(player, "&aSaliste del clan.");
         broadcastToClan(clan.id(), "&e" + player.getName() + " &7salió del clan.");
+        return true;
     }
 
     private void handleKick(Player player, String[] args) throws SQLException {
@@ -4916,7 +4926,19 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         else if (slot == nativeSlot("menus.hub.items.storage.slot", 13)) openStorageHubMenu(player);
         else if (slot == nativeSlot("menus.hub.items.base.slot", 14)) openBasesMenu(player);
         else if (slot == nativeSlot("menus.hub.items.clan-list.slot", 15)) openClanListMenu(player, 1);
-        else if (slot == nativeSlot("menus.hub.items.leave.slot", 16)) { player.closeInventory(); player.performCommand("clan salir"); }
+        else if (slot == nativeSlot("menus.hub.items.leave.slot", 16)) {
+            runAfterGuiClick(player, () -> {
+                player.closeInventory();
+                try {
+                    if (handleLeave(player)) {
+                        Bukkit.getScheduler().runTaskLater(this, () -> player.performCommand("social"), 1L);
+                    }
+                } catch (SQLException e) {
+                    getLogger().warning("No se pudo procesar la salida del clan de " + player.getName() + ": " + e.getMessage());
+                    msg(player, "&cNo se pudo salir del clan. Inténtalo nuevamente.");
+                }
+            });
+        }
         else if (slot == nativeSlot("menus.hub.items.settings.slot", 17)) openSettingsMenu(player);
         else if (slot == nativeSlot("menus.hub.items.close.slot", 26)) player.closeInventory();
     }
@@ -5058,7 +5080,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             runAfterGuiClick(player, () -> {
                 player.closeInventory();
                 try {
-                    handleLeave(player);
+                    if (handleLeave(player)) {
+                        Bukkit.getScheduler().runTaskLater(this, () -> player.performCommand("social"), 1L);
+                    }
                 } catch (SQLException e) {
                     getLogger().warning("No se pudo procesar la salida del clan de " + player.getName() + ": " + e.getMessage());
                     msg(player, "&cNo se pudo salir del clan. Inténtalo nuevamente.");
