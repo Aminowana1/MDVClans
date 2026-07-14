@@ -6093,13 +6093,11 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         if (current == null || Bukkit.getScoreboardManager() == null) return current;
 
         Scoreboard main = Bukkit.getScoreboardManager().getMainScoreboard();
-        boolean compatibility = getConfig().getBoolean("nametags.animated-scoreboard-compatibility.enabled", true);
 
-        // AnimatedScoreboard suele asignar su propio scoreboard unos ticks después del join.
-        // Si todavía está usando el scoreboard principal, MDVClans no lo reemplaza: espera al
-        // siguiente refresco. Esto evita borrar/desactivar el SIDEBAR.
-        if (compatibility && current == main) return null;
-
+        // El modo de compatibilidad con AnimatedScoreboard ya no altera esta lógica.
+        // Los nametags conservan exactamente el comportamiento clásico configurado abajo.
+        // La compatibilidad solo fuerza el scoreboard visible al entrar mediante un comando
+        // seguro (por defecto: /asb toggle on {player}).
         boolean forcePersonal = getConfig().getBoolean("nametags.force-personal-scoreboard", false);
         boolean forceIfMain = getConfig().getBoolean("nametags.force-personal-scoreboard-if-main", false);
         if (forcePersonal || (forceIfMain && current == main)) {
@@ -6153,11 +6151,30 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoinNametag(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
         long first = Math.max(20L, getConfig().getLong("nametags.animated-scoreboard-compatibility.join-delay-ticks", 60L));
-        requestNametagSync(first);
+
+        if (getConfig().getBoolean("nametags.animated-scoreboard-compatibility.enabled", false)) {
+            String command = getConfig().getString(
+                    "nametags.animated-scoreboard-compatibility.join-command",
+                    "asb toggle on {player}"
+            );
+            if (command != null && !command.isBlank()) {
+                String finalCommand = command.replace("{player}", player.getName());
+                if (finalCommand.startsWith("/")) finalCommand = finalCommand.substring(1);
+                String commandToRun = finalCommand;
+                Bukkit.getScheduler().runTaskLater(this, () -> {
+                    if (!player.isOnline()) return;
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), commandToRun);
+                }, first);
+            }
+        }
+
+        // Sincroniza los prefijos/sufijos después de que AnimatedScoreboard haya sido forzado ON.
+        requestNametagSync(first + 5L);
         requestNametagSync(first + 40L);
-        scheduleProfileCacheUpdate(event.getPlayer(), 20L);
-        scheduleProfileCacheUpdate(event.getPlayer(), Math.max(40L, getConfig().getLong("profile-cache.update-on-join-delay-ticks", 80L)));
+        scheduleProfileCacheUpdate(player, 20L);
+        scheduleProfileCacheUpdate(player, Math.max(40L, getConfig().getLong("profile-cache.update-on-join-delay-ticks", 80L)));
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

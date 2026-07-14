@@ -200,14 +200,16 @@ nametags:
   enabled: true
   update-interval-ticks: 200
 
-  # Compatibilidad segura: espera a que AnimatedScoreboard asigne su scoreboard
-  # y nunca reemplaza el scoreboard principal mientras tanto.
+  # Compatibilidad simple con AnimatedScoreboard.
+  # Al entrar, ejecuta una sola vez desde consola el comando configurado.
+  # "toggle on" fuerza el scoreboard encendido y no lo apaga si ya estaba activo.
   animated-scoreboard-compatibility:
     enabled: true
     join-delay-ticks: 60
+    join-command: 'asb toggle on {player}'
 
-  # Mantener ambos en false con AnimatedScoreboard.
-  force-personal-scoreboard-if-main: false
+  # Mantiene el sistema clásico de nametags que funciona con tus relaciones.
+  force-personal-scoreboard-if-main: true
   force-personal-scoreboard: false
 
   formats:

@@ -1,0 +1,18 @@
+MDVClans 1.10.22 - Compatibilidad AnimatedScoreboard por comando seguro al ingresar
+
+Cambios:
+- El sistema de nametags vuelve a conservar exactamente la lógica clásica de scoreboards personales.
+- animated-scoreboard-compatibility ya no bloquea ni modifica la aplicación de tags.
+- Si está activado, al ingresar ejecuta una sola vez desde consola:
+  asb toggle on {player}
+- El comando y el retraso son configurables.
+- Después del comando, MDVClans sincroniza prefijo de clan y sufijo de nivel.
+
+Config:
+nametags:
+  animated-scoreboard-compatibility:
+    enabled: true
+    join-delay-ticks: 60
+    join-command: 'asb toggle on {player}'
+  force-personal-scoreboard-if-main: true
+  force-personal-scoreboard: false
