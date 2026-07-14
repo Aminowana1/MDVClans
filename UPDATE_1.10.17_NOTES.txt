@@ -1,0 +1,21 @@
+MDVClans 1.10.17 - Salir, cooldown de estandartes y nivel MMOCore en nametags
+
+Cambios:
+- El botón Salir del clan en Ajustes ahora llama directamente a la lógica de salida después de cerrar la GUI, evitando que el comando se pierda durante InventoryClickEvent.
+- Todos los miembros del clan pueden seguir abriendo Ajustes; las acciones administrativas continúan bloqueadas individualmente por permisos de rango.
+- Se añadió cooldown configurable para sacar copias del estandarte desde el visualizador.
+- Se añadió un sufijo individual configurable con el nivel principal de MMOCore en el nametag.
+- Los teams de nametag ahora son individuales por jugador, porque el nivel no puede compartirse entre todos los miembros del mismo clan.
+
+Agregar manualmente a config.yml:
+
+nametags:
+  level-suffix:
+    enabled: true
+    format: ' &a[&2{level}&a]'
+
+banners:
+  copy-cooldown-seconds: 10
+  copy-cooldown-message: '&cDebes esperar &e{seconds}s &cantes de sacar otro estandarte.'
+
+No borrar Data/clans.db ni la carpeta del plugin.

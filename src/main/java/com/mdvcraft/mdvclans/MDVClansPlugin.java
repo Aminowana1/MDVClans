@@ -124,6 +124,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private final Map<UUID, String> currentLogFilter = new ConcurrentHashMap<>();
     private final Map<UUID, Scoreboard> personalNametagBoards = new ConcurrentHashMap<>();
     private final Map<UUID, Map<String, String>> nametagAppliedTeams = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> bannerCopyCooldowns = new ConcurrentHashMap<>();
     private final Map<UUID, String> currentNativeMenu = new ConcurrentHashMap<>();
     private final Map<UUID, String> previousNativeMenu = new ConcurrentHashMap<>();
     private final Set<UUID> suppressHistoryOnce = ConcurrentHashMap.newKeySet();
@@ -1700,8 +1701,11 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                             ? new ArrayList<>(previewMeta.getLore())
                             : new ArrayList<>();
                     lore.add("");
+                    int cooldownSeconds = Math.max(0, getConfig().getInt("banners.copy-cooldown-seconds", 10));
                     lore.add(color("&eHaz clic para obtener una copia."));
-                    lore.add(color("&7Puedes sacar todas las que necesites."));
+                    lore.add(color(cooldownSeconds > 0
+                            ? "&7Espera &f" + cooldownSeconds + "s &7entre cada copia."
+                            : "&7Puedes sacar todas las que necesites."));
                     previewMeta.setLore(lore);
                     preview.setItemMeta(previewMeta);
                 }
@@ -2108,7 +2112,17 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 event.setCancelled(true);
             }
             if (clickedTop && event.getSlot() == BANNER_EDITOR_INPUT_SLOT) {
+                long cooldownMillis = Math.max(0L, getConfig().getLong("banners.copy-cooldown-seconds", 10L)) * 1000L;
+                long now = System.currentTimeMillis();
+                long availableAt = bannerCopyCooldowns.getOrDefault(player.getUniqueId(), 0L);
+                if (cooldownMillis > 0L && now < availableAt) {
+                    long remaining = Math.max(1L, (availableAt - now + 999L) / 1000L);
+                    String message = getConfig().getString("banners.copy-cooldown-message", "&cDebes esperar &e{seconds}s &cantes de sacar otro estandarte.");
+                    msg(player, message.replace("{seconds}", String.valueOf(remaining)));
+                    return;
+                }
                 giveItemSafely(player, bannerHolder.newCopy());
+                if (cooldownMillis > 0L) bannerCopyCooldowns.put(player.getUniqueId(), now + cooldownMillis);
                 player.updateInventory();
             }
             return;
@@ -5040,7 +5054,17 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         else if (slot == nativeSlot("menus.settings.items.open.slot", 15)) { player.closeInventory(); Clan clan = getPlayerClan(player.getUniqueId()).orElseThrow(); player.performCommand("clan abierto " + (clan.open() ? "off" : "on")); }
         else if (slot == nativeSlot("menus.settings.items.disband.slot", 16)) { player.closeInventory(); msg(player, "&cPara disolver usa: &e/clan disolver confirmar"); }
         else if (slot == nativeSlot("menus.settings.items.tier-upgrade.slot", 20)) { handleTierUpgrade(player); openSettingsMenu(player); }
-        else if (nativeSection("menus.settings.items.leave") != null && slot == nativeSlot("menus.settings.items.leave.slot", 24)) { player.closeInventory(); player.performCommand("clan salir"); }
+        else if (nativeSection("menus.settings.items.leave") != null && slot == nativeSlot("menus.settings.items.leave.slot", 24)) {
+            runAfterGuiClick(player, () -> {
+                player.closeInventory();
+                try {
+                    handleLeave(player);
+                } catch (SQLException e) {
+                    getLogger().warning("No se pudo procesar la salida del clan de " + player.getName() + ": " + e.getMessage());
+                    msg(player, "&cNo se pudo salir del clan. Inténtalo nuevamente.");
+                }
+            });
+        }
     }
 
 
@@ -6061,8 +6085,10 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         Map<UUID, Member> memberSnapshot = new HashMap<>();
         Map<Integer, Clan> clanSnapshot = new HashMap<>();
         Map<String, String> relationSnapshot = new HashMap<>();
+        Map<UUID, String> levelSnapshot = new HashMap<>();
 
         for (Player player : players) {
+            levelSnapshot.put(player.getUniqueId(), resolveNametagLevel(player));
             try {
                 Optional<Member> memberOpt = getMember(player.getUniqueId());
                 if (memberOpt.isPresent()) {
@@ -6081,7 +6107,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             try {
                 Scoreboard board = getViewerNametagScoreboard(viewer);
                 for (Player target : players) {
-                    updateNametagFor(viewer, target, board, memberSnapshot, clanSnapshot, relationSnapshot);
+                    updateNametagFor(viewer, target, board, memberSnapshot, clanSnapshot, relationSnapshot, levelSnapshot);
                 }
             } catch (Exception e) {
                 getLogger().warning("Error actualizando nametags: " + e.getMessage());
@@ -6109,6 +6135,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         personalNametagBoards.remove(event.getPlayer().getUniqueId());
         nametagAppliedTeams.remove(event.getPlayer().getUniqueId());
         nametagAppliedTeams.values().forEach(map -> map.remove(event.getPlayer().getName()));
+        bannerCopyCooldowns.remove(event.getPlayer().getUniqueId());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -6117,7 +6144,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         requestNametagSync(30L);
     }
 
-    private void updateNametagFor(Player viewer, Player target, Scoreboard board, Map<UUID, Member> memberSnapshot, Map<Integer, Clan> clanSnapshot, Map<String, String> relationSnapshot) throws SQLException {
+    private void updateNametagFor(Player viewer, Player target, Scoreboard board, Map<UUID, Member> memberSnapshot, Map<Integer, Clan> clanSnapshot, Map<String, String> relationSnapshot, Map<UUID, String> levelSnapshot) throws SQLException {
         String entry = target.getName();
         Member targetMember = memberSnapshot.get(target.getUniqueId());
         if (targetMember == null) {
@@ -6145,15 +6172,17 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             default -> "neutral";
         };
 
-        String teamName = ("mdvc_" + formatKey.substring(0, Math.min(2, formatKey.length())) + "_" + targetClan.id());
+        String compactUuid = target.getUniqueId().toString().replace("-", "");
+        String teamName = "mdvc_" + formatKey.substring(0, Math.min(2, formatKey.length())) + "_" + compactUuid.substring(0, 8);
         if (teamName.length() > 16) teamName = teamName.substring(0, 16);
+        String targetLevel = levelSnapshot.getOrDefault(target.getUniqueId(), "");
 
         Map<String, String> viewerApplied = nametagAppliedTeams.computeIfAbsent(viewer.getUniqueId(), ignored -> new ConcurrentHashMap<>());
         String previousTeam = viewerApplied.get(entry);
         if (teamName.equals(previousTeam)) {
             Team existing = board.getTeam(teamName);
             if (existing != null && existing.hasEntry(entry)) {
-                ensureNametagTeam(existing, formatKey, targetClan);
+                ensureNametagTeam(existing, formatKey, targetClan, targetLevel);
                 return;
             }
         }
@@ -6167,18 +6196,38 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
         Team team = board.getTeam(teamName);
         if (team == null) team = board.registerNewTeam(teamName);
-        ensureNametagTeam(team, formatKey, targetClan);
+        ensureNametagTeam(team, formatKey, targetClan, targetLevel);
         if (!team.hasEntry(entry)) team.addEntry(entry);
         viewerApplied.put(entry, teamName);
     }
 
-    private void ensureNametagTeam(Team team, String formatKey, Clan targetClan) {
+    private void ensureNametagTeam(Team team, String formatKey, Clan targetClan, String targetLevel) {
         String prefix = color(getConfig().getString("nametags.formats." + formatKey, "&7[{id}] ")
                 .replace("{id}", targetClan.tag())
                 .replace("{name}", targetClan.name()));
+        String suffix = "";
+        if (getConfig().getBoolean("nametags.level-suffix.enabled", true)) {
+            String level = targetLevel == null ? "" : targetLevel.trim();
+            if (!level.isBlank()) {
+                suffix = color(getConfig().getString("nametags.level-suffix.format", " &a[&2{level}&a]")
+                        .replace("{level}", level)
+                        .replace("%level%", level)
+                        .replace("%nivel%", level));
+            }
+        }
         if (!prefix.equals(team.getPrefix())) team.setPrefix(prefix);
-        if (!team.getSuffix().isEmpty()) team.setSuffix("");
+        if (!suffix.equals(team.getSuffix())) team.setSuffix(suffix);
         try { team.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.ALWAYS); } catch (Throwable ignored) { }
+    }
+
+    private String resolveNametagLevel(Player player) {
+        if (player == null || !getConfig().getBoolean("nametags.level-suffix.enabled", true)) return "";
+        String level = firstPapi(player, papiPlaceholderList("integrations.mmocore.level-placeholders", List.of("%mmocore_level%")));
+        if (level.isBlank()) level = resolveMMOCoreProfile(player).level();
+        if (level == null) return "";
+        String clean = ChatColor.stripColor(color(level)).trim();
+        if (clean.isBlank() || clean.equalsIgnoreCase("Sin datos")) return "";
+        return clean;
     }
 
     private void removeAppliedNametagTeam(Player viewer, Scoreboard board, String entry) {

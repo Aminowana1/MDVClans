@@ -1,9 +1,9 @@
 name: MDVClans
-version: 1.10.16
+version: 1.10.17
 main: com.mdvcraft.mdvclans.MDVClansPlugin
 api-version: '1.21'
 author: MDVCRAFT
-softdepend: [Vault, PlaceholderAPI, MDVSocial, LPC]
+softdepend: [Vault, PlaceholderAPI, MDVSocial, LPC, MMOCore]
 commands:
   clan:
     description: Sistema de clanes de MDVCRAFT.

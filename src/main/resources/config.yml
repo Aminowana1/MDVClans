@@ -208,6 +208,11 @@ nametags:
     ally: '&9[{id}] '
     enemy: '&c[{id}] '
     neutral: '&7[{id}] '
+  # Sufijo individual mostrado después del nombre de cada jugador.
+  # Usa el nivel principal de MMOCore. Placeholders: {level}, %level%, %nivel%.
+  level-suffix:
+    enabled: true
+    format: ' &a[&2{level}&a]'
 
 placeholders:
   no-clan: ''
@@ -262,3 +267,6 @@ gui:
 banners:
   # Oculta en los banners del clan el tooltip de patrones/ingredientes.
   hide-patterns: true
+  # Espera entre cada copia retirada desde /clan estandarte ver.
+  copy-cooldown-seconds: 10
+  copy-cooldown-message: '&cDebes esperar &e{seconds}s &cantes de sacar otro estandarte.'
