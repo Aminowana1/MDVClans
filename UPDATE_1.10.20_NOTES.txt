@@ -1,0 +1,6 @@
+MDVClans 1.10.20
+- Corrige compatibilidad con AnimatedScoreboard.
+- MDVClans ya no crea un scoreboard personal, no ignora el scoreboard principal y no reemplaza el SIDEBAR.
+- Los teams de prefijo de clan y sufijo de nivel se aplican sobre el scoreboard actualmente asignado al observador.
+- El sufijo de nivel continúa mostrándose aunque el objetivo no pertenezca a un clan.
+- Las opciones antiguas force-personal-scoreboard, force-personal-scoreboard-if-main y skip-main-scoreboard quedan sin efecto práctico.

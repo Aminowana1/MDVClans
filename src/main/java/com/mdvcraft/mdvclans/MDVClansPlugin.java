@@ -6089,25 +6089,15 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private Scoreboard getViewerNametagScoreboard(Player viewer) {
+        // Nunca reemplazar ni ignorar el scoreboard activo del jugador.
+        // AnimatedScoreboard administra el SIDEBAR y normalmente entrega un
+        // scoreboard personal. MDVClans solo agrega/actualiza sus teams sobre
+        // ese mismo scoreboard, conservando el sidebar existente.
         Scoreboard current = viewer.getScoreboard();
-        if (Bukkit.getScoreboardManager() == null) return current;
-
-        boolean forcePersonal = getConfig().getBoolean("nametags.force-personal-scoreboard", false);
-        boolean forceIfMain = getConfig().getBoolean("nametags.force-personal-scoreboard-if-main", true);
-        Scoreboard main = Bukkit.getScoreboardManager().getMainScoreboard();
-
-        boolean skipMain = getConfig().getBoolean("nametags.skip-main-scoreboard", true);
-        if ((current == null || current == main) && skipMain && !forcePersonal) {
-            // No reemplazar el scoreboard principal: plugins como AnimatedScoreboard
-            // todavía pueden estar preparando/asignando su scoreboard al jugador.
-            return null;
-        }
-        if (forcePersonal || (forceIfMain && (current == null || current == main))) {
-            Scoreboard personal = personalNametagBoards.computeIfAbsent(viewer.getUniqueId(), ignored -> Bukkit.getScoreboardManager().getNewScoreboard());
-            if (current != personal) viewer.setScoreboard(personal);
-            return personal;
-        }
-        return current;
+        if (current != null) return current;
+        return Bukkit.getScoreboardManager() == null
+                ? null
+                : Bukkit.getScoreboardManager().getMainScoreboard();
     }
 
     private void syncNametags() {
