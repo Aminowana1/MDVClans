@@ -199,19 +199,25 @@ top:
 nametags:
   enabled: true
   update-interval-ticks: 200
-  # Necesario cuando el scoreboard principal es compartido; evita que los colores se mezclen entre jugadores.
+
+  # Compatibilidad segura: espera a que AnimatedScoreboard asigne su scoreboard
+  # y nunca reemplaza el scoreboard principal mientras tanto.
+  animated-scoreboard-compatibility:
+    enabled: true
+    join-delay-ticks: 60
+
+  # Mantener ambos en false con AnimatedScoreboard.
   force-personal-scoreboard-if-main: false
-  # No reemplaza el scoreboard principal mientras AnimatedScoreboard lo prepara.
-  skip-main-scoreboard: true
-  # Más fuerte: fuerza scoreboard personal siempre. Úsalo solo si otro plugin no te rompe el sidebar.
   force-personal-scoreboard: false
+
   formats:
     same: '&a[{id}] '
     ally: '&9[{id}] '
     enemy: '&c[{id}] '
     neutral: '&7[{id}] '
-  # Sufijo individual mostrado después del nombre de cada jugador.
-  # Usa el nivel principal de MMOCore. Placeholders: {level}, %level%, %nivel%.
+    no-clan: ''
+
+  # Se muestra siempre, tenga o no tenga clan.
   level-suffix:
     enabled: true
     format: ' &a[&2{level}&a]'

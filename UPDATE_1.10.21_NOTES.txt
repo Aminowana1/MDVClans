@@ -1,0 +1,19 @@
+MDVClans 1.10.21 - Nametags agrupados + nivel + compatibilidad AnimatedScoreboard
+
+- Restaura el sistema agrupado de nametags de 1.10.16.
+- Conserva colores por relación: same/ally/enemy/neutral.
+- Jugadores sin clan usan prefijo vacío configurable en formats.no-clan.
+- El sufijo de nivel se aplica a todos los jugadores, tengan clan o no.
+- Los teams se agrupan por relación + clan + nivel, porque un team comparte prefijo/sufijo.
+- No reemplaza el scoreboard principal cuando AnimatedScoreboard aún no está listo.
+- Añade retraso configurable al entrar para evitar que desaparezca el SIDEBAR.
+
+Config nueva/recomendada:
+nametags:
+  animated-scoreboard-compatibility:
+    enabled: true
+    join-delay-ticks: 60
+  force-personal-scoreboard-if-main: false
+  force-personal-scoreboard: false
+  formats:
+    no-clan: ''

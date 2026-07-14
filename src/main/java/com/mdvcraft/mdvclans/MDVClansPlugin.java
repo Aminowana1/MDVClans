@@ -6089,15 +6089,25 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private Scoreboard getViewerNametagScoreboard(Player viewer) {
-        // Nunca reemplazar ni ignorar el scoreboard activo del jugador.
-        // AnimatedScoreboard administra el SIDEBAR y normalmente entrega un
-        // scoreboard personal. MDVClans solo agrega/actualiza sus teams sobre
-        // ese mismo scoreboard, conservando el sidebar existente.
         Scoreboard current = viewer.getScoreboard();
-        if (current != null) return current;
-        return Bukkit.getScoreboardManager() == null
-                ? null
-                : Bukkit.getScoreboardManager().getMainScoreboard();
+        if (current == null || Bukkit.getScoreboardManager() == null) return current;
+
+        Scoreboard main = Bukkit.getScoreboardManager().getMainScoreboard();
+        boolean compatibility = getConfig().getBoolean("nametags.animated-scoreboard-compatibility.enabled", true);
+
+        // AnimatedScoreboard suele asignar su propio scoreboard unos ticks después del join.
+        // Si todavía está usando el scoreboard principal, MDVClans no lo reemplaza: espera al
+        // siguiente refresco. Esto evita borrar/desactivar el SIDEBAR.
+        if (compatibility && current == main) return null;
+
+        boolean forcePersonal = getConfig().getBoolean("nametags.force-personal-scoreboard", false);
+        boolean forceIfMain = getConfig().getBoolean("nametags.force-personal-scoreboard-if-main", false);
+        if (forcePersonal || (forceIfMain && current == main)) {
+            Scoreboard personal = personalNametagBoards.computeIfAbsent(viewer.getUniqueId(), ignored -> Bukkit.getScoreboardManager().getNewScoreboard());
+            if (current != personal) viewer.setScoreboard(personal);
+            return personal;
+        }
+        return current;
     }
 
     private void syncNametags() {
@@ -6136,8 +6146,6 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
     }
 
-
-
     private void requestNametagSync(long delayTicks) {
         if (!getConfig().getBoolean("nametags.enabled", true)) return;
         Bukkit.getScheduler().runTaskLater(this, this::syncNametags, Math.max(1L, delayTicks));
@@ -6145,8 +6153,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoinNametag(PlayerJoinEvent event) {
-        requestNametagSync(10L);
-        requestNametagSync(40L);
+        long first = Math.max(20L, getConfig().getLong("nametags.animated-scoreboard-compatibility.join-delay-ticks", 60L));
+        requestNametagSync(first);
+        requestNametagSync(first + 40L);
         scheduleProfileCacheUpdate(event.getPlayer(), 20L);
         scheduleProfileCacheUpdate(event.getPlayer(), Math.max(40L, getConfig().getLong("profile-cache.update-on-join-delay-ticks", 80L)));
     }
@@ -6161,11 +6170,15 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerRespawnNametag(PlayerRespawnEvent event) {
-        requestNametagSync(5L);
-        requestNametagSync(30L);
+        requestNametagSync(10L);
+        requestNametagSync(40L);
     }
 
-    private void updateNametagFor(Player viewer, Player target, Scoreboard board, Map<UUID, Member> memberSnapshot, Map<Integer, Clan> clanSnapshot, Map<String, String> relationSnapshot, Map<UUID, String> levelSnapshot) throws SQLException {
+    private void updateNametagFor(Player viewer, Player target, Scoreboard board,
+                                  Map<UUID, Member> memberSnapshot,
+                                  Map<Integer, Clan> clanSnapshot,
+                                  Map<String, String> relationSnapshot,
+                                  Map<UUID, String> levelSnapshot) throws SQLException {
         String entry = target.getName();
         Member targetMember = memberSnapshot.get(target.getUniqueId());
         Clan targetClan = targetMember == null ? null : clanSnapshot.get(targetMember.clanId());
@@ -6188,10 +6201,14 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             };
         }
 
-        String compactUuid = target.getUniqueId().toString().replace("-", "");
-        String teamName = "mdvc_" + formatKey.substring(0, Math.min(2, formatKey.length())) + "_" + compactUuid.substring(0, 8);
+        String targetLevel = levelSnapshot.getOrDefault(target.getUniqueId(), "").trim();
+        // Se conserva el sistema agrupado de 1.10.16. El nivel forma parte de la clave
+        // porque un Team comparte prefijo y sufijo entre todos sus miembros.
+        String groupBase = formatKey + ":" + (targetClan == null ? 0 : targetClan.id()) + ":" + targetLevel;
+        String compactHash = Integer.toUnsignedString(groupBase.hashCode(), 36);
+        String shortKey = formatKey.equals("no-clan") ? "nc" : formatKey.substring(0, Math.min(2, formatKey.length()));
+        String teamName = "mdvc_" + shortKey + "_" + compactHash;
         if (teamName.length() > 16) teamName = teamName.substring(0, 16);
-        String targetLevel = levelSnapshot.getOrDefault(target.getUniqueId(), "");
 
         Map<String, String> viewerApplied = nametagAppliedTeams.computeIfAbsent(viewer.getUniqueId(), ignored -> new ConcurrentHashMap<>());
         String previousTeam = viewerApplied.get(entry);
@@ -6218,14 +6235,15 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void ensureNametagTeam(Team team, String formatKey, Clan targetClan, String targetLevel) {
-        String prefix = "";
-        if (targetClan != null) {
+        String prefix;
+        if (targetClan == null) {
+            prefix = color(getConfig().getString("nametags.formats.no-clan", ""));
+        } else {
             prefix = color(getConfig().getString("nametags.formats." + formatKey, "&7[{id}] ")
                     .replace("{id}", targetClan.tag())
                     .replace("{name}", targetClan.name()));
-        } else {
-            prefix = color(getConfig().getString("nametags.formats.no-clan", ""));
         }
+
         String suffix = "";
         if (getConfig().getBoolean("nametags.level-suffix.enabled", true)) {
             String level = targetLevel == null ? "" : targetLevel.trim();
@@ -6236,6 +6254,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                         .replace("%nivel%", level));
             }
         }
+
         if (!prefix.equals(team.getPrefix())) team.setPrefix(prefix);
         if (!suffix.equals(team.getSuffix())) team.setSuffix(suffix);
         try { team.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.ALWAYS); } catch (Throwable ignored) { }
@@ -6260,7 +6279,6 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
     }
 
-
     private void removeFromMDVTeams(Scoreboard board, String entry) {
         for (Team team : board.getTeams()) {
             if (team.getName().startsWith("mdvc") && team.hasEntry(entry)) {
@@ -6268,7 +6286,6 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             }
         }
     }
-
 
     private synchronized void setClanName(int clanId, String name) throws SQLException {
         try (PreparedStatement ps = connection.prepareStatement("UPDATE clans SET name=? WHERE id=?")) {
