@@ -20,8 +20,8 @@ creation:
   duplicate-id: '&cYa existe un clan con ese ID.'
   duplicate-name: '&cYa existe un clan con ese nombre.'
   created: '&aClan creado: &8[&b{id}&8] &f{name}'
-  chat-name-prompt: '&7Escribe el &enombre completo &7del clan. Ejemplo: &fMedieval Craft&7. Escribe &ccancelar &7para cancelar.'
-  chat-id-prompt: '&7Ahora escribe el &eID/tag &7del clan. Ejemplo: &bMDV&7. Escribe &ccancelar &7para cancelar.'
+  chat-name-prompt: '&7Escribe el &enombre completo &7del clan. No se permiten colores ni formatos. Ejemplo: &fMedieval Craft&7. Escribe &ccancelar &7para cancelar.'
+  chat-id-prompt: '&7Ahora escribe el &eID/tag &7del clan. Solo letras y números, sin colores ni formatos. Ejemplo: &bMDV&7. Escribe &ccancelar &7para cancelar.'
 
 edit:
   name-prompt: '&7Escribe el nuevo &enombre &7del clan. Escribe &ccancelar &7para cancelar.'

@@ -1,0 +1,15 @@
+MDVClans 1.10.23
+
+- Los nombres e IDs de clan ya no aceptan & ni §, colores, formatos o caracteres de control.
+- Al iniciar, los clanes existentes se limpian automáticamente: se eliminan códigos como &c, &k, §c y formatos hex.
+- Si la limpieza genera nombres/IDs duplicados o vacíos, el plugin crea una variante segura y única.
+- El nombre visible del clan cambia automáticamente por tier:
+  Tier 1 / interno 0: &a verde claro
+  Tier 2 / interno 1: &2 verde oscuro
+  Tier 3 / interno 2: &9 azul
+  Tier 4 / interno 3: &5 morado
+  Tier 5 / interno 4: &e amarillo
+- El color automático se aplica a listas, rankings, información, menús y el placeholder de nombre.
+- El ID/tag no cambia de color por tier.
+- Los nametags mantienen exactamente su formato configurable anterior.
+- Nuevos placeholders plain: {name_plain}, {clan_name_plain}, %mdvclans_name_plain% y variantes _of_.

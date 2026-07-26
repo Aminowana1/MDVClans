@@ -1,4 +1,4 @@
-# MDVClans 1.10.5
+# MDVClans 1.10.23
 
 Actualización de tiers/progreso de clanes para MDVCRAFT.
 
@@ -19,7 +19,16 @@ Actualización de tiers/progreso de clanes para MDVCRAFT.
 mvn clean package
 ```
 
-El jar queda en `target/MDVClans-1.10.5.jar`.
+El jar queda en `target/MDVClans-1.10.23.jar`.
+
+## 1.10.23 - Nombres seguros y color por tier
+
+- El nombre y el ID/tag del clan ya no aceptan `&`, `§`, colores, formatos ni caracteres de control.
+- Los clanes existentes se limpian automáticamente al iniciar.
+- El nombre visible cambia por tier: T1 `&a`, T2 `&2`, T3 `&9`, T4 `&5`, T5 `&e`.
+- El color se aplica en listas, rankings, información, menús y `%mdvclans_name%`.
+- El nametag, el ID/tag y el prefijo de chat conservan su comportamiento anterior.
+- `%mdvclans_name_plain%` devuelve el nombre sin color.
 
 
 

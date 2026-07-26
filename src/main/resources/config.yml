@@ -26,6 +26,16 @@ creation:
   name-max: 19
   id-regex: '^[A-Za-z0-9]+$'
 
+# Color automático del nombre visible según el tier interno del clan.
+# Tier interno 0 = Tier visible 1, hasta tier interno 4 = Tier visible 5.
+# Solo afecta el nombre mostrado en listas, menús e información; el nametag conserva su formato actual.
+clan-name-colors:
+  '0': '&a' # Tier 1: verde claro
+  '1': '&2' # Tier 2: verde oscuro
+  '2': '&9' # Tier 3: azul
+  '3': '&5' # Tier 4: morado
+  '4': '&e' # Tier 5: amarillo
+
 
 clan-description:
   enabled: true
@@ -229,7 +239,7 @@ placeholders:
   # Texto usado para placeholders de otro jugador, por ejemplo %mdvclans_clan_line_of_Jugador%.
   other-no-clan: '&8Sin clan'
   # Formato para %mdvclans_clan_line_of_<jugador>%.
-  # Placeholders disponibles: {id}, {tag}, {name}, {tier}, {tier_name}, {role}, {role_number}, {members}, {max_members}
+  # Placeholders disponibles: {id}, {tag}, {name}, {name_plain}, {tier}, {tier_name}, {role}, {role_number}, {members}, {max_members}
   clan-line-format: '&5{tier_name} &8- &f{name} &8[&6{id}&8]'
   tag-format: '&8[&b{id}&8]&r'
   lpc-tag-format: '&8[&b{id}&8]&r '

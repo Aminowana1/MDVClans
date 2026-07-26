@@ -91,6 +91,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private static final String MAIL_ALLY_REQUEST = "ALLY_REQUEST";
     private static final String MAIL_NEUTRAL_REQUEST = "NEUTRAL_REQUEST";
     private static final String HIDE_LINE = "__MDVCLANS_HIDE_LINE__";
+    private static final Pattern CLAN_HEX_FORMAT_PATTERN = Pattern.compile("(?i)(?:&|§)#[0-9a-f]{6}");
+    private static final Pattern CLAN_LEGACY_FORMAT_PATTERN = Pattern.compile("(?i)(?:&|§)[0-9a-fk-orx]");
+    private static final Pattern CLAN_CONTROL_PATTERN = Pattern.compile("[\\p{Cc}\\p{Cf}]");
 
     private Connection connection;
     private Economy economy;
@@ -143,6 +146,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         try {
             openDatabase();
             createTables();
+            sanitizeExistingClanIdentities();
             cleanupExpiredInvites();
             cleanupAllClanLogs();
         } catch (Exception e) {
@@ -169,7 +173,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.10.16 habilitado.");
+        getLogger().info("MDVClans 1.10.23 habilitado.");
     }
 
     @Override
@@ -630,8 +634,15 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             return;
         }
 
-        String tag = normalizeTag(args[1]);
-        String name = join(args, 2);
+        String rawTag = args[1];
+        String rawName = join(args, 2);
+        String formattingValidation = validateClanFormatting(rawTag, rawName);
+        if (formattingValidation != null) {
+            msg(player, formattingValidation);
+            return;
+        }
+        String tag = normalizeTag(rawTag);
+        String name = sanitizeClanName(rawName);
         String validation = validateClanIdentity(tag, name);
         if (validation != null) {
             msg(player, validation);
@@ -678,7 +689,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             seedDefaultRoleNames(clanId);
         }
         logAction(clanId, player, "CREAR", "Clan creado: " + tag + " / " + name);
-        msg(player, "&aClan creado: &8[&b" + tag + "&8] &f" + name);
+        msg(player, "&aClan creado: &8[&b" + tag + "&8] " + tierColoredClanName(0, name));
     }
 
     private void handleInfo(Player player, String[] args) throws SQLException {
@@ -692,7 +703,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         Clan clan = clanOpt.get();
         List<Member> members = getMembers(clan.id());
         player.sendMessage(color("&8&m-----------------------------"));
-        player.sendMessage(color("&6Clan: &8[&b" + clan.tag() + "&8] &f" + clan.name() + " &8- &d" + tierName(clan.tier())));
+        player.sendMessage(color("&6Clan: &8[&b" + clan.tag() + "&8] " + tierColoredClanName(clan) + " &8- &d" + tierName(clan.tier())));
         player.sendMessage(color("&7Miembros: &e" + members.size() + "&7/&e" + maxMembersForClan(clan)));
         player.sendMessage(color("&7Entrada: " + (clan.open() ? "&aAbierta" : "&cCon invitación")));
         player.sendMessage(color("&7Descripción: &f" + clanDescription(clan)));
@@ -724,7 +735,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         for (int i = start; i < Math.min(start + pageSize, clans.size()); i++) {
             Clan c = clans.get(i);
             int count = countMembers(c.id());
-            player.sendMessage(color("&8[&b" + c.tag() + "&8] &f" + c.name() + " &8- &d" + tierName(c.tier()) + " &7- &e" + count + " &7miembros &8| &6Fuerza &e" + formatNumber(calculateStrength(c))));
+            player.sendMessage(color("&8[&b" + c.tag() + "&8] " + tierColoredClanName(c) + " &8- &d" + tierName(c.tier()) + " &7- &e" + count + " &7miembros &8| &6Fuerza &e" + formatNumber(calculateStrength(c))));
         }
         if (clans.isEmpty()) player.sendMessage(color("&7No hay clanes creados todavía."));
     }
@@ -771,7 +782,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         msg(player, "&aInvitaste a &e" + targetName + " &aal clan." + (onlineTarget == null ? " &7(offline)" : ""));
         boolean sentMail = sendMDVSocialClanInviteMail(player, targetUuid, targetName, clan, expires);
         if (onlineTarget != null) {
-            msg(onlineTarget, "&aRecibiste una invitación del clan &8[&b" + clan.tag() + "&8] &f" + clan.name() + "&a.");
+            msg(onlineTarget, "&aRecibiste una invitación del clan &8[&b" + clan.tag() + "&8] " + tierColoredClanName(clan) + "&a.");
             if (sentMail) {
                 onlineTarget.sendMessage(color("&7También llegó a tu &e/correo&7 personal."));
             } else {
@@ -1948,7 +1959,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
         for (int i = 0; i < max; i++) {
             ClanTopEntry e = entries.get(i);
-            player.sendMessage(color("&e#" + (i + 1) + " &8[&b" + e.clan().tag() + "&8] &f" + e.clan().name() + " &7- &6" + formatNumber(e.value())));
+            player.sendMessage(color("&e#" + (i + 1) + " &8[&b" + e.clan().tag() + "&8] " + tierColoredClanName(e.clan()) + " &7- &6" + formatNumber(e.value())));
         }
     }
 
@@ -1969,7 +1980,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
         player.sendMessage(color("&7Clanes que más bajas le hicieron:"));
         for (ClanTopEntry e : suffered) {
-            player.sendMessage(color("&8- &8[&c" + e.clan().tag() + "&8] &f" + e.clan().name() + " &7» &c" + (int) e.value() + " bajas"));
+            player.sendMessage(color("&8- &8[&c" + e.clan().tag() + "&8] " + tierColoredClanName(e.clan()) + " &7» &c" + (int) e.value() + " bajas"));
         }
     }
 
@@ -1991,14 +2002,17 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 msg(player, "&7Escribe el nuevo nombre del clan en el chat. &cCancelar &7para cancelar.");
                 return;
             }
-            String name = join(args, 2).trim();
+            String rawName = join(args, 2).trim();
+            String formattingValidation = validateClanFormatting(null, rawName);
+            if (formattingValidation != null) { msg(player, formattingValidation); return; }
+            String name = sanitizeClanName(rawName);
             int min = getConfig().getInt("creation.name-min", 3), max = getConfig().getInt("creation.name-max", 19);
             if (name.length() < min || name.length() > max) { msg(player, "&cEl nombre debe tener entre &e" + min + " &cy &e" + max + " &ccaracteres."); return; }
             Optional<Clan> existing = getClanByName(name);
             if (existing.isPresent() && existing.get().id() != clan.id()) { msg(player, "&cYa existe un clan con ese nombre."); return; }
             setClanName(clan.id(), name);
             logAction(clan.id(), player, "AJUSTES", "Cambió nombre a " + name);
-            broadcastToClan(clan.id(), "&aEl clan ahora se llama &f" + name + "&a.");
+            broadcastToClan(clan.id(), "&aEl clan ahora se llama " + tierColoredClanName(clan.tier(), name) + "&a.");
             return;
         }
         if (equalsAny(mode, "id", "tag")) {
@@ -2009,7 +2023,10 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 msg(player, "&7Escribe el nuevo ID del clan en el chat. &cCancelar &7para cancelar.");
                 return;
             }
-            String tag = normalizeTag(args[2]);
+            String rawTag = args[2];
+            String formattingValidation = validateClanFormatting(rawTag, null);
+            if (formattingValidation != null) { msg(player, formattingValidation); return; }
+            String tag = normalizeTag(rawTag);
             String validation = validateClanIdentity(tag, clan.name());
             if (validation != null) { msg(player, validation); return; }
             Optional<Clan> existing = getClanByTag(tag);
@@ -2282,7 +2299,13 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             }
 
             if (storedName == null || storedName.isBlank()) {
-                String name = text.trim();
+                String rawName = text.trim();
+                String formattingValidation = validateClanFormatting(null, rawName);
+                if (formattingValidation != null) {
+                    msg(player, formattingValidation + " &7Escribe otro nombre o &ccancelar&7.");
+                    return;
+                }
+                String name = sanitizeClanName(rawName);
                 int min = getConfig().getInt("creation.name-min", 3), max = getConfig().getInt("creation.name-max", 19);
                 if (name.length() < min || name.length() > max) {
                     msg(player, "&cEl nombre debe tener entre &e" + min + " &cy &e" + max + " &ccaracteres. Escribe otro nombre o &4cancelar&c.");
@@ -2535,7 +2558,52 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private int maxRole() { return Math.min(4, Math.max(minRole(), getConfig().getInt("roles.max", 4))); }
 
     private String normalizeTag(String raw) {
-        return ChatColor.stripColor(raw).replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
+        return stripClanFormatting(raw).replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
+    }
+
+    private String sanitizeClanName(String raw) {
+        return stripClanFormatting(raw).replaceAll("\\s+", " ").trim();
+    }
+
+    private String stripClanFormatting(String raw) {
+        if (raw == null || raw.isBlank()) return "";
+        String clean = CLAN_HEX_FORMAT_PATTERN.matcher(raw).replaceAll("");
+        clean = CLAN_LEGACY_FORMAT_PATTERN.matcher(clean).replaceAll("");
+        clean = ChatColor.stripColor(clean);
+        clean = clean.replace("&", "").replace("§", "");
+        return CLAN_CONTROL_PATTERN.matcher(clean).replaceAll("");
+    }
+
+    private String validateClanFormatting(String rawTag, String rawName) {
+        if (containsForbiddenClanFormatting(rawTag) || containsForbiddenClanFormatting(rawName)) {
+            return "&cEl nombre y el ID del clan no pueden usar colores, formatos ni caracteres de control.";
+        }
+        return null;
+    }
+
+    private boolean containsForbiddenClanFormatting(String raw) {
+        if (raw == null || raw.isEmpty()) return false;
+        return raw.indexOf('&') >= 0 || raw.indexOf('§') >= 0 || CLAN_CONTROL_PATTERN.matcher(raw).find();
+    }
+
+    private String tierClanNameColor(int tier) {
+        String fallback = switch (Math.max(0, Math.min(4, tier))) {
+            case 0 -> "&a"; // Tier visible 1: verde claro
+            case 1 -> "&2"; // Tier visible 2: verde oscuro
+            case 2 -> "&9"; // Tier visible 3: azul
+            case 3 -> "&5"; // Tier visible 4: morado
+            default -> "&e"; // Tier visible 5: amarillo
+        };
+        return getConfig().getString("clan-name-colors." + Math.max(0, Math.min(4, tier)), fallback);
+    }
+
+    private String tierColoredClanName(Clan clan) {
+        if (clan == null) return "";
+        return tierColoredClanName(clan.tier(), clan.name());
+    }
+
+    private String tierColoredClanName(int tier, String plainName) {
+        return tierClanNameColor(tier) + sanitizeClanName(plainName) + "&r";
     }
 
     private String join(String[] args, int start) {
@@ -2559,6 +2627,120 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private String color(String text) {
         if (text == null) return "";
         return ChatColor.translateAlternateColorCodes('&', text);
+    }
+
+    private synchronized void sanitizeExistingClanIdentities() throws SQLException {
+        List<ClanIdentityRow> rows = new ArrayList<>();
+        try (Statement st = connection.createStatement();
+             ResultSet rs = st.executeQuery("SELECT id, tag, name FROM clans ORDER BY id ASC")) {
+            while (rs.next()) rows.add(new ClanIdentityRow(rs.getInt("id"), rs.getString("tag"), rs.getString("name")));
+        }
+        if (rows.isEmpty()) return;
+
+        int idMin = Math.max(1, getConfig().getInt("creation.id-min", 3));
+        int idMax = Math.max(idMin, getConfig().getInt("creation.id-max", 5));
+        int nameMin = Math.max(1, getConfig().getInt("creation.name-min", 3));
+        int nameMax = Math.max(nameMin, getConfig().getInt("creation.name-max", 19));
+        Set<String> usedTags = new HashSet<>();
+        Set<String> usedNames = new HashSet<>();
+        List<ClanIdentityUpdate> updates = new ArrayList<>();
+
+        for (ClanIdentityRow row : rows) {
+            String cleanTag = normalizeTag(row.tag());
+            if (cleanTag.length() > idMax) cleanTag = cleanTag.substring(0, idMax);
+            if (cleanTag.length() < idMin || !idPattern.matcher(cleanTag).matches()) {
+                cleanTag = fallbackClanTag(row.id(), idMin, idMax);
+            }
+            cleanTag = uniqueClanTag(cleanTag, row.id(), idMin, idMax, usedTags);
+
+            String cleanName = sanitizeClanName(row.name());
+            if (cleanName.length() > nameMax) cleanName = cleanName.substring(0, nameMax).trim();
+            if (cleanName.length() < nameMin) cleanName = fallbackClanName(row.id(), nameMin, nameMax);
+            cleanName = uniqueClanName(cleanName, row.id(), nameMax, usedNames);
+
+            if (!cleanTag.equals(row.tag()) || !cleanName.equals(row.name())) {
+                updates.add(new ClanIdentityUpdate(row.id(), row.tag(), cleanTag, row.name(), cleanName));
+            }
+        }
+        if (updates.isEmpty()) return;
+
+        boolean originalAutoCommit = connection.getAutoCommit();
+        String temporaryPrefix = "__MDVCLEAN_" + System.nanoTime() + "_";
+        try {
+            connection.setAutoCommit(false);
+            try (PreparedStatement temporary = connection.prepareStatement("UPDATE clans SET tag=?, name=? WHERE id=?")) {
+                for (ClanIdentityUpdate update : updates) {
+                    temporary.setString(1, temporaryPrefix + "T" + update.id());
+                    temporary.setString(2, temporaryPrefix + "N" + update.id());
+                    temporary.setInt(3, update.id());
+                    temporary.addBatch();
+                }
+                temporary.executeBatch();
+            }
+            try (PreparedStatement finalUpdate = connection.prepareStatement("UPDATE clans SET tag=?, name=? WHERE id=?")) {
+                for (ClanIdentityUpdate update : updates) {
+                    finalUpdate.setString(1, update.newTag());
+                    finalUpdate.setString(2, update.newName());
+                    finalUpdate.setInt(3, update.id());
+                    finalUpdate.addBatch();
+                }
+                finalUpdate.executeBatch();
+            }
+            connection.commit();
+        } catch (SQLException ex) {
+            connection.rollback();
+            throw ex;
+        } finally {
+            connection.setAutoCommit(originalAutoCommit);
+        }
+
+        for (ClanIdentityUpdate update : updates) {
+            getLogger().info("Identidad de clan limpiada (#" + update.id() + "): [" + update.oldTag() + "] " + update.oldName()
+                    + " -> [" + update.newTag() + "] " + update.newName());
+        }
+        getLogger().info("Se limpiaron colores, formatos y símbolos no permitidos en " + updates.size() + " clan(es) existente(s).");
+    }
+
+    private String fallbackClanTag(int clanId, int min, int max) {
+        String digits = String.valueOf(Math.max(0, clanId));
+        String base = "C" + digits;
+        while (base.length() < min) base = "C0" + base.substring(1);
+        return base.length() > max ? base.substring(base.length() - max) : base;
+    }
+
+    private String uniqueClanTag(String base, int clanId, int min, int max, Set<String> used) {
+        String candidate = base.toUpperCase(Locale.ROOT);
+        int attempt = 0;
+        while (!used.add(candidate.toLowerCase(Locale.ROOT))) {
+            String suffix = String.valueOf(attempt == 0 ? clanId : clanId + attempt);
+            int prefixLength = Math.max(1, max - suffix.length());
+            String prefix = base.substring(0, Math.min(base.length(), prefixLength));
+            candidate = (prefix + suffix).toUpperCase(Locale.ROOT);
+            if (candidate.length() > max) candidate = candidate.substring(candidate.length() - max);
+            while (candidate.length() < min) candidate = "C" + candidate;
+            attempt++;
+        }
+        return candidate;
+    }
+
+    private String fallbackClanName(int clanId, int min, int max) {
+        String value = "Clan " + clanId;
+        if (value.length() > max) value = value.substring(0, max).trim();
+        while (value.length() < min) value += "X";
+        return value;
+    }
+
+    private String uniqueClanName(String base, int clanId, int max, Set<String> used) {
+        String candidate = base;
+        int attempt = 0;
+        while (!used.add(candidate.toLowerCase(Locale.ROOT))) {
+            String suffix = " " + (attempt == 0 ? clanId : clanId + attempt);
+            int keep = Math.max(1, max - suffix.length());
+            candidate = base.substring(0, Math.min(base.length(), keep)).trim() + suffix;
+            if (candidate.length() > max) candidate = candidate.substring(0, max).trim();
+            attempt++;
+        }
+        return candidate;
     }
 
     private synchronized int countClans() throws SQLException {
@@ -6025,8 +6207,10 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         if (clan != null) {
             map.put("clan_id", clan.tag());
             map.put("id", clan.tag());
-            map.put("clan_name", clan.name());
-            map.put("name", clan.name());
+            map.put("clan_name", tierColoredClanName(clan));
+            map.put("name", tierColoredClanName(clan));
+            map.put("clan_name_plain", clan.name());
+            map.put("name_plain", clan.name());
             map.put("members", String.valueOf(countMembers(clan.id())));
             map.put("max_members", String.valueOf(maxMembersForClan(clan)));
             map.putAll(tierPlaceholders(clan));
@@ -6583,6 +6767,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     public record ClanRelationView(Clan clan, String relation) {}
 
+    private record ClanIdentityRow(int id, String tag, String name) {}
+    private record ClanIdentityUpdate(int id, String oldTag, String newTag, String oldName, String newName) {}
+
     public record ClanTier(int tier, String name, double cost, int maxMembers, int maxBases, int storageSlots, int storagePages, int maxAllies) {}
 
     public record ClanBase(int clanId, int baseNumber, String world, double x, double y, double z, float yaw, float pitch) {}
@@ -6671,6 +6858,10 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 target = params.substring("clan_name_of_".length());
                 return targetClanValue(target, "name");
             }
+            if (lower.startsWith("clan_name_plain_of_")) {
+                target = params.substring("clan_name_plain_of_".length());
+                return targetClanValue(target, "name_plain");
+            }
             if (lower.startsWith("clan_id_of_")) {
                 target = params.substring("clan_id_of_".length());
                 return targetClanValue(target, "id");
@@ -6717,6 +6908,10 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 target = params.substring("name_of_".length());
                 return targetClanValue(target, "name");
             }
+            if (lower.startsWith("name_plain_of_")) {
+                target = params.substring("name_plain_of_".length());
+                return targetClanValue(target, "name_plain");
+            }
             if (lower.startsWith("id_of_")) {
                 target = params.substring("id_of_".length());
                 return targetClanValue(target, "id");
@@ -6759,7 +6954,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             return color(format
                     .replace("{id}", clan.tag())
                     .replace("{tag}", clan.tag())
-                    .replace("{name}", clan.name())
+                    .replace("{name}", tierColoredClanName(clan))
                     .replace("{tier}", String.valueOf(clan.tier()))
                     .replace("{tier_name}", tierName(clan.tier()))
                     .replace("{role}", getRoleName(clan.id(), memberOpt.get().role()))
@@ -6777,7 +6972,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             Clan clan = clanOpt.get();
             return switch (key) {
                 case "id" -> clan.tag();
-                case "name" -> clan.name();
+                case "name" -> color(tierColoredClanName(clan));
+                case "name_plain" -> clan.name();
                 case "tag" -> color(getConfig().getString("placeholders.tag-format", "&8[&b{id}&8]&r").replace("{id}", clan.tag()).replace("{name}", clan.name()));
                 case "lpc_tag" -> color(getConfig().getString("placeholders.lpc-tag-format", "&8[&b{id}&8]&r ").replace("{id}", clan.tag()).replace("{name}", clan.name()));
                 case "tier" -> String.valueOf(clan.tier());
@@ -6802,7 +6998,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     return switch (params.toLowerCase(Locale.ROOT)) {
                         // Placeholder dedicado al chat: nunca muestra textos como "Sin clan".
                         case "chat_prefix" -> "";
-                        case "id", "name", "tag", "lpc_tag", "role", "role_number", "members", "member_count", "clan_members", "bank", "kills", "deaths", "strength", "tier", "tier_name", "max_members", "max_bases", "max_allies", "storage_slots", "storage_pages", "storage_display", "allies", "bases", "description", "description_plain", "description_line_1", "description_line_2", "description_line_3", "description_line_4", "description_line_5", "board", "board_plain", "board_line_1", "board_line_2", "board_line_3", "board_line_4", "board_line_5", "board_line_6", "board_line_7", "board_line_8", "board_line_9", "board_line_10", "is_in_clan" -> params.equalsIgnoreCase("is_in_clan") ? "false" : noClan;
+                        case "id", "name", "name_plain", "tag", "lpc_tag", "role", "role_number", "members", "member_count", "clan_members", "bank", "kills", "deaths", "strength", "tier", "tier_name", "max_members", "max_bases", "max_allies", "storage_slots", "storage_pages", "storage_display", "allies", "bases", "description", "description_plain", "description_line_1", "description_line_2", "description_line_3", "description_line_4", "description_line_5", "board", "board_plain", "board_line_1", "board_line_2", "board_line_3", "board_line_4", "board_line_5", "board_line_6", "board_line_7", "board_line_8", "board_line_9", "board_line_10", "is_in_clan" -> params.equalsIgnoreCase("is_in_clan") ? "false" : noClan;
                         default -> noClan;
                     };
                 }
@@ -6812,7 +7008,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 Clan clan = clanOpt.get();
                 return switch (params.toLowerCase(Locale.ROOT)) {
                     case "id" -> clan.tag();
-                    case "name" -> clan.name();
+                    case "name" -> color(tierColoredClanName(clan));
+                    case "name_plain" -> clan.name();
                     case "tag" -> color(getConfig().getString("placeholders.tag-format", "&8[&b{id}&8]&r").replace("{id}", clan.tag()).replace("{name}", clan.name()));
                     case "lpc_tag" -> color(getConfig().getString("placeholders.lpc-tag-format", "&8[&b{id}&8]&r ").replace("{id}", clan.tag()).replace("{name}", clan.name()));
                     case "chat_prefix" -> color(getConfig().getString("placeholders.chat-prefix-format", "&8[&6{id}&8]&r ").replace("{id}", clan.tag()).replace("{tag}", clan.tag()).replace("{name}", clan.name()));
