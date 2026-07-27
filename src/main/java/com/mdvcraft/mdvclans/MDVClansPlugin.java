@@ -133,6 +133,12 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private final Set<UUID> suppressHistoryOnce = ConcurrentHashMap.newKeySet();
     private int nametagTaskId = -1;
 
+    // 1.10.24: snapshot ligero para placeholders de rankings de clanes.
+    // Evita recalcular SQLite una vez por cada línea de holograma.
+    private final Object clanTopPlaceholderCacheLock = new Object();
+    private volatile List<ClanLeaderboardSnapshot> clanTopPlaceholderCache = List.of();
+    private volatile long clanTopPlaceholderCacheExpiresAt = 0L;
+
     @Override
     public void onEnable() {
         saveDefaultConfig();
@@ -173,7 +179,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.10.23 habilitado.");
+        getLogger().info("MDVClans 1.10.24 habilitado.");
     }
 
     @Override
@@ -243,6 +249,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private void reloadLocalSettings() {
         String regex = getConfig().getString("creation.id-regex", "^[A-Za-z0-9]+$");
         idPattern = Pattern.compile(regex);
+        invalidateClanTopPlaceholderCache();
     }
 
     private void setupEconomy() {
@@ -3407,6 +3414,53 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         return entries;
     }
 
+    private void invalidateClanTopPlaceholderCache() {
+        clanTopPlaceholderCacheExpiresAt = 0L;
+    }
+
+    private List<ClanLeaderboardSnapshot> clanTopPlaceholderSnapshot() throws SQLException {
+        long now = System.currentTimeMillis();
+        List<ClanLeaderboardSnapshot> cached = clanTopPlaceholderCache;
+        if (now < clanTopPlaceholderCacheExpiresAt) return cached;
+
+        synchronized (clanTopPlaceholderCacheLock) {
+            now = System.currentTimeMillis();
+            if (now < clanTopPlaceholderCacheExpiresAt) return clanTopPlaceholderCache;
+
+            List<ClanLeaderboardSnapshot> rebuilt = new ArrayList<>();
+            for (Clan clan : listClans()) {
+                int kills = getTotalKillsByClan(clan.id());
+                int members = countMembers(clan.id());
+                double strength = calculateStrength(clan, kills, members);
+                rebuilt.add(new ClanLeaderboardSnapshot(clan, strength, kills, members, clan.bankBalance()));
+            }
+
+            clanTopPlaceholderCache = List.copyOf(rebuilt);
+            long cacheSeconds = Math.max(1L, getConfig().getLong("top.placeholder-cache-seconds", 30L));
+            clanTopPlaceholderCacheExpiresAt = now + cacheSeconds * 1000L;
+            return clanTopPlaceholderCache;
+        }
+    }
+
+    private Optional<ClanLeaderboardSnapshot> clanTopPlaceholderEntry(String mode, int position) throws SQLException {
+        if (position < 1) return Optional.empty();
+        List<ClanLeaderboardSnapshot> sorted = new ArrayList<>(clanTopPlaceholderSnapshot());
+        sorted.sort((first, second) -> {
+            int compared = Double.compare(clanTopMetric(second, mode), clanTopMetric(first, mode));
+            if (compared != 0) return compared;
+            return first.clan().name().compareToIgnoreCase(second.clan().name());
+        });
+        return position <= sorted.size() ? Optional.of(sorted.get(position - 1)) : Optional.empty();
+    }
+
+    private double clanTopMetric(ClanLeaderboardSnapshot entry, String mode) {
+        return switch (mode) {
+            case "kills" -> entry.kills();
+            case "banco" -> entry.bank();
+            default -> entry.strength();
+        };
+    }
+
     private synchronized void disbandClan(int clanId) throws SQLException {
         try (PreparedStatement ps = connection.prepareStatement("DELETE FROM clans WHERE id=?")) {
             ps.setInt(1, clanId);
@@ -3738,13 +3792,17 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private double calculateStrength(Clan clan) throws SQLException {
+        return calculateStrength(clan, getTotalKillsByClan(clan.id()), countMembers(clan.id()));
+    }
+
+    private double calculateStrength(Clan clan, int kills, int members) {
         double killWeight = getConfig().getDouble("top.strength.kill-weight", 10.0);
         double bankDivisor = Math.max(1.0, getConfig().getDouble("top.strength.bank-divisor", 10.0));
         double bankCap = getConfig().getDouble("top.strength.bank-cap", 500.0);
         double memberWeight = getConfig().getDouble("top.strength.member-weight", 5.0);
-        return getTotalKillsByClan(clan.id()) * killWeight
+        return kills * killWeight
                 + Math.min(clan.bankBalance() / bankDivisor, bankCap)
-                + countMembers(clan.id()) * memberWeight;
+                + members * memberWeight;
     }
 
     private int parseBaseNumber(String[] args, int defaultNumber) {
@@ -6763,6 +6821,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     public record ClanTopEntry(Clan clan, double value) {}
 
+    private record ClanLeaderboardSnapshot(Clan clan, double strength, int kills, int members, double bank) {}
+
     public record ClanMail(int id, int fromClanId, int toClanId, String senderName, long sentAt, String message, String mailType, int relationClanId) {}
 
     public record ClanRelationView(Clan clan, String relation) {}
@@ -6986,9 +7046,84 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             };
         }
 
+        private String clanTopPlaceholder(String params) throws SQLException {
+            if (params == null || params.isBlank()) return null;
+            String lower = params.toLowerCase(Locale.ROOT);
+            if (!lower.startsWith("top_")) return null;
+
+            String remainder = lower.substring("top_".length());
+            int modeSeparator = remainder.indexOf('_');
+            if (modeSeparator <= 0) return null;
+            String rawMode = remainder.substring(0, modeSeparator);
+            String mode = switch (rawMode) {
+                case "strength", "fuerza" -> "fuerza";
+                case "kills" -> "kills";
+                case "bank", "banco" -> "banco";
+                default -> null;
+            };
+            if (mode == null) return null;
+
+            String afterMode = remainder.substring(modeSeparator + 1);
+            int positionSeparator = afterMode.indexOf('_');
+            if (positionSeparator <= 0) return null;
+
+            int position;
+            try {
+                position = Integer.parseInt(afterMode.substring(0, positionSeparator));
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+            if (position < 1 || position > 100) return null;
+
+            String field = afterMode.substring(positionSeparator + 1);
+            Optional<ClanLeaderboardSnapshot> entryOpt = clanTopPlaceholderEntry(mode, position);
+            if (entryOpt.isEmpty()) {
+                return switch (field) {
+                    case "rank", "position", "value", "strength", "fuerza", "kills", "bank", "banco", "members", "tier" -> "0";
+                    default -> color(getConfig().getString("placeholders.top-empty-text", "&8---"));
+                };
+            }
+
+            ClanLeaderboardSnapshot entry = entryOpt.get();
+            Clan clan = entry.clan();
+            double value = clanTopMetric(entry, mode);
+            return switch (field) {
+                case "rank", "position" -> String.valueOf(position);
+                case "id" -> clan.tag();
+                case "tag" -> color(getConfig().getString("placeholders.tag-format", "&8[&b{id}&8]&r")
+                        .replace("{id}", clan.tag())
+                        .replace("{name}", clan.name()));
+                case "name" -> color(tierColoredClanName(clan));
+                case "name_plain" -> clan.name();
+                case "value" -> formatNumber(value);
+                case "strength", "fuerza" -> formatNumber(entry.strength());
+                case "kills" -> String.valueOf(entry.kills());
+                case "bank", "banco" -> formatNumber(entry.bank());
+                case "members" -> String.valueOf(entry.members());
+                case "tier" -> String.valueOf(clan.tier());
+                case "tier_name" -> tierName(clan.tier());
+                case "line" -> color(getConfig().getString("placeholders.top-line-format", "&8[&b{id}&8] {name} &8- &6{value}")
+                        .replace("{rank}", String.valueOf(position))
+                        .replace("{id}", clan.tag())
+                        .replace("{tag}", clan.tag())
+                        .replace("{name}", tierColoredClanName(clan))
+                        .replace("{name_plain}", clan.name())
+                        .replace("{value}", formatNumber(value))
+                        .replace("{strength}", formatNumber(entry.strength()))
+                        .replace("{kills}", String.valueOf(entry.kills()))
+                        .replace("{bank}", formatNumber(entry.bank()))
+                        .replace("{members}", String.valueOf(entry.members()))
+                        .replace("{tier}", String.valueOf(clan.tier()))
+                        .replace("{tier_name}", tierName(clan.tier())));
+                default -> color(getConfig().getString("placeholders.top-empty-text", "&8---"));
+            };
+        }
+
         @Override
         public String onPlaceholderRequest(Player player, String params) {
             try {
+                String topValue = clanTopPlaceholder(params);
+                if (topValue != null) return topValue;
                 String targetValue = targetClanPlaceholder(params);
                 if (targetValue != null) return targetValue;
                 if (player == null) return "";

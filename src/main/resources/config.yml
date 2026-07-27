@@ -200,6 +200,8 @@ kills:
   same-victim-cooldown-seconds: 900
 
 top:
+  # Los placeholders de hologramas comparten una instantánea para no consultar SQLite por cada línea.
+  placeholder-cache-seconds: 30
   strength:
     kill-weight: 10.0
     bank-divisor: 10.0
@@ -235,6 +237,10 @@ nametags:
     format: ' &a[&2{level}&a]'
 
 placeholders:
+  # Texto usado cuando todavía no existe un clan para esa posición del ranking.
+  top-empty-text: '&8---'
+  # Formato opcional para %mdvclans_top_strength_<posición>_line%.
+  top-line-format: '&8[&b{id}&8] {name} &8- &6{value}'
   no-clan: ''
   # Texto usado para placeholders de otro jugador, por ejemplo %mdvclans_clan_line_of_Jugador%.
   other-no-clan: '&8Sin clan'

@@ -1,0 +1,8 @@
+MDVClans 1.10.24
+
+- Añade placeholders directos de ranking de clanes para hologramas, sin usar ajLeaderboards ni duplicar miembros.
+- Modos disponibles: fuerza/strength, kills y banco/bank.
+- Formato: %mdvclans_top_strength_<posición>_<campo>%.
+- Campos: rank, id, tag, name, name_plain, value, strength, kills, bank, members, tier, tier_name y line.
+- Añade una instantánea configurable (top.placeholder-cache-seconds, 30 s por defecto) para evitar consultas SQLite por cada línea del holograma.
+- Los placeholders funcionan sin jugador asociado, por lo que DecentHolograms puede resolverlos correctamente.
