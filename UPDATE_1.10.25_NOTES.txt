@@ -1,0 +1,21 @@
+MDVClans 1.10.25
+================
+
+Nuevos comandos administrativos (permiso mdvclans.admin):
+- /mdvclans almacen <ID> [pagina]
+  Abre el almacen de objetos de un clan en modo completamente solo lectura.
+- /mdvclans banco <ID> <agregar|quitar> <cantidad>
+  Modifica directamente el saldo del banco del clan, registra la accion y avisa a sus miembros.
+- /mdvclans disolver <ID> confirmar
+  Disuelve el clan inmediatamente y expulsa a todos sus miembros.
+- /mdvclans entrar <jugador> <ID>
+  Fuerza el ingreso del jugador, incluso si el clan esta cerrado. Si ya pertenece a otro clan se lo mueve, salvo que sea su lider.
+
+Lista de clanes:
+- El lore de cada clan ahora muestra el nombre personalizado del rango lider y el jugador que ocupa ese cargo.
+  Ejemplo: Emperador: Aminowana
+- Nuevos placeholders internos: {leader_role}, {leader_name} y {leader_line}.
+
+Compatibilidad:
+- Base de datos sin cambios de esquema.
+- Compila con Maven y Java 21 como las versiones anteriores.

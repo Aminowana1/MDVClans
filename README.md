@@ -1,4 +1,4 @@
-# MDVClans 1.10.23
+# MDVClans 1.10.25
 
 Actualización de tiers/progreso de clanes para MDVCRAFT.
 
@@ -19,7 +19,26 @@ Actualización de tiers/progreso de clanes para MDVCRAFT.
 mvn clean package
 ```
 
-El jar queda en `target/MDVClans-1.10.23.jar`.
+El jar queda en `target/MDVClans-1.10.25.jar`.
+
+
+## 1.10.25 - Administración de clanes
+
+Permiso requerido: `mdvclans.admin`.
+
+```text
+/mdvclans almacen <ID> [pagina]
+/mdvclans banco <ID> <agregar|quitar> <cantidad>
+/mdvclans disolver <ID> confirmar
+/mdvclans entrar <jugador> <ID>
+```
+
+- El almacén administrativo es completamente de solo lectura y permite navegar todas sus páginas.
+- El banco puede ajustarse sin retirar o entregar dinero a un jugador.
+- La disolución elimina inmediatamente el clan y expulsa a todos sus miembros.
+- La entrada forzada ignora invitaciones y estado abierto/cerrado; no mueve al líder de otro clan para evitar dejarlo sin liderazgo.
+- La lista de clanes muestra el nombre personalizado del rango líder y su jugador, por ejemplo `Emperador: Aminowana`.
+- Placeholders internos nuevos: `{leader_role}`, `{leader_name}` y `{leader_line}`.
 
 ## 1.10.23 - Nombres seguros y color por tier
 

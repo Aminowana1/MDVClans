@@ -49,6 +49,7 @@ menus:
       - '&7ID: &b{id}'
       - '&7Tier: &d{clan_tier_name}'
       - '&7Miembros: &e{members}&7/&e{max_members}'
+      - '&7{leader_role}: &f{leader_name}'
       - '&7Entrada: {entry}'
       - '{relation_line}'
       - '&7Fuerza: &6{strength}'
