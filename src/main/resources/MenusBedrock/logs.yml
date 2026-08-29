@@ -1,0 +1,16 @@
+title: '&6&lRegistros &8({page}/{pages})'
+content:
+  - '&7Filtro: &e{filter}'
+page-size: 8
+entry: '&e#{log_id} &6{action}\n&r&7{actor} • {date}\n&8{detail}'
+filters:
+  all: '&eTodos'
+  miembros: '&aMiembros'
+  banco: '&eBanco'
+  diplomacia: '&9Diplomacia'
+  correo: '&dCorreo'
+  combate: '&cCombate'
+  admin: '&6Admin'
+previous: '&ePágina anterior'
+next: '&ePágina siguiente'
+back: '&6Volver'

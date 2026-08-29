@@ -1,0 +1,77 @@
+MDVClans 1.11.0 - Adaptacion Bedrock para MDVCRAFT
+===================================================
+
+OBJETIVO
+--------
+- Java conserva exactamente sus menus actuales de NativeMenus/ y Menus/.
+- Bedrock usa Forms nativos de Floodgate/Cumulus configurables desde MenusBedrock/.
+- Los menus raiz del clan siguen perteneciendo a MDVSocial:
+  clan_con_clan.yml y clan_sin_clan.yml NO se sustituyen.
+
+FLUJO DE CREACION BEDROCK
+-------------------------
+Al pulsar "Crear clan" desde clan_sin_clan de MDVSocial, el comando /clan crear
+es interceptado por MDVClans si el jugador es Floodgate y abre un CustomForm:
+1. Nombre del clan.
+2. ID / Tag.
+3. Confirmacion.
+
+Si creation.cost-enabled=true y creation.cost>0, la confirmacion muestra el coste.
+Si no hay coste, no se muestra ninguna linea de coste.
+La validacion y la creacion usan la misma logica/SQLite/Vault que Java.
+
+MENUS BEDROCK
+-------------
+MenusBedrock contiene configuracion para:
+- create.yml              Crear clan.
+- members.yml             Miembros, paginacion e invitacion por nombre.
+- member_actions.yml      Perfil/carta/promover/degradar/rango/lider/expulsar.
+- info.yml                Tablero, descripcion, solicitudes, correo, logs, permisos.
+- relations.yml           Diplomacia, bajas y rankings.
+- clan_list.yml           Lista de clanes.
+- clan_actions.yml        Unirse/solicitar/alianza/enemistad/paz/correo.
+- storage.yml             Banco y acceso al almacen real.
+- bases.yml               Bases del clan.
+- mailbox.yml             Buzon del clan.
+- mail_actions.yml        Responder, diplomacia y borrar cartas.
+- settings.yml            Ajustes, rangos, permisos, nombre/ID, banner, tier, salir/disolver.
+- roles.yml               Nombres de rangos.
+- permissions.yml         Editor de permisos por rango.
+- join_requests.yml       Aceptar/rechazar solicitudes.
+- rankings.yml            Tops y estadisticas de bajas.
+- logs.yml                Historial del clan.
+
+EXCEPCIONES QUE SIGUEN COMO INVENTARIO
+--------------------------------------
+Dos funciones necesitan mover/ver items reales y por eso conservan un inventario:
+- Almacen compartido del clan.
+- Editor de estandarte/banner.
+El menu que conduce a ellas si es un Form Bedrock.
+
+NAVEGACION
+----------
+- No se agregan botones "Cerrar". La X nativa de Bedrock cierra el Form.
+- Los submenus incluyen Volver.
+- Volver desde el panel principal de MDVClans regresa al menu de clan de MDVSocial.
+
+COMPATIBILIDAD
+--------------
+- Purpur/Paper 1.21.6, Java 21.
+- Floodgate/Geyser para identificar jugadores Bedrock.
+- Misma interfaz Bedrock para movil, Windows Bedrock y consola.
+- Se reutiliza la logica real de MDVClans; no hay una base de clanes paralela.
+
+INSTALACION
+-----------
+1. Apagar el servidor.
+2. Hacer backup de plugins/MDVClans/.
+3. Reemplazar el JAR por MDVClans-1.11.0.jar.
+4. NO reemplazar config.yml, NativeMenus/ ni Menus/ si ya estan personalizados.
+5. Encender el servidor.
+6. MDVClans crea los YAML faltantes de MenusBedrock/ automaticamente.
+7. Editar MenusBedrock/ y usar /mdvclans reload para recargarlos.
+
+NOTA DE BUILD
+-------------
+El source incluye la API de Floodgate como dependencia provided y el repositorio
+OpenCollab. El JAR final se genera con Maven/Java 21.

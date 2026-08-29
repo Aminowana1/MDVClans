@@ -1,0 +1,40 @@
+title: '&c&lAjustes del clan'
+content:
+  - '&f{name} &8[&6{id}&8]'
+  - '&7Tier actual: &d{tier_name}'
+buttons:
+  toggle-open: '&a&lEntrada del clan\n&r&8Estado: {entry}'
+  roles: '&d&lNombres de rangos'
+  permissions: '&b&lConfigurar permisos'
+  rename: '&e&lCambiar nombre'
+  retag: '&b&lCambiar ID / Tag'
+  description: '&6&lEditar descripción'
+  banner: '&f&lCambiar estandarte\n&r&8Abre el editor de inventario.'
+  upgrade: '&d&lMejorar clan\n&r&8Siguiente tier: {next_tier}\n&7Coste: {upgrade_cost}'
+  leave: '&c&lSalir del clan\n&r&8Abandonar el clan.'
+  disband: '&4&lDisolver clan\n&r&cAcción irreversible.'
+  back: '&6Volver'
+rename-form:
+  title: '&e&lCambiar nombre'
+  label: '&eNuevo nombre'
+  placeholder: 'Nombre del clan'
+retag-form:
+  title: '&b&lCambiar ID'
+  label: '&eNuevo ID / Tag'
+  placeholder: 'Ej: MDV'
+upgrade-confirm:
+  title: '&d&lMejorar clan'
+  content: '&7Subir a &d{next_tier}&7 por &e{upgrade_cost} monedas &7del banco.'
+  confirm: '&a&lConfirmar mejora'
+  back: '&6Volver'
+disband-confirm:
+  title: '&4&lDisolver clan'
+  content: '&cEsto eliminará permanentemente el clan &f{name}&c.'
+  confirm: '&4&lSí, disolver'
+  back: '&6Volver'
+
+leave-confirm:
+  title: '&c&lSalir del clan'
+  content: '&7¿Seguro que quieres abandonar &f{name}&7?'
+  confirm: '&c&lSí, salir'
+  back: '&6Volver'

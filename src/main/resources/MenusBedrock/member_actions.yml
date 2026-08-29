@@ -1,0 +1,26 @@
+title: '&a&l{player}'
+content:
+  - '&7Rango: &f{role_name}'
+  - '&7Estado: {status}'
+buttons:
+  profile:
+    text: '&b&lVer perfil\n&r&8Abrir opciones sociales.'
+  mail:
+    text: '&d&lEnviar carta\n&r&8Escribir por MDVSocial.'
+  promote:
+    text: '&a&lPromover\n&r&8Subir un rango.'
+  demote:
+    text: '&e&lDegradar\n&r&8Bajar un rango.'
+  set-rank:
+    text: '&6&lAsignar rango\n&r&8Elegir un rango exacto.'
+  leader:
+    text: '&6&lTransferir liderazgo\n&r&8Convertirlo en líder.'
+  kick:
+    text: '&c&lExpulsar\n&r&8Quitar del clan.'
+  back:
+    text: '&6Volver'
+confirm-kick:
+  title: '&c&lExpulsar miembro'
+  content: '&7¿Seguro que quieres expulsar a &f{player}&7?'
+  confirm: '&c&lSí, expulsar'
+  back: '&6Volver'

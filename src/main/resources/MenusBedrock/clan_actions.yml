@@ -1,0 +1,27 @@
+title: '&f&l{name} &8[&6{id}&8]'
+content:
+  - '&7Tier: &d{tier_name}'
+  - '&7Miembros: &e{members}/{max_members}'
+  - '&7Entrada: {entry}'
+  - '&7Relación: {relation}'
+buttons:
+  join:
+    text: '&a&lUnirse\n&r&8Entrar al clan abierto.'
+  request:
+    text: '&e&lSolicitar ingreso\n&r&8Enviar solicitud.'
+  info:
+    text: '&b&lInformación pública'
+  ally:
+    text: '&9&lProponer alianza'
+  enemy:
+    text: '&c&lDeclarar enemigo'
+  neutral:
+    text: '&7&lVolver neutral / Paz'
+  mail:
+    text: '&d&lEnviar correo de clan'
+  back:
+    text: '&6Volver'
+mail-form:
+  title: '&d&lCorreo a {name}'
+  label: '&eMensaje'
+  placeholder: 'Escribe el mensaje...'

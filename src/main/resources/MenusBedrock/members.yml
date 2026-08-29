@@ -1,0 +1,26 @@
+title: '&a&lMiembros &8({page}/{pages})'
+content:
+  - '&7Miembros: &f{count}&7/&f{max_members}'
+  - '&8Selecciona un jugador para ver sus opciones.'
+page-size: 8
+member:
+  text: '&f{player}\n&r&7{role_name} • {status}'
+  online: '&aEn línea'
+  offline: '&8Desconectado'
+  image:
+    type: URL
+    data: ''
+buttons:
+  invite:
+    text: '&a&lInvitar jugador\n&r&8Escribe el nombre del jugador.'
+  previous:
+    text: '&ePágina anterior'
+  next:
+    text: '&ePágina siguiente'
+  back:
+    text: '&6Volver'
+
+invite-form:
+  title: '&a&lInvitar al clan'
+  label: '&eNombre del jugador'
+  placeholder: 'Escribe el nombre...'

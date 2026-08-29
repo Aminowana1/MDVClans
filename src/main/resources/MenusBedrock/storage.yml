@@ -1,0 +1,18 @@
+title: '&6&lBanco y almacén'
+content:
+  - '&7Balance del clan: &e{bank}'
+  - '&7Capacidad del almacén: &f{storage_display}'
+buttons:
+  storage:
+    text: '&a&lAbrir almacén\n&r&8Inventario compartido.'
+  deposit:
+    text: '&a&lDepositar\n&r&8Añadir monedas al banco.'
+  withdraw:
+    text: '&c&lRetirar\n&r&8Sacar monedas del banco.'
+  back:
+    text: '&6Volver'
+amount-form:
+  deposit-title: '&a&lDepositar al banco'
+  withdraw-title: '&c&lRetirar del banco'
+  label: '&eCantidad'
+  placeholder: 'Ej: 1000'

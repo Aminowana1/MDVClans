@@ -1,0 +1,36 @@
+title: '&e&lInformación del clan'
+content:
+  - '&f{name} &8[&6{id}&8]'
+  - '&7Tier: &d{tier_name} &8• &7Miembros: &e{members}/{max_members}'
+  - '&7Banco: &e{bank} &8• &7Fuerza: &6{strength}'
+buttons:
+  board:
+    text: '&e&lTablero\n&r&8Ver o editar el mensaje.'
+  description:
+    text: '&6&lDescripción pública\n&r&8Ver o editar la descripción.'
+  requests:
+    text: '&a&lSolicitudes ({join_requests})\n&r&8Gestionar aspirantes.'
+  mailbox:
+    text: '&d&lBuzón ({mail_count})\n&r&8Correo entre clanes.'
+  logs:
+    text: '&6&lRegistros\n&r&8Historial del clan.'
+  permissions:
+    text: '&b&lPermisos y rangos\n&r&8Consultar jerarquía.'
+  back:
+    text: '&6Volver'
+board:
+  title: '&e&lTablero del clan'
+  content: '{board}'
+  edit: '&e&lEditar tablero'
+  back: '&6Volver'
+  input-title: '&e&lEditar tablero'
+  input-label: '&eNuevo texto'
+  input-placeholder: 'Usa | para separar líneas'
+description:
+  title: '&6&lDescripción pública'
+  content: '{description}'
+  edit: '&e&lEditar descripción'
+  back: '&6Volver'
+  input-title: '&6&lEditar descripción'
+  input-label: '&eNueva descripción'
+  input-placeholder: 'Describe tu clan...'

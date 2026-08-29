@@ -1,0 +1,18 @@
+# Solo Bedrock. Java sigue usando NativeMenus/config actuales.
+title: '&a&lCrear clan'
+content:
+  - '&7Completa los datos de tu nuevo clan.'
+  - '&8El ID es corto y visible junto al nombre.'
+form:
+  name-label: '&eNombre del clan'
+  name-placeholder: 'Ej: Guardianes del Norte'
+  id-label: '&eID / Tag'
+  id-placeholder: 'Ej: GDN'
+confirm:
+  title: '&a&lConfirmar creación'
+  content: '&7Clan: &f{name}\n&7ID: &b{id}\n{cost_line}'
+  cost-line: '&7Coste: &e{cost} monedas'
+  free-line: ''
+  button-paid: '&a&lCrear clan\n&r&7Pagar {cost} monedas'
+  button-free: '&a&lCrear clan\n&r&7Confirmar creación'
+  back: '&6Volver'

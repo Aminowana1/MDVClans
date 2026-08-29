@@ -1,0 +1,24 @@
+title: '&9&lRelaciones'
+content:
+  - '&7Aliados, enemigos, estadísticas y rankings.'
+buttons:
+  list:
+    text: '&9&lAliados y enemigos\n&r&8Consultar relaciones.'
+  kills:
+    text: '&c&lBajas entre clanes\n&r&8Estadísticas de combate.'
+  strength:
+    text: '&6&lRanking de fuerza'
+  kills-top:
+    text: '&c&lRanking de kills'
+  bank-top:
+    text: '&e&lRanking de banco'
+  back:
+    text: '&6Volver'
+list:
+  title: '&9&lRelaciones &8({page}/{pages})'
+  content: '&7Selecciona un clan.'
+  page-size: 8
+  entry: '&f{name} &8[&6{id}&8]\n&r&7Relación: {relation}'
+  previous: '&ePágina anterior'
+  next: '&ePágina siguiente'
+  back: '&6Volver'

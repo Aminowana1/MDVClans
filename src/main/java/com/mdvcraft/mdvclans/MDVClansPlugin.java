@@ -132,6 +132,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private final Map<UUID, String> previousNativeMenu = new ConcurrentHashMap<>();
     private final Set<UUID> suppressHistoryOnce = ConcurrentHashMap.newKeySet();
     private int nametagTaskId = -1;
+    private BedrockClanUi bedrockUi;
 
     // 1.10.25: snapshot ligero para placeholders de rankings de clanes.
     // Evita recalcular SQLite una vez por cada línea de holograma.
@@ -146,6 +147,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         saveNativeMenuResources();
         loadMessages();
         loadNativeMenus();
+        bedrockUi = new BedrockClanUi();
+        bedrockUi.reload();
         reloadLocalSettings();
         setupEconomy();
 
@@ -179,7 +182,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.10.25 habilitado.");
+        getLogger().info("MDVClans 1.11.0 habilitado.");
     }
 
     @Override
@@ -550,6 +553,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 reloadConfig();
                 loadMessages();
                 loadNativeMenus();
+                if (bedrockUi != null) bedrockUi.reload();
                 reloadLocalSettings();
                 if (nametagTaskId != -1) Bukkit.getScheduler().cancelTask(nametagTaskId);
                 nametagTaskId = -1;
@@ -804,6 +808,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void startClanCreateNamePrompt(Player player) throws SQLException {
+        if (bedrockUi != null && bedrockUi.isBedrock(player)) { bedrockUi.openCreate(player); return; }
         if (!getConfig().getBoolean("creation.enabled", true)) {
             msg(player, "&cLa creación de clanes está desactivada.");
             return;
@@ -1645,6 +1650,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             msg(player, msgConfig("menu.requires-clan", "&cNo perteneces a ningún clan. Solo puedes abrir la lista de clanes o crear uno."));
             return;
         }
+
+        if (bedrockUi != null && bedrockUi.openDynamic(player, ui, page)) return;
 
         switch (ui) {
             case "principal", "completo", "panel", "hub", "gestion", "conclan", "con_clan", "clan_con_clan", "sinclan", "sin_clan", "clan_sin_clan", "crear", "creacion", "crear_clan", "nuevo_clan" -> openLegacyMainOrRedirect(player, ui);
@@ -4452,6 +4459,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void openFullClanHub(Player player) throws SQLException {
+        if (bedrockUi != null && bedrockUi.isBedrock(player)) { openMDVSocialClanRoot(player); return; }
         Member viewer = requireMember(player); if (viewer == null) return;
         Clan clan = getClan(viewer.clanId()).orElseThrow();
         Map<String, String> ph = clanPlaceholders(clan);
@@ -4472,6 +4480,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void openNoClanMenu(Player player) throws SQLException {
+        if (bedrockUi != null && bedrockUi.isBedrock(player)) { openMDVSocialClanRoot(player); return; }
         Inventory inv = Bukkit.createInventory(new ClanMenuHolder("noclan", 1, -1, null, -1), 27, nativeTitle("no-clan", "&8&lClanes", Map.of("player", player.getName())));
         fill(inv);
         inv.setItem(nativeSlot("menus.no-clan.items.list.slot", 11), nativeItem("menus.no-clan.items.list", Material.BOOK, "&b&lLista de clanes", List.of("", "&7Mira los clanes creados", "&7en MDVCRAFT.", "", "&eClick para abrir."), Map.of("player", player.getName())));
@@ -4481,6 +4490,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void openCreateClanMenu(Player player) throws SQLException {
+        if (bedrockUi != null && bedrockUi.isBedrock(player)) { bedrockUi.openCreate(player); return; }
         if (getMember(player.getUniqueId()).isPresent()) {
             msg(player, msgConfig("creation.already-in-clan", "&cYa perteneces a un clan."));
             return;
@@ -4495,6 +4505,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void openClanManagementMenu(Player player) throws SQLException {
+        if (bedrockUi != null && bedrockUi.isBedrock(player)) { openMDVSocialClanRoot(player); return; }
         Member member = requireMember(player); if (member == null) return;
         Clan clan = getClan(member.clanId()).orElseThrow();
         Map<String, String> ph = clanPlaceholders(clan);
@@ -4513,6 +4524,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void openMembersMenu(Player player, int page) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openMembers(player, page)) return;
         Member viewer = requireMember(player); if (viewer == null) return;
         Clan clan = getClan(viewer.clanId()).orElseThrow();
         List<Member> members = getMembers(clan.id());
@@ -4530,6 +4542,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void openClanInfoMenu(Player player) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openInfo(player)) return;
         Member member = requireMember(player); if (member == null) return;
         Clan clan = getClan(member.clanId()).orElseThrow();
         Map<String, String> ph = clanPlaceholders(clan);
@@ -4558,6 +4571,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
     private void openRelationsMenu(Player player) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openRelations(player)) return;
         Member member = requireMember(player); if (member == null) return;
         Clan clan = getClan(member.clanId()).orElseThrow();
         Map<String, String> ph = clanPlaceholders(clan);
@@ -4572,6 +4586,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
     private void openStorageHubMenu(Player player) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openStorageHub(player)) return;
         Member member = requireMember(player); if (member == null) return;
         Clan clan = getClan(member.clanId()).orElseThrow();
         Map<String, String> ph = clanPlaceholders(clan);
@@ -4586,6 +4601,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
     private void openBasesMenu(Player player) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openBases(player)) return;
         Member member = requireMember(player); if (member == null) return;
         Clan clan = getClan(member.clanId()).orElseThrow();
         Map<String, String> ph = clanPlaceholders(clan);
@@ -4618,6 +4634,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void openClanListMenu(Player player, int page) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openClanList(player, page)) return;
         List<Clan> clans = listClans();
         Map<String, String> basePh = Map.of("player", player.getName());
         Inventory inv = Bukkit.createInventory(new ClanMenuHolder("clanlist", page, -1, null, -1), 54, nativeTitle("clan-list", "&8Clanes de MDVCRAFT", basePh));
@@ -4648,6 +4665,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
     private void openRelationsListMenu(Player player, int page) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openRelationsList(player, page)) return;
         Member member = requireMember(player); if (member == null) return;
         Clan own = getClan(member.clanId()).orElseThrow();
         List<ClanRelationView> relations = getVisibleRelations(member.clanId());
@@ -4670,6 +4688,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
     private void openKillStatsGui(Player player) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openKillStats(player)) return;
         Member member = requireMember(player); if (member == null) return;
         Clan clan = getClan(member.clanId()).orElseThrow();
         Map<String, String> ownPh = clanPlaceholders(clan);
@@ -4695,6 +4714,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
     private void openTopGui(Player player, String mode) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openRanking(player, mode)) return;
         if (!equalsAny(mode, "fuerza", "kills", "banco")) mode = "fuerza";
         List<ClanTopEntry> entries = topEntries(mode);
         Map<String, String> menuPh = Map.of("mode", mode);
@@ -4719,6 +4739,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
     private void openMailboxMenu(Player player, int page) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openMailbox(player, page)) return;
         Member member = requireMember(player); if (member == null) return;
         Clan own = getClan(member.clanId()).orElseThrow();
         List<ClanMail> mails = getClanMails(member.clanId(), page, GUI_PAGE_SIZE);
@@ -4745,6 +4766,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void openLogsGui(Player player, int page, String filter) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openLogs(player, page, filter)) return;
         Member member = requireMember(player); if (member == null) return;
         if (!hasRank(player, member, "logs-view")) return;
         String normalized = normalizeLogFilter(filter);
@@ -4796,6 +4818,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void openSettingsMenu(Player player) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openSettings(player)) return;
         Member member = requireMember(player); if (member == null) return;
         Clan clan = getClan(member.clanId()).orElseThrow();
         Map<String, String> ph = clanPlaceholders(clan);
@@ -4822,6 +4845,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
     private void openRoleSettingsMenu(Player player) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openRoles(player)) return;
         Member member = requireMember(player); if (member == null) return;
         Clan clan = getClan(member.clanId()).orElseThrow();
         Inventory inv = Bukkit.createInventory(new ClanMenuHolder("rolesettings", 1, clan.id(), null, -1), 27, nativeTitle("role-settings", "&8Rangos &b{id}", clanPlaceholders(clan)));
@@ -4839,10 +4863,12 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
     private void openPermissionsMenu(Player player, int page) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openPermissions(player, page, false)) return;
         openPermissionTableMenu(player, page, false);
     }
 
     private void openPermissionsEditMenu(Player player, int page) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openPermissions(player, page, true)) return;
         Member member = requireMember(player); if (member == null) return;
         if (!hasRank(player, member, "permissions-edit")) return;
         openPermissionTableMenu(player, page, true);
@@ -4912,6 +4938,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void openJoinRequestsMenu(Player player, int page) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openJoinRequests(player, page)) return;
         Member member = requireMember(player); if (member == null) return;
         Clan clan = getClan(member.clanId()).orElseThrow();
         cleanupInvalidJoinRequests(clan.id());
@@ -4947,6 +4974,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
     private void openMemberActionMenu(Player player, UUID targetUuid) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openMemberActions(player, targetUuid, 1)) return;
         Member actor = requireMember(player); if (actor == null) return;
         Optional<Member> targetOpt = getMember(targetUuid);
         if (targetOpt.isEmpty() || targetOpt.get().clanId() != actor.clanId()) { msg(player, "&cEse jugador ya no está en tu clan."); return; }
@@ -4980,6 +5008,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
     private void openClanActionMenu(Player player, int targetClanId) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openClanActions(player, targetClanId, "clanlist", 1)) return;
         Optional<Clan> targetOpt = getClan(targetClanId);
         if (targetOpt.isEmpty()) { msg(player, "&cClan no encontrado."); return; }
         Clan target = targetOpt.get();
@@ -5061,6 +5090,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void openMailActionMenu(Player player, int mailId) throws SQLException {
+        if (bedrockUi != null && bedrockUi.openMailActions(player, mailId, 1)) return;
         Member member = requireMember(player); if (member == null) return;
         Optional<ClanMail> mailOpt = getClanMail(member.clanId(), mailId);
         if (mailOpt.isEmpty()) { msg(player, "&cCorreo no encontrado."); return; }
@@ -7127,6 +7157,595 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         if (member.isEmpty()) return Collections.emptyList();
         return getMembers(member.get().clanId()).stream().map(Member::name).collect(Collectors.toList());
     }
+
+
+    // ============================================================
+    // BEDROCK FORMS - 1.11.0
+    // ============================================================
+    // Java conserva todos sus NativeMenus/Inventarios actuales.
+    // Esta capa solo se activa para jugadores Floodgate y reutiliza
+    // la misma lógica/SQLite/comandos del core de MDVClans.
+    private final class BedrockClanUi {
+        private static final List<String> FILES = List.of(
+                "create.yml", "members.yml", "member_actions.yml", "info.yml",
+                "relations.yml", "clan_list.yml", "clan_actions.yml", "storage.yml",
+                "bases.yml", "mailbox.yml", "mail_actions.yml", "settings.yml",
+                "roles.yml", "permissions.yml", "join_requests.yml", "rankings.yml",
+                "logs.yml"
+        );
+
+        private final Map<String, YamlConfiguration> menus = new HashMap<>();
+        private final Map<UUID, Long> actionDebounce = new ConcurrentHashMap<>();
+        private boolean floodgateAvailable;
+
+        void reload() {
+            floodgateAvailable = Bukkit.getPluginManager().isPluginEnabled("floodgate");
+            File folder = new File(getDataFolder(), "MenusBedrock");
+            if (!folder.exists() && !folder.mkdirs()) {
+                getLogger().warning("[Bedrock] No se pudo crear MenusBedrock.");
+                return;
+            }
+            for (String file : FILES) {
+                File target = new File(folder, file);
+                if (!target.exists()) {
+                    try { saveResource("MenusBedrock/" + file, false); }
+                    catch (IllegalArgumentException ex) {
+                        getLogger().warning("[Bedrock] Recurso faltante MenusBedrock/" + file + ": " + ex.getMessage());
+                    }
+                }
+            }
+            menus.clear();
+            File[] loaded = folder.listFiles((dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".yml") || name.toLowerCase(Locale.ROOT).endsWith(".yaml"));
+            if (loaded != null) {
+                for (File file : loaded) {
+                    String id = file.getName();
+                    int dot = id.lastIndexOf('.');
+                    if (dot > 0) id = id.substring(0, dot);
+                    menus.put(id.toLowerCase(Locale.ROOT), YamlConfiguration.loadConfiguration(file));
+                }
+            }
+            getLogger().info("[Bedrock] MenusBedrock cargados: " + menus.size() + (floodgateAvailable ? " (Floodgate detectado)" : " (Floodgate no detectado)"));
+        }
+
+        boolean isBedrock(Player player) {
+            if (player == null) return false;
+            if (!floodgateAvailable) floodgateAvailable = Bukkit.getPluginManager().isPluginEnabled("floodgate");
+            if (!floodgateAvailable) return false;
+            try { return org.geysermc.floodgate.api.FloodgateApi.getInstance().isFloodgatePlayer(player.getUniqueId()); }
+            catch (Throwable ignored) { return false; }
+        }
+
+        boolean openDynamic(Player player, String rawUi, int page) throws SQLException {
+            if (!isBedrock(player)) return false;
+            String ui = normalizeUiName(rawUi);
+            switch (ui) {
+                case "crear", "creacion", "crear_clan", "nuevo_clan" -> openCreate(player);
+                case "miembros", "miembro", "members" -> openMembers(player, page);
+                case "info", "tablero", "informacion", "informacion_clan" -> openInfo(player);
+                case "relaciones", "relation", "relations" -> openRelations(player);
+                case "relaciones_lista", "lista_relaciones", "aliados_enemigos" -> openRelationsList(player, page);
+                case "almacen", "almacen_banco", "banco_almacen", "recursos" -> openStorageHub(player);
+                case "base", "bases", "bases_clan", "base_clan" -> openBases(player);
+                case "lista", "clanes", "lista_clanes", "lista_con_clan", "lista_sinclan", "lista_sin_clan" -> openClanList(player, page);
+                case "correo", "correos", "buzon", "buzon_clan" -> openMailbox(player, page);
+                case "top", "ranking", "fuerza", "top_fuerza", "ranking_fuerza" -> openRanking(player, "fuerza");
+                case "top_kills", "ranking_kills" -> openRanking(player, "kills");
+                case "top_banco", "ranking_banco" -> openRanking(player, "banco");
+                case "bajas", "kills", "estadisticas" -> openKillStats(player);
+                case "logs", "registro", "registros" -> openLogs(player, page, currentLogFilter.getOrDefault(player.getUniqueId(), "ALL"));
+                case "ajustes", "settings", "configuracion" -> openSettings(player);
+                case "rangos", "roles" -> openRoles(player);
+                case "permisos", "permissions" -> openPermissions(player, page, false);
+                case "permisos_editar", "editar_permisos", "permissions_edit", "permissionsedit" -> openPermissions(player, page, true);
+                case "solicitudes", "requests", "join_requests" -> openJoinRequests(player, page);
+                case "principal", "completo", "panel", "hub", "gestion", "conclan", "con_clan", "clan_con_clan", "sinclan", "sin_clan", "clan_sin_clan" -> openSocialRoot(player);
+                default -> openSocialRoot(player);
+            }
+            return true;
+        }
+
+        private YamlConfiguration ui(String id) {
+            return menus.getOrDefault(id, new YamlConfiguration());
+        }
+
+        private String text(String menu, String path, String fallback, Map<String, String> tokens) {
+            String raw = ui(menu).getString(path, fallback);
+            if (raw == null) raw = fallback == null ? "" : fallback;
+            for (Map.Entry<String, String> entry : tokens.entrySet()) raw = raw.replace("{" + entry.getKey() + "}", entry.getValue() == null ? "" : entry.getValue());
+            return color(raw.replace("\\n", "\n"));
+        }
+
+        private String content(String menu, String path, String fallback, Map<String, String> tokens) {
+            YamlConfiguration yaml = ui(menu);
+            if (yaml.isList(path)) {
+                List<String> lines = yaml.getStringList(path);
+                String joined = String.join("\n", lines);
+                return replaceTokens(joined, tokens);
+            }
+            return text(menu, path, fallback, tokens);
+        }
+
+        private String replaceTokens(String raw, Map<String, String> tokens) {
+            if (raw == null) return "";
+            for (Map.Entry<String, String> entry : tokens.entrySet()) raw = raw.replace("{" + entry.getKey() + "}", entry.getValue() == null ? "" : entry.getValue());
+            return color(raw.replace("\\n", "\n"));
+        }
+
+        private void addButton(org.geysermc.cumulus.form.SimpleForm.Builder builder, String menu, String path, String fallback, Map<String, String> tokens) {
+            String label = text(menu, path + ".text", fallback, tokens);
+            String image = ui(menu).getString(path + ".image.data", "");
+            if (image == null || image.isBlank()) builder.button(label);
+            else {
+                String type = ui(menu).getString(path + ".image.type", "URL");
+                org.geysermc.cumulus.util.FormImage.Type imageType = type.equalsIgnoreCase("PATH")
+                        ? org.geysermc.cumulus.util.FormImage.Type.PATH : org.geysermc.cumulus.util.FormImage.Type.URL;
+                builder.button(label, imageType, image);
+            }
+        }
+
+        private void addRawButton(org.geysermc.cumulus.form.SimpleForm.Builder builder, String menu, String path, String fallback, Map<String, String> tokens) {
+            YamlConfiguration yaml = ui(menu);
+            String label = yaml.isConfigurationSection(path)
+                    ? text(menu, path + ".text", fallback, tokens)
+                    : text(menu, path, fallback, tokens);
+            String image = yaml.getString(path + ".image.data", "");
+            if (image == null || image.isBlank()) builder.button(label);
+            else {
+                String type = yaml.getString(path + ".image.type", "URL");
+                org.geysermc.cumulus.util.FormImage.Type imageType = type.equalsIgnoreCase("PATH")
+                        ? org.geysermc.cumulus.util.FormImage.Type.PATH : org.geysermc.cumulus.util.FormImage.Type.URL;
+                builder.button(label, imageType, image);
+            }
+        }
+
+        private boolean send(Player player, org.geysermc.cumulus.form.SimpleForm.Builder builder) {
+            try { return org.geysermc.floodgate.api.FloodgateApi.getInstance().sendForm(player.getUniqueId(), builder); }
+            catch (Throwable ex) {
+                getLogger().warning("[Bedrock] No se pudo enviar SimpleForm a " + player.getName() + ": " + ex.getMessage());
+                return false;
+            }
+        }
+
+        private boolean send(Player player, org.geysermc.cumulus.form.CustomForm.Builder builder) {
+            try { return org.geysermc.floodgate.api.FloodgateApi.getInstance().sendForm(player.getUniqueId(), builder); }
+            catch (Throwable ex) {
+                getLogger().warning("[Bedrock] No se pudo enviar CustomForm a " + player.getName() + ": " + ex.getMessage());
+                return false;
+            }
+        }
+
+        private void run(Player player, Runnable action) {
+            if (player == null) return;
+            long now = System.currentTimeMillis();
+            long previous = actionDebounce.getOrDefault(player.getUniqueId(), 0L);
+            if (now - previous < 110L) return;
+            actionDebounce.put(player.getUniqueId(), now);
+            Bukkit.getScheduler().runTaskLater(MDVClansPlugin.this, () -> {
+                if (player.isOnline()) action.run();
+            }, 1L);
+        }
+
+        private void sql(Player player, SqlRunnable action) {
+            try { action.run(); }
+            catch (SQLException ex) {
+                getLogger().warning("[Bedrock] Error SQL de interfaz para " + player.getName() + ": " + ex.getMessage());
+                msg(player, "&cNo se pudo completar la acción del clan.");
+            }
+        }
+
+        private void openSocialRoot(Player player) {
+            player.closeInventory();
+            player.performCommand("social " + defaultSocialBackTarget(player));
+        }
+
+        private Map<String, String> clanTokens(Clan clan) throws SQLException {
+            Map<String, String> t = new HashMap<>();
+            t.put("id", clan.tag());
+            t.put("name", clan.name());
+            t.put("tier_name", tierName(clan.tier()));
+            t.put("tier", String.valueOf(clan.tier()));
+            t.put("members", String.valueOf(countMembers(clan.id())));
+            t.put("max_members", String.valueOf(maxMembersForClan(clan)));
+            t.put("bank", formatNumber(clan.bankBalance()));
+            t.put("strength", formatNumber(calculateStrength(clan)));
+            t.put("entry", clan.open() ? "&aAbierto" : "&cPor solicitud");
+            t.put("join_requests", String.valueOf(countJoinRequests(clan.id())));
+            t.put("mail_count", String.valueOf(countClanMails(clan.id())));
+            t.put("description", clanDescription(clan));
+            t.put("board", String.join("\n", boardLines(clan.boardMessage())));
+            if (clan.tier() < maxClanTier()) {
+                ClanTier next = tierDefinition(clan.tier() + 1);
+                t.put("next_tier", next.name());
+                t.put("upgrade_cost", formatNumber(next.cost()));
+            } else {
+                t.put("next_tier", "Máximo");
+                t.put("upgrade_cost", "-");
+            }
+            t.put("storage_display", String.valueOf(storageSlotsForClan(clan)) + " slots");
+            return t;
+        }
+
+        void openCreate(Player player) throws SQLException {
+            if (!isBedrock(player)) return;
+            if (!getConfig().getBoolean("creation.enabled", true)) { msg(player, "&cLa creación de clanes está desactivada."); return; }
+            if (getMember(player.getUniqueId()).isPresent()) { msg(player, "&cYa perteneces a un clan."); return; }
+            if (countClans() >= getConfig().getInt("limits.max-clans", 60)) { msg(player, "&cEl servidor alcanzó el máximo de clanes."); return; }
+            Map<String, String> t = Map.of();
+            org.geysermc.cumulus.form.CustomForm.Builder builder = org.geysermc.cumulus.form.CustomForm.builder()
+                    .title(text("create", "title", "&a&lCrear clan", t))
+                    .input(text("create", "form.name-label", "&eNombre del clan", t), stripColors(text("create", "form.name-placeholder", "Ej: Guardianes", t)), "")
+                    .input(text("create", "form.id-label", "&eID / Tag", t), stripColors(text("create", "form.id-placeholder", "Ej: GDN", t)), "");
+            builder.validResultHandler(response -> {
+                String rawName = response.asInput(0);
+                String rawTag = response.asInput(1);
+                run(player, () -> sql(player, () -> validateAndConfirmCreate(player, rawTag, rawName)));
+            });
+            send(player, builder);
+        }
+
+        private void validateAndConfirmCreate(Player player, String rawTag, String rawName) throws SQLException {
+            if (rawName == null) rawName = "";
+            if (rawTag == null) rawTag = "";
+            String formatting = validateClanFormatting(rawTag, rawName);
+            if (formatting != null) { msg(player, formatting); openCreate(player); return; }
+            String tag = normalizeTag(rawTag);
+            String name = sanitizeClanName(rawName);
+            String validation = validateClanIdentity(tag, name);
+            if (validation != null) { msg(player, validation); openCreate(player); return; }
+            if (getClanByTag(tag).isPresent()) { msg(player, "&cYa existe un clan con ese ID."); openCreate(player); return; }
+            if (getClanByName(name).isPresent()) { msg(player, "&cYa existe un clan con ese nombre."); openCreate(player); return; }
+            double cost = getConfig().getDouble("creation.cost", 10.0D);
+            boolean paid = getConfig().getBoolean("creation.cost-enabled", false) && cost > 0D;
+            Map<String, String> t = new HashMap<>();
+            t.put("name", name); t.put("id", tag); t.put("cost", formatNumber(cost));
+            t.put("cost_line", paid ? text("create", "confirm.cost-line", "&7Coste: &e{cost} monedas", t)
+                    : text("create", "confirm.free-line", "", t));
+            org.geysermc.cumulus.form.SimpleForm.Builder builder = org.geysermc.cumulus.form.SimpleForm.builder()
+                    .title(text("create", "confirm.title", "&a&lConfirmar creación", t))
+                    .content(text("create", "confirm.content", "&7Clan: &f{name}\n&7ID: &b{id}\n{cost_line}", t));
+            builder.button(text("create", paid ? "confirm.button-paid" : "confirm.button-free", paid ? "&a&lCrear clan\n&r&7Pagar {cost} monedas" : "&a&lCrear clan", t));
+            builder.button(text("create", "confirm.back", "&6Volver", t));
+            builder.validResultHandler(response -> run(player, () -> sql(player, () -> {
+                if (response.clickedButtonId() == 0) {
+                    handleCreate(player, new String[]{"crear", tag, name});
+                    if (getMember(player.getUniqueId()).isPresent()) openSocialRoot(player);
+                } else openCreate(player);
+            })));
+            send(player, builder);
+        }
+
+        boolean openMembers(Player player, int page) throws SQLException {
+            if (!isBedrock(player)) return false;
+            Member viewer = requireMember(player); if (viewer == null) return true;
+            Clan clan = getClan(viewer.clanId()).orElseThrow();
+            List<Member> all = getMembers(clan.id());
+            int pageSize = Math.max(4, ui("members").getInt("page-size", 8));
+            int pages = Math.max(1, (int) Math.ceil(all.size() / (double) pageSize));
+            int safePage = Math.max(1, Math.min(page, pages));
+            int start = (safePage - 1) * pageSize;
+            Map<String, String> base = clanTokens(clan);
+            base.put("page", String.valueOf(safePage)); base.put("pages", String.valueOf(pages)); base.put("count", String.valueOf(all.size()));
+            org.geysermc.cumulus.form.SimpleForm.Builder builder = org.geysermc.cumulus.form.SimpleForm.builder()
+                    .title(text("members", "title", "&a&lMiembros &8({page}/{pages})", base))
+                    .content(content("members", "content", "&7Selecciona un miembro.", base));
+            List<Runnable> actions = new ArrayList<>();
+            if (can(viewer, "invite") && all.size() < maxMembersForClan(clan)) {
+                addButton(builder, "members", "buttons.invite", "&a&lInvitar jugador\n&r&8Escribe el nombre del jugador.", base);
+                actions.add(() -> openInviteForm(player, safePage));
+            }
+            for (int i = start; i < Math.min(start + pageSize, all.size()); i++) {
+                Member m = all.get(i);
+                Map<String, String> t = new HashMap<>(base);
+                boolean online = Bukkit.getPlayer(m.uuid()) != null;
+                t.put("player", m.name()); t.put("role", String.valueOf(m.role())); t.put("role_name", getRoleName(clan.id(), m.role()));
+                t.put("status", online ? text("members", "member.online", "&aEn línea", t) : text("members", "member.offline", "&8Desconectado", t));
+                addButton(builder, "members", "member", "&f{player}\n&r&7{role_name} • {status}", t);
+                actions.add(() -> sql(player, () -> openMemberActions(player, m.uuid(), safePage)));
+            }
+            if (safePage > 1) { addButton(builder, "members", "buttons.previous", "&ePágina anterior", base); actions.add(() -> sql(player, () -> openMembers(player, safePage - 1))); }
+            if (safePage < pages) { addButton(builder, "members", "buttons.next", "&ePágina siguiente", base); actions.add(() -> sql(player, () -> openMembers(player, safePage + 1))); }
+            addButton(builder, "members", "buttons.back", "&6Volver", base); actions.add(() -> openSocialRoot(player));
+            builder.validResultHandler(response -> run(player, () -> {
+                int idx = response.clickedButtonId(); if (idx >= 0 && idx < actions.size()) actions.get(idx).run();
+            }));
+            send(player, builder);
+            return true;
+        }
+
+        private void openInviteForm(Player player, int returnPage) {
+            org.geysermc.cumulus.form.CustomForm.Builder builder = org.geysermc.cumulus.form.CustomForm.builder()
+                    .title(text("members", "invite-form.title", "&a&lInvitar al clan", Map.of()))
+                    .input(text("members", "invite-form.label", "&eNombre del jugador", Map.of()),
+                            stripColors(text("members", "invite-form.placeholder", "Escribe el nombre...", Map.of())), "");
+            builder.validResultHandler(response -> {
+                String target = response.asInput(0);
+                run(player, () -> sql(player, () -> {
+                    if (target != null && !target.isBlank()) handleInvite(player, new String[]{"invitar", target.trim()});
+                    openMembers(player, returnPage);
+                }));
+            });
+            send(player, builder);
+        }
+
+        boolean openMemberActions(Player player, UUID targetUuid, int returnPage) throws SQLException {
+            if (!isBedrock(player)) return false;
+            Member actor = requireMember(player); if (actor == null) return true;
+            Optional<Member> opt = getMember(targetUuid);
+            if (opt.isEmpty() || opt.get().clanId() != actor.clanId()) { msg(player, "&cEse miembro ya no está en tu clan."); openMembers(player, returnPage); return true; }
+            Member target = opt.get();
+            Clan clan = getClan(actor.clanId()).orElseThrow();
+            boolean online = Bukkit.getPlayer(target.uuid()) != null;
+            Map<String, String> t = new HashMap<>();
+            t.put("player", target.name()); t.put("role", String.valueOf(target.role())); t.put("role_name", getRoleName(clan.id(), target.role()));
+            t.put("status", online ? "&aEn línea" : "&8Desconectado");
+            org.geysermc.cumulus.form.SimpleForm.Builder builder = org.geysermc.cumulus.form.SimpleForm.builder()
+                    .title(text("member_actions", "title", "&a&l{player}", t))
+                    .content(content("member_actions", "content", "&7Rango: &f{role_name}", t));
+            List<Runnable> actions = new ArrayList<>();
+            if (!target.uuid().equals(player.getUniqueId())) {
+                addButton(builder, "member_actions", "buttons.mail", "&d&lEnviar carta", t);
+                actions.add(() -> openPersonalMailForm(player, target, returnPage));
+            }
+            if (can(actor, "promote") && target.role() < actor.role() && target.role() < maxRole() - 1) {
+                addButton(builder, "member_actions", "buttons.promote", "&a&lPromover", t);
+                actions.add(() -> { player.performCommand("clan promover " + target.name()); sql(player, () -> openMemberActions(player, target.uuid(), returnPage)); });
+            }
+            if (can(actor, "demote") && target.role() < actor.role() && target.role() > minRole()) {
+                addButton(builder, "member_actions", "buttons.demote", "&e&lDegradar", t);
+                actions.add(() -> { player.performCommand("clan degradar " + target.name()); sql(player, () -> openMemberActions(player, target.uuid(), returnPage)); });
+            }
+            if (can(actor, "set-rank") && target.role() < maxRole() && (actor.role() >= maxRole() || target.role() < actor.role())) {
+                addButton(builder, "member_actions", "buttons.set-rank", "&6&lAsignar rango", t);
+                actions.add(() -> sql(player, () -> openSetRank(player, target, returnPage)));
+            }
+            if (actor.role() >= maxRole() && !target.uuid().equals(player.getUniqueId())) {
+                addButton(builder, "member_actions", "buttons.leader", "&6&lTransferir liderazgo", t);
+                actions.add(() -> openConfirm(player, "member_actions", "&6&lTransferir liderazgo", "&7¿Transferir el liderazgo a &f" + target.name() + "&7?", "&6&lSí, transferir", "&6Volver",
+                        () -> { player.performCommand("clan lider " + target.name()); openSocialRoot(player); },
+                        () -> sql(player, () -> openMemberActions(player, target.uuid(), returnPage))));
+            }
+            if (can(actor, "kick") && !target.uuid().equals(player.getUniqueId()) && target.role() < actor.role()) {
+                addButton(builder, "member_actions", "buttons.kick", "&c&lExpulsar", t);
+                actions.add(() -> openConfirm(player, "member_actions", text("member_actions", "confirm-kick.title", "&c&lExpulsar miembro", t), text("member_actions", "confirm-kick.content", "&7¿Expulsar a &f{player}&7?", t), text("member_actions", "confirm-kick.confirm", "&c&lSí, expulsar", t), text("member_actions", "confirm-kick.back", "&6Volver", t),
+                        () -> { player.performCommand("clan expulsar " + target.name()); sql(player, () -> openMembers(player, returnPage)); },
+                        () -> sql(player, () -> openMemberActions(player, target.uuid(), returnPage))));
+            }
+            addButton(builder, "member_actions", "buttons.back", "&6Volver", t); actions.add(() -> sql(player, () -> openMembers(player, returnPage)));
+            builder.validResultHandler(response -> run(player, () -> { int idx = response.clickedButtonId(); if (idx >= 0 && idx < actions.size()) actions.get(idx).run(); }));
+            send(player, builder);
+            return true;
+        }
+
+        private void openPersonalMailForm(Player player, Member target, int returnPage) {
+            Map<String, String> t = Map.of("player", target.name());
+            org.geysermc.cumulus.form.CustomForm.Builder builder = org.geysermc.cumulus.form.CustomForm.builder()
+                    .title(text("member_actions", "buttons.mail", "&d&lCarta para {player}", t))
+                    .input("§eMensaje", "Escribe tu carta...", "");
+            builder.validResultHandler(response -> {
+                String message = response.asInput(0);
+                run(player, () -> {
+                    if (message != null && !message.isBlank()) player.performCommand("carta enviar " + target.name() + " " + message.trim());
+                    sql(player, () -> openMemberActions(player, target.uuid(), returnPage));
+                });
+            });
+            send(player, builder);
+        }
+
+        private void openSetRank(Player player, Member target, int returnPage) throws SQLException {
+            Member actor = requireMember(player); if (actor == null) return;
+            Clan clan = getClan(actor.clanId()).orElseThrow();
+            org.geysermc.cumulus.form.SimpleForm.Builder builder = org.geysermc.cumulus.form.SimpleForm.builder()
+                    .title(color("&6&lRango de " + target.name()))
+                    .content(color("&7Selecciona el nuevo rango."));
+            List<Integer> roles = new ArrayList<>();
+            for (int role = minRole(); role < maxRole(); role++) {
+                if (!player.hasPermission("mdvclans.admin") && actor.role() < maxRole() && role >= actor.role()) continue;
+                builder.button(color("&fRango " + role + "\n&7" + getRoleName(clan.id(), role)));
+                roles.add(role);
+            }
+            builder.button(color("&6Volver"));
+            builder.validResultHandler(response -> run(player, () -> {
+                int idx = response.clickedButtonId();
+                if (idx >= 0 && idx < roles.size()) player.performCommand("clan setrango " + target.name() + " " + roles.get(idx));
+                sql(player, () -> openMemberActions(player, target.uuid(), returnPage));
+            }));
+            send(player, builder);
+        }
+
+        boolean openInfo(Player player) throws SQLException {
+            if (!isBedrock(player)) return false;
+            Member member = requireMember(player); if (member == null) return true;
+            Clan clan = getClan(member.clanId()).orElseThrow();
+            Map<String, String> t = clanTokens(clan);
+            org.geysermc.cumulus.form.SimpleForm.Builder builder = org.geysermc.cumulus.form.SimpleForm.builder()
+                    .title(text("info", "title", "&e&lInformación del clan", t))
+                    .content(content("info", "content", "&f{name} &8[&6{id}&8]", t));
+            List<Runnable> actions = new ArrayList<>();
+            addButton(builder, "info", "buttons.board", "&e&lTablero", t); actions.add(() -> sql(player, () -> openBoard(player)));
+            addButton(builder, "info", "buttons.description", "&6&lDescripción pública", t); actions.add(() -> sql(player, () -> openDescription(player)));
+            addButton(builder, "info", "buttons.requests", "&a&lSolicitudes ({join_requests})", t); actions.add(() -> sql(player, () -> openJoinRequests(player, 1)));
+            addButton(builder, "info", "buttons.mailbox", "&d&lBuzón ({mail_count})", t); actions.add(() -> sql(player, () -> openMailbox(player, 1)));
+            if (can(member, "logs-view")) { addButton(builder, "info", "buttons.logs", "&6&lRegistros", t); actions.add(() -> sql(player, () -> openLogs(player, 1, "ALL"))); }
+            addButton(builder, "info", "buttons.permissions", "&b&lPermisos y rangos", t); actions.add(() -> sql(player, () -> openPermissions(player, 1, false)));
+            addButton(builder, "info", "buttons.back", "&6Volver", t); actions.add(() -> openSocialRoot(player));
+            builder.validResultHandler(response -> run(player, () -> { int idx=response.clickedButtonId(); if(idx>=0&&idx<actions.size()) actions.get(idx).run(); }));
+            send(player, builder);
+            return true;
+        }
+
+        private void openBoard(Player player) throws SQLException {
+            Member member = requireMember(player); if (member == null) return;
+            Clan clan = getClan(member.clanId()).orElseThrow(); Map<String,String> t = clanTokens(clan);
+            org.geysermc.cumulus.form.SimpleForm.Builder builder = org.geysermc.cumulus.form.SimpleForm.builder()
+                    .title(text("info", "board.title", "&e&lTablero del clan", t))
+                    .content(text("info", "board.content", "{board}", t));
+            List<Runnable> actions = new ArrayList<>();
+            if (can(member, "board-edit")) { builder.button(text("info", "board.edit", "&e&lEditar tablero", t)); actions.add(() -> openBoardInput(player)); }
+            builder.button(text("info", "board.back", "&6Volver", t)); actions.add(() -> sql(player, () -> openInfo(player)));
+            builder.validResultHandler(r -> run(player, () -> {int i=r.clickedButtonId(); if(i>=0&&i<actions.size())actions.get(i).run();})); send(player,builder);
+        }
+
+        private void openBoardInput(Player player) {
+            org.geysermc.cumulus.form.CustomForm.Builder builder = org.geysermc.cumulus.form.CustomForm.builder()
+                    .title(text("info", "board.input-title", "&e&lEditar tablero", Map.of()))
+                    .input(text("info", "board.input-label", "&eNuevo texto", Map.of()), stripColors(text("info", "board.input-placeholder", "Usa | para separar líneas", Map.of())), "");
+            builder.validResultHandler(r -> { String value=r.asInput(0); run(player,()->sql(player,()->{ if(value!=null&&!value.isBlank()) handleBoard(player,new String[]{"tablero","set",value.trim()}); openBoard(player);})); }); send(player,builder);
+        }
+
+        private void openDescription(Player player) throws SQLException {
+            Member member=requireMember(player); if(member==null)return; Clan clan=getClan(member.clanId()).orElseThrow(); Map<String,String>t=clanTokens(clan);
+            org.geysermc.cumulus.form.SimpleForm.Builder builder=org.geysermc.cumulus.form.SimpleForm.builder().title(text("info","description.title","&6&lDescripción pública",t)).content(text("info","description.content","{description}",t));
+            List<Runnable> actions=new ArrayList<>();
+            if(can(member,"description-edit")){builder.button(text("info","description.edit","&e&lEditar descripción",t));actions.add(()->openDescriptionInput(player));}
+            builder.button(text("info","description.back","&6Volver",t));actions.add(()->sql(player,()->openInfo(player)));
+            builder.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<actions.size())actions.get(i).run();}));send(player,builder);
+        }
+
+        private void openDescriptionInput(Player player){
+            org.geysermc.cumulus.form.CustomForm.Builder builder=org.geysermc.cumulus.form.CustomForm.builder().title(text("info","description.input-title","&6&lEditar descripción",Map.of())).input(text("info","description.input-label","&eNueva descripción",Map.of()),stripColors(text("info","description.input-placeholder","Describe tu clan...",Map.of())),"");
+            builder.validResultHandler(r->{String value=r.asInput(0);run(player,()->sql(player,()->{if(value!=null)handleDescription(player,new String[]{"descripcion","set",value.trim()});openDescription(player);}));});send(player,builder);
+        }
+
+        boolean openRelations(Player player) throws SQLException {
+            if(!isBedrock(player))return false; Member m=requireMember(player);if(m==null)return true;
+            org.geysermc.cumulus.form.SimpleForm.Builder builder=org.geysermc.cumulus.form.SimpleForm.builder().title(text("relations","title","&9&lRelaciones",Map.of())).content(content("relations","content","&7Diplomacia y rankings.",Map.of()));
+            List<Runnable>a=new ArrayList<>();
+            addButton(builder,"relations","buttons.list","&9&lAliados y enemigos",Map.of());a.add(()->sql(player,()->openRelationsList(player,1)));
+            addButton(builder,"relations","buttons.kills","&c&lBajas entre clanes",Map.of());a.add(()->sql(player,()->openKillStats(player)));
+            addButton(builder,"relations","buttons.strength","&6&lRanking de fuerza",Map.of());a.add(()->sql(player,()->openRanking(player,"fuerza")));
+            addButton(builder,"relations","buttons.kills-top","&c&lRanking de kills",Map.of());a.add(()->sql(player,()->openRanking(player,"kills")));
+            addButton(builder,"relations","buttons.bank-top","&e&lRanking de banco",Map.of());a.add(()->sql(player,()->openRanking(player,"banco")));
+            addButton(builder,"relations","buttons.back","&6Volver",Map.of());a.add(()->openSocialRoot(player));
+            builder.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<a.size())a.get(i).run();}));send(player,builder);return true;
+        }
+
+        boolean openRelationsList(Player player,int page)throws SQLException{
+            if(!isBedrock(player))return false;Member m=requireMember(player);if(m==null)return true;Clan own=getClan(m.clanId()).orElseThrow();List<ClanRelationView>list=getVisibleRelations(own.id());
+            int size=Math.max(4,ui("relations").getInt("list.page-size",8));int pages=Math.max(1,(int)Math.ceil(list.size()/(double)size));int p=Math.max(1,Math.min(page,pages));int start=(p-1)*size;
+            Map<String,String>base=new HashMap<>();base.put("page",String.valueOf(p));base.put("pages",String.valueOf(pages));
+            org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("relations","list.title","&9&lRelaciones &8({page}/{pages})",base)).content(text("relations","list.content","&7Selecciona un clan.",base));List<Runnable>a=new ArrayList<>();
+            for(int i=start;i<Math.min(start+size,list.size());i++){ClanRelationView v=list.get(i);Map<String,String>t=new HashMap<>(base);t.put("name",v.clan().name());t.put("id",v.clan().tag());t.put("relation",relationText(v.relation()));b.button(text("relations","list.entry","&f{name} &8[&6{id}&8]\\n&r&7Relación: {relation}",t));a.add(()->sql(player,()->openClanActions(player,v.clan().id(),"relations",p)));}
+            if(p>1){b.button(text("relations","list.previous","&ePágina anterior",base));a.add(()->sql(player,()->openRelationsList(player,p-1)));}if(p<pages){b.button(text("relations","list.next","&ePágina siguiente",base));a.add(()->sql(player,()->openRelationsList(player,p+1)));}
+            b.button(text("relations","list.back","&6Volver",base));a.add(()->sql(player,()->openRelations(player)));b.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<a.size())a.get(i).run();}));send(player,b);return true;
+        }
+
+        boolean openStorageHub(Player player)throws SQLException{
+            if(!isBedrock(player))return false;Member m=requireMember(player);if(m==null)return true;Clan c=getClan(m.clanId()).orElseThrow();Map<String,String>t=clanTokens(c);
+            org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("storage","title","&6&lBanco y almacén",t)).content(content("storage","content","&7Balance: &e{bank}",t));List<Runnable>a=new ArrayList<>();
+            if(can(m,"storage-open")){addButton(b,"storage","buttons.storage","&a&lAbrir almacén",t);a.add(()->sql(player,()->handleStorage(player)));}
+            if(can(m,"bank-deposit")){addButton(b,"storage","buttons.deposit","&a&lDepositar",t);a.add(()->openBankAmount(player,true));}
+            if(can(m,"bank-withdraw")){addButton(b,"storage","buttons.withdraw","&c&lRetirar",t);a.add(()->openBankAmount(player,false));}
+            addButton(b,"storage","buttons.back","&6Volver",t);a.add(()->openSocialRoot(player));b.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<a.size())a.get(i).run();}));send(player,b);return true;
+        }
+
+        private void openBankAmount(Player player,boolean deposit){
+            Map<String,String>t=Map.of();String title=text("storage",deposit?"amount-form.deposit-title":"amount-form.withdraw-title",deposit?"&a&lDepositar al banco":"&c&lRetirar del banco",t);
+            org.geysermc.cumulus.form.CustomForm.Builder b=org.geysermc.cumulus.form.CustomForm.builder().title(title).input(text("storage","amount-form.label","&eCantidad",t),stripColors(text("storage","amount-form.placeholder","Ej: 1000",t)),"");
+            b.validResultHandler(r->{String amount=r.asInput(0);run(player,()->sql(player,()->{if(amount!=null&&!amount.isBlank())handleBank(player,new String[]{"banco",deposit?"depositar":"retirar",amount.trim()});openStorageHub(player);}));});send(player,b);
+        }
+
+        boolean openBases(Player player)throws SQLException{
+            if(!isBedrock(player))return false;Member m=requireMember(player);if(m==null)return true;Clan c=getClan(m.clanId()).orElseThrow();Map<String,String>base=clanTokens(c);base.put("max_bases",String.valueOf(maxBasesForClan(c)));
+            org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("bases","title","&5&lBases del clan",base)).content(content("bases","content","&7Bases disponibles: &e{max_bases}",base));List<Runnable>a=new ArrayList<>();
+            int visible=Math.max(maxBasesForClan(c),Math.max(2,getConfig().getInt("clan-tiers.4.max-bases",2)));
+            for(int n=1;n<=visible;n++){final int number=n;Map<String,String>t=new HashMap<>(base);t.put("number",String.valueOf(n));Optional<ClanBase>bo=getClanBase(c.id(),n);if(n>maxBasesForClan(c)){b.button(text("bases","base.text-locked","&8&lBase {number}\\n&r&cBloqueada por tier",t));a.add(()->msg(player,"&cEsta base está bloqueada por el tier del clan."));}else if(bo.isPresent()){ClanBase cb=bo.get();t.put("world",cb.world());t.put("x",String.valueOf(Math.round(cb.x())));t.put("y",String.valueOf(Math.round(cb.y())));t.put("z",String.valueOf(Math.round(cb.z())));b.button(text("bases","base.text-set","&5&lBase {number}\\n&r&7{world} • {x}, {y}, {z}",t));a.add(()->sql(player,()->openBaseActions(player,number)));}else{b.button(text("bases","base.text-missing","&7&lBase {number}\\n&r&8No establecida",t));a.add(()->sql(player,()->openBaseActions(player,number)));}}
+            b.button(text("bases","buttons.back","&6Volver",base));a.add(()->openSocialRoot(player));b.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<a.size())a.get(i).run();}));send(player,b);return true;
+        }
+
+        private void openBaseActions(Player player,int number)throws SQLException{
+            Member m=requireMember(player);if(m==null)return;Clan c=getClan(m.clanId()).orElseThrow();Map<String,String>t=clanTokens(c);t.put("number",String.valueOf(number));
+            org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("bases","actions.title","&5&lBase {number}",t)).content("");List<Runnable>a=new ArrayList<>();
+            if(getClanBase(c.id(),number).isPresent()){b.button(text("bases","actions.teleport","&5&lTeletransportarse",t));a.add(()->{player.performCommand("clan base "+number);});}
+            if(can(m,"setbase")){b.button(text("bases","actions.set","&6&lEstablecer aquí",t));a.add(()->{player.performCommand("clan setbase "+number);sql(player,()->openBases(player));});}
+            b.button(text("bases","actions.back","&6Volver",t));a.add(()->sql(player,()->openBases(player)));b.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<a.size())a.get(i).run();}));send(player,b);
+        }
+
+        boolean openClanList(Player player,int page)throws SQLException{
+            if(!isBedrock(player))return false;List<Clan>all=listClans();int size=Math.max(4,ui("clan_list").getInt("page-size",8));int pages=Math.max(1,(int)Math.ceil(all.size()/(double)size));int p=Math.max(1,Math.min(page,pages));int start=(p-1)*size;
+            Map<String,String>base=new HashMap<>();base.put("page",String.valueOf(p));base.put("pages",String.valueOf(pages));base.put("count",String.valueOf(all.size()));
+            org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("clan_list","title","&f&lLista de clanes &8({page}/{pages})",base)).content(content("clan_list","content","&7Clanes: &f{count}",base));List<Runnable>a=new ArrayList<>();
+            for(int i=start;i<Math.min(start+size,all.size());i++){Clan c=all.get(i);Map<String,String>t=clanTokens(c);t.putAll(base);b.button(text("clan_list","entry","&f{name} &8[&6{id}&8]\\n&r&7{tier_name} • {members}/{max_members} miembros",t));a.add(()->sql(player,()->openClanActions(player,c.id(),"clanlist",p)));}
+            if(p>1){b.button(text("clan_list","buttons.previous","&ePágina anterior",base));a.add(()->sql(player,()->openClanList(player,p-1)));}if(p<pages){b.button(text("clan_list","buttons.next","&ePágina siguiente",base));a.add(()->sql(player,()->openClanList(player,p+1)));}
+            b.button(text("clan_list","buttons.back","&6Volver",base));a.add(()->openSocialRoot(player));b.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<a.size())a.get(i).run();}));send(player,b);return true;
+        }
+
+        boolean openClanActions(Player player,int targetClanId,String returnMenu,int returnPage)throws SQLException{
+            if(!isBedrock(player))return false;Optional<Clan>opt=getClan(targetClanId);if(opt.isEmpty()){msg(player,"&cClan no encontrado.");return true;}Clan target=opt.get();Optional<Member>own=getMember(player.getUniqueId());Map<String,String>t=clanTokens(target);int ownId=own.map(Member::clanId).orElse(-1);t.put("relation",ownId < 0 ? "&7Sin clan" : relationText(getRelationBetween(ownId,target.id())));
+            org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("clan_actions","title","&f&l{name} &8[&6{id}&8]",t)).content(content("clan_actions","content","&7Entrada: {entry}",t));List<Runnable>a=new ArrayList<>();
+            if(own.isEmpty()){if(target.open()){addButton(b,"clan_actions","buttons.join","&a&lUnirse",t);a.add(()->{player.performCommand("clan unirse "+target.tag());openSocialRoot(player);});}else{addButton(b,"clan_actions","buttons.request","&e&lSolicitar ingreso",t);a.add(()->{player.performCommand("clan unirse "+target.tag());sql(player,()->openClanList(player,returnPage));});}}
+            else if(own.get().clanId()!=target.id()){Member m=own.get();addButton(b,"clan_actions","buttons.info","&b&lInformación pública",t);a.add(()->showPublicClanInfo(player,target,returnMenu,returnPage));if(can(m,"relation")){addButton(b,"clan_actions","buttons.ally","&9&lProponer alianza",t);a.add(()->{player.performCommand("clan relacion "+target.tag()+" aliado");sql(player,()->openClanActions(player,target.id(),returnMenu,returnPage));});addButton(b,"clan_actions","buttons.enemy","&c&lDeclarar enemigo",t);a.add(()->openConfirm(player,"clan_actions","&c&lDeclarar enemigo","&7¿Declarar enemigo al clan &f"+target.name()+"&7?","&c&lSí, declarar","&6Volver",()->{player.performCommand("clan relacion "+target.tag()+" enemigo");sql(player,()->openClanActions(player,target.id(),returnMenu,returnPage));},()->sql(player,()->openClanActions(player,target.id(),returnMenu,returnPage))));addButton(b,"clan_actions","buttons.neutral","&7&lVolver neutral / Paz",t);a.add(()->{player.performCommand("clan relacion "+target.tag()+" neutral");sql(player,()->openClanActions(player,target.id(),returnMenu,returnPage));});}if(can(m,"mail-send")){addButton(b,"clan_actions","buttons.mail","&d&lEnviar correo de clan",t);a.add(()->openClanMailForm(player,target,returnMenu,returnPage));}}
+            b.button(text("clan_actions","buttons.back","&6Volver",t));a.add(()->sql(player,()->{if("relations".equals(returnMenu))openRelationsList(player,returnPage);else openClanList(player,returnPage);}));b.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<a.size())a.get(i).run();}));send(player,b);return true;
+        }
+
+        private void showPublicClanInfo(Player player,Clan target,String returnMenu,int returnPage){sql(player,()->{Map<String,String>t=clanTokens(target);org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(color("&b&l"+target.name()+" &8[&6"+target.tag()+"&8]")).content(color("&7Tier: &d"+tierName(target.tier())+"\n&7Miembros: &e"+countMembers(target.id())+"/&e"+maxMembersForClan(target)+"\n&7Descripción: &f"+clanDescription(target)));b.button(color("&6Volver"));b.validResultHandler(r->run(player,()->sql(player,()->openClanActions(player,target.id(),returnMenu,returnPage))));send(player,b);});}
+
+        private void openClanMailForm(Player player,Clan target,String returnMenu,int returnPage){Map<String,String>t=Map.of("name",target.name(),"id",target.tag());org.geysermc.cumulus.form.CustomForm.Builder b=org.geysermc.cumulus.form.CustomForm.builder().title(text("clan_actions","mail-form.title","&d&lCorreo a {name}",t)).input(text("clan_actions","mail-form.label","&eMensaje",t),stripColors(text("clan_actions","mail-form.placeholder","Escribe el mensaje...",t)),"");b.validResultHandler(r->{String message=r.asInput(0);run(player,()->sql(player,()->{if(message!=null&&!message.isBlank())handleClanMail(player,new String[]{"correo","clan",target.tag(),message.trim()});openClanActions(player,target.id(),returnMenu,returnPage);}));});send(player,b);}
+
+        boolean openMailbox(Player player,int page)throws SQLException{
+            if(!isBedrock(player))return false;Member m=requireMember(player);if(m==null)return true;int count=countClanMails(m.clanId());int size=Math.max(4,ui("mailbox").getInt("page-size",8));int pages=Math.max(1,(int)Math.ceil(count/(double)size));int p=Math.max(1,Math.min(page,pages));List<ClanMail>list=getClanMails(m.clanId(),p,size);Map<String,String>base=Map.of("page",String.valueOf(p),"pages",String.valueOf(pages),"count",String.valueOf(count));org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("mailbox","title","&d&lBuzón del clan &8({page}/{pages})",base)).content(content("mailbox","content","&7Correos: &f{count}",base));List<Runnable>a=new ArrayList<>();
+            for(ClanMail mail:list){Clan from=getClan(mail.fromClanId()).orElse(null);Map<String,String>t=new HashMap<>(base);t.put("mail_id",String.valueOf(mail.id()));t.put("from_name",from==null?"Clan desconocido":from.name());t.put("from_id",from==null?"?":from.tag());b.button(text("mailbox","entry","&6&lCarta #{mail_id}\\n&r&7De: &d{from_name} &8[&6{from_id}&8]",t));a.add(()->sql(player,()->openMailActions(player,mail.id(),p)));}
+            if(p>1){b.button(text("mailbox","buttons.previous","&ePágina anterior",base));a.add(()->sql(player,()->openMailbox(player,p-1)));}if(p<pages){b.button(text("mailbox","buttons.next","&ePágina siguiente",base));a.add(()->sql(player,()->openMailbox(player,p+1)));}b.button(text("mailbox","buttons.back","&6Volver",base));a.add(()->sql(player,()->openInfo(player)));b.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<a.size())a.get(i).run();}));send(player,b);return true;
+        }
+
+        boolean openMailActions(Player player,int mailId,int returnPage)throws SQLException{
+            if(!isBedrock(player))return false;Member m=requireMember(player);if(m==null)return true;Optional<ClanMail>opt=getClanMail(m.clanId(),mailId);if(opt.isEmpty()){msg(player,"&cCorreo no encontrado.");openMailbox(player,returnPage);return true;}ClanMail mail=opt.get();Clan from=getClan(mail.fromClanId()).orElse(null);Map<String,String>t=mailPlaceholders(mail,from);org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("mail_actions","title","&d&lCarta #{mail_id}",t)).content(content("mail_actions","content","&f{message}",t));List<Runnable>a=new ArrayList<>();
+            if(isAllianceRequest(mail)&&can(m,"relation")){b.button(text("mail_actions","buttons.accept-ally","&a&lAceptar alianza",t));a.add(()->sql(player,()->{Optional<Clan>req=getClan(mail.relationClanId());Optional<Clan>own=getClan(m.clanId());if(req.isPresent()&&own.isPresent()){acceptAlliance(own.get(),req.get(),player);deleteClanMail(m.clanId(),mail.id());}openMailbox(player,1);}));b.button(text("mail_actions","buttons.reject-ally","&c&lRechazar alianza",t));a.add(()->sql(player,()->{Optional<Clan>req=getClan(mail.relationClanId());Optional<Clan>own=getClan(m.clanId());if(req.isPresent()&&own.isPresent()){rejectAllianceRequest(own.get(),req.get(),player);deleteClanMail(m.clanId(),mail.id());}openMailbox(player,1);}));}
+            if(isNeutralityRequest(mail)&&can(m,"relation")){b.button(text("mail_actions","buttons.accept-neutral","&a&lAceptar paz",t));a.add(()->sql(player,()->{Optional<Clan>req=getClan(mail.relationClanId());Optional<Clan>own=getClan(m.clanId());if(req.isPresent()&&own.isPresent()){acceptNeutrality(own.get(),req.get(),player);deleteClanMail(m.clanId(),mail.id());}openMailbox(player,1);}));b.button(text("mail_actions","buttons.reject-neutral","&c&lRechazar paz",t));a.add(()->sql(player,()->{Optional<Clan>req=getClan(mail.relationClanId());Optional<Clan>own=getClan(m.clanId());if(req.isPresent()&&own.isPresent()){rejectNeutralityRequest(own.get(),req.get(),player);deleteClanMail(m.clanId(),mail.id());}openMailbox(player,1);}));}
+            if(can(m,"mail-send")&&from!=null){b.button(text("mail_actions","buttons.reply","&d&lResponder",t));a.add(()->openReplyForm(player,mail,from,returnPage));}
+            if(can(m,"mail-delete")){b.button(text("mail_actions","buttons.delete","&c&lEliminar correo",t));a.add(()->openConfirm(player,"mail_actions",text("mail_actions","confirm-delete.title","&c&lEliminar correo",t),text("mail_actions","confirm-delete.content","&7¿Eliminar la carta #{mail_id}?",t),text("mail_actions","confirm-delete.confirm","&c&lSí, eliminar",t),text("mail_actions","confirm-delete.back","&6Volver",t),()->sql(player,()->{deleteClanMail(m.clanId(),mail.id());openMailbox(player,returnPage);}),()->sql(player,()->openMailActions(player,mail.id(),returnPage))));}
+            b.button(text("mail_actions","buttons.back","&6Volver",t));a.add(()->sql(player,()->openMailbox(player,returnPage)));b.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<a.size())a.get(i).run();}));send(player,b);return true;
+        }
+
+        private void openReplyForm(Player player,ClanMail mail,Clan from,int returnPage){Map<String,String>t=mailPlaceholders(mail,from);org.geysermc.cumulus.form.CustomForm.Builder b=org.geysermc.cumulus.form.CustomForm.builder().title(text("mail_actions","reply-form.title","&d&lResponder a {from_name}",t)).input(text("mail_actions","reply-form.label","&eMensaje",t),stripColors(text("mail_actions","reply-form.placeholder","Escribe tu respuesta...",t)),"");b.validResultHandler(r->{String message=r.asInput(0);run(player,()->sql(player,()->{if(message!=null&&!message.isBlank())handleClanMail(player,new String[]{"correo","clan",from.tag(),message.trim()});openMailbox(player,returnPage);}));});send(player,b);}
+
+        boolean openSettings(Player player)throws SQLException{
+            if(!isBedrock(player))return false;Member m=requireMember(player);if(m==null)return true;if(!can(m,"settings")){msg(player,"&cNo tienes permiso para abrir los ajustes del clan.");return true;}Clan c=getClan(m.clanId()).orElseThrow();Map<String,String>t=clanTokens(c);org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("settings","title","&c&lAjustes del clan",t)).content(content("settings","content","&f{name} &8[&6{id}&8]",t));List<Runnable>a=new ArrayList<>();
+            if(can(m,"open")){b.button(text("settings","buttons.toggle-open","&a&lEntrada del clan\\n&r&8Estado: {entry}",t));a.add(()->{player.performCommand("clan abierto "+(c.open()?"off":"on"));sql(player,()->openSettings(player));});}
+            if(can(m,"rename-role")){b.button(text("settings","buttons.roles","&d&lNombres de rangos",t));a.add(()->sql(player,()->openRoles(player)));}
+            if(can(m,"permissions-edit")){b.button(text("settings","buttons.permissions","&b&lConfigurar permisos",t));a.add(()->sql(player,()->openPermissions(player,1,true)));}
+            if(can(m,"rename-clan")){b.button(text("settings","buttons.rename","&e&lCambiar nombre",t));a.add(()->openRenameForm(player,false));}
+            if(can(m,"rename-tag")){b.button(text("settings","buttons.retag","&b&lCambiar ID / Tag",t));a.add(()->openRenameForm(player,true));}
+            if(can(m,"description-edit")){b.button(text("settings","buttons.description","&6&lEditar descripción",t));a.add(()->openDescriptionInput(player));}
+            if(can(m,"banner-set")){b.button(text("settings","buttons.banner","&f&lCambiar estandarte",t));a.add(()->sql(player,()->handleBanner(player,new String[]{"estandarte","set"})));}
+            if(can(m,"tier-upgrade")&&c.tier()<maxClanTier()){b.button(text("settings","buttons.upgrade","&d&lMejorar clan\\n&r&7Coste: {upgrade_cost}",t));a.add(()->openConfirm(player,"settings",text("settings","upgrade-confirm.title","&d&lMejorar clan",t),text("settings","upgrade-confirm.content","&7Subir a &d{next_tier}&7 por &e{upgrade_cost} monedas.",t),text("settings","upgrade-confirm.confirm","&a&lConfirmar mejora",t),text("settings","upgrade-confirm.back","&6Volver",t),()->sql(player,()->{handleTierUpgrade(player);openSettings(player);}),()->sql(player,()->openSettings(player))));}
+            if(m.role()<maxRole()){b.button(text("settings","buttons.leave","&c&lSalir del clan",t));a.add(()->openConfirm(player,"settings",text("settings","leave-confirm.title","&c&lSalir del clan",t),text("settings","leave-confirm.content","&7¿Seguro que quieres abandonar &f{name}&7?",t),text("settings","leave-confirm.confirm","&c&lSí, salir",t),text("settings","leave-confirm.back","&6Volver",t),()->sql(player,()->{handleLeave(player);openSocialRoot(player);}),()->sql(player,()->openSettings(player))));}
+            if(can(m,"disband")){b.button(text("settings","buttons.disband","&4&lDisolver clan",t));a.add(()->openConfirm(player,"settings",text("settings","disband-confirm.title","&4&lDisolver clan",t),text("settings","disband-confirm.content","&cEsto eliminará permanentemente el clan &f{name}&c.",t),text("settings","disband-confirm.confirm","&4&lSí, disolver",t),text("settings","disband-confirm.back","&6Volver",t),()->sql(player,()->{handleDisband(player,new String[]{"disolver","confirmar"});openSocialRoot(player);}),()->sql(player,()->openSettings(player))));}
+            b.button(text("settings","buttons.back","&6Volver",t));a.add(()->openSocialRoot(player));b.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<a.size())a.get(i).run();}));send(player,b);return true;
+        }
+
+        private void openRenameForm(Player player,boolean tag){String menu="settings";String prefix=tag?"retag-form":"rename-form";org.geysermc.cumulus.form.CustomForm.Builder b=org.geysermc.cumulus.form.CustomForm.builder().title(text(menu,prefix+".title",tag?"&b&lCambiar ID":"&e&lCambiar nombre",Map.of())).input(text(menu,prefix+".label",tag?"&eNuevo ID / Tag":"&eNuevo nombre",Map.of()),stripColors(text(menu,prefix+".placeholder",tag?"Ej: MDV":"Nombre del clan",Map.of())),"");b.validResultHandler(r->{String value=r.asInput(0);run(player,()->sql(player,()->{if(value!=null&&!value.isBlank())handleEditClan(player,new String[]{"editar",tag?"id":"nombre",value.trim()});openSettings(player);}));});send(player,b);}
+
+        boolean openRoles(Player player)throws SQLException{
+            if(!isBedrock(player))return false;Member m=requireMember(player);if(m==null)return true;Clan c=getClan(m.clanId()).orElseThrow();org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("roles","title","&d&lRangos del clan",Map.of())).content(content("roles","content","&7Selecciona un rango.",Map.of()));List<Integer>roles=new ArrayList<>();if(can(m,"rename-role")){for(int role=minRole();role<=maxRole();role++){Map<String,String>t=Map.of("role",String.valueOf(role),"name",getRoleName(c.id(),role));b.button(text("roles","role","&d&lRango {role}\\n&r&f{name}",t));roles.add(role);}}b.button(text("roles","back","&6Volver",Map.of()));b.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<roles.size())openRoleRename(player,roles.get(i));else sql(player,()->openSettings(player));}));send(player,b);return true;
+        }
+
+        private void openRoleRename(Player player,int role){Map<String,String>t=Map.of("role",String.valueOf(role));org.geysermc.cumulus.form.CustomForm.Builder b=org.geysermc.cumulus.form.CustomForm.builder().title(text("roles","rename-form.title","&d&lRenombrar rango {role}",t)).input(text("roles","rename-form.label","&eNuevo nombre",t),stripColors(text("roles","rename-form.placeholder","Máximo 16 caracteres",t)),"");b.validResultHandler(r->{String value=r.asInput(0);run(player,()->sql(player,()->{if(value!=null&&!value.isBlank())handleRoleName(player,new String[]{"rol",String.valueOf(role),value.trim()});openRoles(player);}));});send(player,b);}
+
+        boolean openPermissions(Player player,int page,boolean editable)throws SQLException{
+            if(!isBedrock(player))return false;Member m=requireMember(player);if(m==null)return true;if(editable&&!can(m,"permissions-edit")){msg(player,"&cNo tienes permiso para editar permisos.");return true;}List<String>keys=permissionKeys();int size=Math.max(4,ui("permissions").getInt("page-size",7));int pages=Math.max(1,(int)Math.ceil(keys.size()/(double)size));int p=Math.max(1,Math.min(page,pages));Map<String,String>base=Map.of("page",String.valueOf(p),"pages",String.valueOf(pages));org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("permissions","title","&b&lPermisos &8({page}/{pages})",base)).content(content("permissions","content","&7Selecciona un permiso.",base));List<Runnable>a=new ArrayList<>();int start=(p-1)*size;for(int i=start;i<Math.min(start+size,keys.size());i++){String key=keys.get(i);Map<String,String>t=Map.of("name",permissionName(key),"key",key);b.button(text("permissions","entry","&e&l{name}\\n&r&8{key}",t));a.add(()->sql(player,()->openPermissionRoles(player,key,p,editable)));}if(p>1){b.button(text("permissions","previous","&ePágina anterior",base));a.add(()->sql(player,()->openPermissions(player,p-1,editable)));}if(p<pages){b.button(text("permissions","next","&ePágina siguiente",base));a.add(()->sql(player,()->openPermissions(player,p+1,editable)));}if(editable){b.button(text("permissions","reset","&c&lResetear permisos",base));a.add(()->openConfirm(player,"permissions",text("permissions","reset-confirm-title","&c&lResetear permisos",base),text("permissions","reset-confirm-content","&7¿Volver a los permisos por defecto?",base),text("permissions","reset-confirm","&c&lSí, resetear",base),text("permissions","reset-back","&6Volver",base),()->sql(player,()->{resetClanRolePermissions(m.clanId());logAction(m.clanId(),player,"PERMISOS","Reseteó permisos custom");openPermissions(player,1,true);}),()->sql(player,()->openPermissions(player,p,true))));}b.button(text("permissions","back","&6Volver",base));a.add(()->sql(player,()->{if(editable)openSettings(player);else openInfo(player);}));b.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<a.size())a.get(i).run();}));send(player,b);return true;
+        }
+
+        private void openPermissionRoles(Player player,String key,int returnPage,boolean editable)throws SQLException{Member m=requireMember(player);if(m==null)return;Clan c=getClan(m.clanId()).orElseThrow();Map<String,String>t=new HashMap<>();t.put("name",permissionName(key));t.put("key",key);t.put("description",String.join(" ",permissionDescription(key)));org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("permissions","permission-title","&b&l{name}",t)).content(text("permissions","permission-content","&7{description}",t));List<Integer>roles=new ArrayList<>();for(int role=minRole();role<=maxRole();role++){boolean allowed=isClanRolePermissionAllowed(c.id(),key,role);Map<String,String>rt=new HashMap<>(t);rt.put("role",String.valueOf(role));rt.put("role_name",getRoleName(c.id(),role));rt.put("status",role>=maxRole()?text("permissions","leader","&6Siempre permitido",rt):(allowed?text("permissions","allowed","&aPermitido",rt):text("permissions","denied","&cBloqueado",rt)));b.button(text("permissions","role-entry","&fRango {role}: {role_name}\\n{status}",rt));roles.add(role);}b.button(text("permissions","permission-back","&6Volver",t));b.validResultHandler(r->run(player,()->sql(player,()->{int i=r.clickedButtonId();if(i>=0&&i<roles.size()&&editable){int role=roles.get(i);if(role>=maxRole()){msg(player,"&cEl líder siempre tiene todos los permisos.");openPermissionRoles(player,key,returnPage,true);return;}if(!player.hasPermission("mdvclans.admin")&&m.role()<maxRole()&&role>=m.role()){msg(player,"&cSolo puedes modificar rangos menores al tuyo.");openPermissionRoles(player,key,returnPage,true);return;}boolean current=isClanRolePermissionAllowed(c.id(),key,role);setClanRolePermission(c.id(),key,role,!current);logAction(c.id(),player,"PERMISOS",(current?"Bloqueó ":"Permitió ")+key+" para rango "+role);openPermissionRoles(player,key,returnPage,true);}else openPermissions(player,returnPage,editable);})));send(player,b);}
+
+        boolean openJoinRequests(Player player,int page)throws SQLException{
+            if(!isBedrock(player))return false;Member m=requireMember(player);if(m==null)return true;cleanupInvalidJoinRequests(m.clanId());int count=countJoinRequests(m.clanId());int size=Math.max(4,ui("join_requests").getInt("page-size",8));int pages=Math.max(1,(int)Math.ceil(count/(double)size));int p=Math.max(1,Math.min(page,pages));List<ClanJoinRequest>list=getJoinRequests(m.clanId(),p,size);Map<String,String>base=Map.of("page",String.valueOf(p),"pages",String.valueOf(pages),"count",String.valueOf(count));org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("join_requests","title","&a&lSolicitudes &8({page}/{pages})",base)).content(content("join_requests","content","&7Pendientes: &f{count}",base));List<Runnable>a=new ArrayList<>();for(ClanJoinRequest req:list){PlayerProfileSnapshot prof=resolvePlayerProfile(req.uuid(),req.name());Map<String,String>t=new HashMap<>(base);t.put("player",req.name());t.put("level",prof.level().isBlank()?"?":prof.level());t.put("race",prof.race().isBlank()?"?":prof.race());b.button(text("join_requests","entry","&e&l{player}\\n&r&7Nivel: &e{level} &8• &7Raza: &d{race}",t));a.add(()->sql(player,()->openJoinRequestAction(player,req,p)));}if(p>1){b.button(text("join_requests","previous","&ePágina anterior",base));a.add(()->sql(player,()->openJoinRequests(player,p-1)));}if(p<pages){b.button(text("join_requests","next","&ePágina siguiente",base));a.add(()->sql(player,()->openJoinRequests(player,p+1)));}b.button(text("join_requests","back","&6Volver",base));a.add(()->sql(player,()->openInfo(player)));b.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<a.size())a.get(i).run();}));send(player,b);return true;
+        }
+
+        private void openJoinRequestAction(Player player,ClanJoinRequest req,int returnPage)throws SQLException{Member m=requireMember(player);if(m==null)return;Map<String,String>t=Map.of("player",req.name());org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("join_requests","action-title","&e&lSolicitud de {player}",t)).content(text("join_requests","action-content","&7¿Aceptar o rechazar?",t));List<Runnable>a=new ArrayList<>();if(can(m,"join-requests")){b.button(text("join_requests","accept","&a&lAceptar",t));a.add(()->sql(player,()->{acceptJoinRequest(player,m.clanId(),req);openJoinRequests(player,returnPage);}));b.button(text("join_requests","reject","&c&lRechazar",t));a.add(()->sql(player,()->{deleteJoinRequest(m.clanId(),req.uuid());logAction(m.clanId(),player,"SOLICITUD","Rechazó solicitud de "+req.name());openJoinRequests(player,returnPage);}));}b.button(text("join_requests","action-back","&6Volver",t));a.add(()->sql(player,()->openJoinRequests(player,returnPage)));b.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<a.size())a.get(i).run();}));send(player,b);}
+
+        boolean openRanking(Player player,String mode)throws SQLException{if(!isBedrock(player))return false;List<ClanTopEntry>entries=topEntries(mode);Map<String,String>base=Map.of("mode",mode);org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("rankings","title","&6&lRanking: {mode}",base)).content(content("rankings","content","&7Clasificación de clanes.",base));int pos=1;for(ClanTopEntry e:entries){Map<String,String>t=new HashMap<>(base);t.put("position",String.valueOf(pos++));t.put("name",e.clan().name());t.put("id",e.clan().tag());t.put("value",formatNumber(e.value()));b.button(text("rankings","entry","&e#{position} &f{name} &8[&6{id}&8]\\n&r&7{value}",t));}b.button(text("rankings","back","&6Volver",base));b.validResultHandler(r->run(player,()->sql(player,()->openRelations(player))));send(player,b);return true;}
+
+        boolean openKillStats(Player player)throws SQLException{if(!isBedrock(player))return false;Member m=requireMember(player);if(m==null)return true;Clan c=getClan(m.clanId()).orElseThrow();Map<String,String>t=clanTokens(c);t.put("kills",String.valueOf(getTotalKillsByClan(c.id())));t.put("deaths",String.valueOf(getTotalDeathsByClan(c.id())));org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("rankings","kill-stats-title","&c&lBajas de {name}",t)).content(text("rankings","kill-stats-content","&7Kills: &a{kills}\\n&7Bajas: &c{deaths}",t));for(ClanTopEntry e:getTopKillersAgainst(c.id(),8)){Map<String,String>et=new HashMap<>();et.put("name",e.clan().name());et.put("id",e.clan().tag());et.put("value",formatNumber(e.value()));b.button(text("rankings","kill-entry","&c{name} &8[&6{id}&8]\\n&r&7{value} bajas causadas",et));}b.button(text("rankings","back","&6Volver",t));b.validResultHandler(r->run(player,()->sql(player,()->openRelations(player))));send(player,b);return true;}
+
+        boolean openLogs(Player player,int page,String filter)throws SQLException{if(!isBedrock(player))return false;Member m=requireMember(player);if(m==null)return true;if(!can(m,"logs-view")){msg(player,"&cNo tienes permiso para ver registros.");return true;}String f=filter==null?"ALL":filter.toUpperCase(Locale.ROOT);currentLogFilter.put(player.getUniqueId(),f);int count=countLogs(m.clanId(),f);int size=Math.max(4,ui("logs").getInt("page-size",8));int pages=Math.max(1,(int)Math.ceil(count/(double)size));int p=Math.max(1,Math.min(page,pages));List<ClanLog>logs=getLogs(m.clanId(),f,p,size);Map<String,String>base=Map.of("page",String.valueOf(p),"pages",String.valueOf(pages),"filter",f);org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("logs","title","&6&lRegistros &8({page}/{pages})",base)).content(content("logs","content","&7Filtro: &e{filter}",base));List<Runnable>a=new ArrayList<>();String[]filters={"ALL","MIEMBROS","BANCO","DIPLOMACIA","CORREO","COMBATE","ADMIN"};String[]paths={"all","miembros","banco","diplomacia","correo","combate","admin"};for(int i=0;i<filters.length;i++){final String ff=filters[i];b.button(text("logs","filters."+paths[i],"&e"+ff,base));a.add(()->sql(player,()->openLogs(player,1,ff)));}for(ClanLog log:logs){Map<String,String>t=new HashMap<>(base);t.put("log_id",String.valueOf(log.id()));t.put("action",log.action());t.put("actor",log.actorName());t.put("date",date(log.time()));t.put("detail",log.detail());b.button(text("logs","entry","&e#{log_id} &6{action}\\n&r&7{actor} • {date}\\n&8{detail}",t));a.add(()->{});}if(p>1){b.button(text("logs","previous","&ePágina anterior",base));a.add(()->sql(player,()->openLogs(player,p-1,f)));}if(p<pages){b.button(text("logs","next","&ePágina siguiente",base));a.add(()->sql(player,()->openLogs(player,p+1,f)));}b.button(text("logs","back","&6Volver",base));a.add(()->sql(player,()->openInfo(player)));b.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<a.size())a.get(i).run();}));send(player,b);return true;}
+
+        private void openConfirm(Player player,String menu,String title,String content,String confirm,String back,Runnable yes,Runnable no){org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(title).content(content).button(confirm).button(back);b.validResultHandler(r->run(player,()->{if(r.clickedButtonId()==0)yes.run();else no.run();}));send(player,b);}
+
+        private String stripColors(String value){return ChatColor.stripColor(color(value==null?"":value));}
+
+        @FunctionalInterface private interface SqlRunnable { void run() throws SQLException; }
+    }
+
 
     public record Clan(int id, String tag, String name, UUID ownerUuid, boolean open, long createdAt,
                        int tier, double bankBalance, String banner, String storage, String boardMessage, String description,

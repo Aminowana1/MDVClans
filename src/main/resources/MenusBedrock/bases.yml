@@ -1,0 +1,15 @@
+title: '&5&lBases del clan'
+content:
+  - '&7Tier: &d{tier_name}'
+  - '&7Bases disponibles: &e{max_bases}'
+base:
+  text-set: '&5&lBase {number}\n&r&7{world} • {x}, {y}, {z}'
+  text-missing: '&7&lBase {number}\n&r&8No establecida'
+  text-locked: '&8&lBase {number}\n&r&cBloqueada por tier'
+actions:
+  title: '&5&lBase {number}'
+  teleport: '&5&lTeletransportarse'
+  set: '&6&lEstablecer aquí'
+  back: '&6Volver'
+buttons:
+  back: '&6Volver'
