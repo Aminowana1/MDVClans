@@ -19,6 +19,12 @@ buttons:
     text: '&c&lExpulsar\n&r&8Quitar del clan.'
   back:
     text: '&6Volver'
+
+mail-form:
+  title: '&d&lCarta para {player}'
+  label: '&eMensaje'
+  placeholder: 'Escribe tu carta...'
+
 confirm-kick:
   title: '&c&lExpulsar miembro'
   content: '&7¿Seguro que quieres expulsar a &f{player}&7?'

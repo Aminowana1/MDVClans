@@ -1,0 +1,10 @@
+MDVClans 1.11.1 - Correcciones de MenusBedrock
+
+Solo se modifica la interfaz Bedrock/Floodgate. Los menús Java se mantienen intactos.
+
+Cambios:
+- Nuevo MenusBedrock/leadership_confirm.yml para editar por completo la confirmación de transferencia de liderazgo.
+- Nuevo MenusBedrock/set_rank.yml para editar título, contenido, formato de cada rango y botón Volver.
+- Corregido el título del formulario "Enviar carta" desde member_actions. Ahora usa member_actions.yml -> mail-form.
+- Corregido el botón Volver de clan_actions.yml que podía mostrar MemorySection[...] en lugar del texto configurado.
+- El lector de textos Bedrock ahora entiende tanto valores YAML directos como secciones con `text:` y evita mostrar MemorySection[...] en otros formularios.

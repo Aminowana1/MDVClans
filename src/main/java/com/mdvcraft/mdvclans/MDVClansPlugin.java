@@ -182,7 +182,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.11.0 habilitado.");
+        getLogger().info("MDVClans 1.11.1 habilitado.");
     }
 
     @Override
@@ -7160,7 +7160,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
     // ============================================================
-    // BEDROCK FORMS - 1.11.0
+    // BEDROCK FORMS - 1.11.1
     // ============================================================
     // Java conserva todos sus NativeMenus/Inventarios actuales.
     // Esta capa solo se activa para jugadores Floodgate y reutiliza
@@ -7171,7 +7171,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                 "relations.yml", "clan_list.yml", "clan_actions.yml", "storage.yml",
                 "bases.yml", "mailbox.yml", "mail_actions.yml", "settings.yml",
                 "roles.yml", "permissions.yml", "join_requests.yml", "rankings.yml",
-                "logs.yml"
+                "logs.yml", "leadership_confirm.yml", "set_rank.yml"
         );
 
         private final Map<String, YamlConfiguration> menus = new HashMap<>();
@@ -7249,7 +7249,13 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
 
         private String text(String menu, String path, String fallback, Map<String, String> tokens) {
-            String raw = ui(menu).getString(path, fallback);
+            YamlConfiguration yaml = ui(menu);
+            // Bukkit devuelve MemorySection#toString() si se pide getString() sobre una sección.
+            // En MenusBedrock aceptamos tanto `clave: texto` como `clave: { text: texto }`
+            // y nunca dejamos que una sección termine renderizada como "MemorySection[...]".
+            String raw;
+            if (yaml.isConfigurationSection(path)) raw = yaml.getString(path + ".text", fallback);
+            else raw = yaml.getString(path, fallback);
             if (raw == null) raw = fallback == null ? "" : fallback;
             for (Map.Entry<String, String> entry : tokens.entrySet()) raw = raw.replace("{" + entry.getKey() + "}", entry.getValue() == null ? "" : entry.getValue());
             return color(raw.replace("\\n", "\n"));
@@ -7500,7 +7506,11 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             }
             if (actor.role() >= maxRole() && !target.uuid().equals(player.getUniqueId())) {
                 addButton(builder, "member_actions", "buttons.leader", "&6&lTransferir liderazgo", t);
-                actions.add(() -> openConfirm(player, "member_actions", "&6&lTransferir liderazgo", "&7¿Transferir el liderazgo a &f" + target.name() + "&7?", "&6&lSí, transferir", "&6Volver",
+                actions.add(() -> openConfirm(player, "leadership_confirm",
+                        text("leadership_confirm", "title", "&6&lTransferir liderazgo", t),
+                        content("leadership_confirm", "content", "&7¿Transferir el liderazgo a &f{player}&7?", t),
+                        text("leadership_confirm", "buttons.confirm", "&6&lSí, transferir", t),
+                        text("leadership_confirm", "buttons.back", "&6Volver", t),
                         () -> { player.performCommand("clan lider " + target.name()); openSocialRoot(player); },
                         () -> sql(player, () -> openMemberActions(player, target.uuid(), returnPage))));
             }
@@ -7519,8 +7529,9 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         private void openPersonalMailForm(Player player, Member target, int returnPage) {
             Map<String, String> t = Map.of("player", target.name());
             org.geysermc.cumulus.form.CustomForm.Builder builder = org.geysermc.cumulus.form.CustomForm.builder()
-                    .title(text("member_actions", "buttons.mail", "&d&lCarta para {player}", t))
-                    .input("§eMensaje", "Escribe tu carta...", "");
+                    .title(text("member_actions", "mail-form.title", "&d&lCarta para {player}", t))
+                    .input(text("member_actions", "mail-form.label", "&eMensaje", t),
+                            stripColors(text("member_actions", "mail-form.placeholder", "Escribe tu carta...", t)), "");
             builder.validResultHandler(response -> {
                 String message = response.asInput(0);
                 run(player, () -> {
@@ -7534,16 +7545,23 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         private void openSetRank(Player player, Member target, int returnPage) throws SQLException {
             Member actor = requireMember(player); if (actor == null) return;
             Clan clan = getClan(actor.clanId()).orElseThrow();
+            Map<String, String> base = new HashMap<>();
+            base.put("player", target.name());
+            base.put("current_role", String.valueOf(target.role()));
+            base.put("current_role_name", getRoleName(clan.id(), target.role()));
             org.geysermc.cumulus.form.SimpleForm.Builder builder = org.geysermc.cumulus.form.SimpleForm.builder()
-                    .title(color("&6&lRango de " + target.name()))
-                    .content(color("&7Selecciona el nuevo rango."));
+                    .title(text("set_rank", "title", "&6&lRango de {player}", base))
+                    .content(content("set_rank", "content", "&7Selecciona el nuevo rango.", base));
             List<Integer> roles = new ArrayList<>();
             for (int role = minRole(); role < maxRole(); role++) {
                 if (!player.hasPermission("mdvclans.admin") && actor.role() < maxRole() && role >= actor.role()) continue;
-                builder.button(color("&fRango " + role + "\n&7" + getRoleName(clan.id(), role)));
+                Map<String, String> t = new HashMap<>(base);
+                t.put("role", String.valueOf(role));
+                t.put("role_name", getRoleName(clan.id(), role));
+                addRawButton(builder, "set_rank", "role", "&fRango {role}\n&r&7{role_name}", t);
                 roles.add(role);
             }
-            builder.button(color("&6Volver"));
+            addButton(builder, "set_rank", "buttons.back", "&6Volver", base);
             builder.validResultHandler(response -> run(player, () -> {
                 int idx = response.clickedButtonId();
                 if (idx >= 0 && idx < roles.size()) player.performCommand("clan setrango " + target.name() + " " + roles.get(idx));
@@ -7674,7 +7692,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(text("clan_actions","title","&f&l{name} &8[&6{id}&8]",t)).content(content("clan_actions","content","&7Entrada: {entry}",t));List<Runnable>a=new ArrayList<>();
             if(own.isEmpty()){if(target.open()){addButton(b,"clan_actions","buttons.join","&a&lUnirse",t);a.add(()->{player.performCommand("clan unirse "+target.tag());openSocialRoot(player);});}else{addButton(b,"clan_actions","buttons.request","&e&lSolicitar ingreso",t);a.add(()->{player.performCommand("clan unirse "+target.tag());sql(player,()->openClanList(player,returnPage));});}}
             else if(own.get().clanId()!=target.id()){Member m=own.get();addButton(b,"clan_actions","buttons.info","&b&lInformación pública",t);a.add(()->showPublicClanInfo(player,target,returnMenu,returnPage));if(can(m,"relation")){addButton(b,"clan_actions","buttons.ally","&9&lProponer alianza",t);a.add(()->{player.performCommand("clan relacion "+target.tag()+" aliado");sql(player,()->openClanActions(player,target.id(),returnMenu,returnPage));});addButton(b,"clan_actions","buttons.enemy","&c&lDeclarar enemigo",t);a.add(()->openConfirm(player,"clan_actions","&c&lDeclarar enemigo","&7¿Declarar enemigo al clan &f"+target.name()+"&7?","&c&lSí, declarar","&6Volver",()->{player.performCommand("clan relacion "+target.tag()+" enemigo");sql(player,()->openClanActions(player,target.id(),returnMenu,returnPage));},()->sql(player,()->openClanActions(player,target.id(),returnMenu,returnPage))));addButton(b,"clan_actions","buttons.neutral","&7&lVolver neutral / Paz",t);a.add(()->{player.performCommand("clan relacion "+target.tag()+" neutral");sql(player,()->openClanActions(player,target.id(),returnMenu,returnPage));});}if(can(m,"mail-send")){addButton(b,"clan_actions","buttons.mail","&d&lEnviar correo de clan",t);a.add(()->openClanMailForm(player,target,returnMenu,returnPage));}}
-            b.button(text("clan_actions","buttons.back","&6Volver",t));a.add(()->sql(player,()->{if("relations".equals(returnMenu))openRelationsList(player,returnPage);else openClanList(player,returnPage);}));b.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<a.size())a.get(i).run();}));send(player,b);return true;
+            addButton(b,"clan_actions","buttons.back","&6Volver",t);a.add(()->sql(player,()->{if("relations".equals(returnMenu))openRelationsList(player,returnPage);else openClanList(player,returnPage);}));b.validResultHandler(r->run(player,()->{int i=r.clickedButtonId();if(i>=0&&i<a.size())a.get(i).run();}));send(player,b);return true;
         }
 
         private void showPublicClanInfo(Player player,Clan target,String returnMenu,int returnPage){sql(player,()->{Map<String,String>t=clanTokens(target);org.geysermc.cumulus.form.SimpleForm.Builder b=org.geysermc.cumulus.form.SimpleForm.builder().title(color("&b&l"+target.name()+" &8[&6"+target.tag()+"&8]")).content(color("&7Tier: &d"+tierName(target.tier())+"\n&7Miembros: &e"+countMembers(target.id())+"/&e"+maxMembersForClan(target)+"\n&7Descripción: &f"+clanDescription(target)));b.button(color("&6Volver"));b.validResultHandler(r->run(player,()->sql(player,()->openClanActions(player,target.id(),returnMenu,returnPage))));send(player,b);});}
