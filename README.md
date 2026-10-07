@@ -1,8 +1,18 @@
-# MDVClans 1.11.2
+# MDVClans 1.11.3
+
+## 1.11.3 - Título integrado en el nametag nativo
+
+- Sustituye el texto flotante de 1.11.2 por la línea nativa BELOW_NAME debajo del nombre. No crea entidades.
+- Conserva el nombre, clan y nivel existentes y el scoreboard lateral. Solo gestiona su propio objetivo del título y respeta cualquier otro objetivo BELOW_NAME existente.
+- El título de cada jugador se obtiene directamente de MDVSocial, con sus colores.
+- Conserva los arreglos del almacén compartido y la edición administrativa de 1.11.2.
+- La posición nativa solo puede ser debajo; altura y distancia dependen del cliente de Minecraft.
+
+Consulta `UPDATE_1.11.3_NOTES.md` para instalar, configurar y comprobar esta versión.
 
 ## 1.11.2 - Título equipado y almacén seguro
 
-- El título equipado de MDVSocial aparece en una línea independiente, encima o debajo del nombre. Se configura en `nametags.equipped-title-line`.
+- En 1.11.2, el título equipado de MDVSocial utilizaba un texto flotante encima o debajo del nombre. Ese sistema se sustituye por la línea nativa en 1.11.3.
 - Los formatos existentes del nombre, nivel, clan, equipos y scoreboards conservan su funcionamiento.
 - El almacén admite una persona editando por clan, incluyendo administradores. Un segundo jugador recibe un aviso mientras está ocupado.
 - Los cambios se guardan al pasar de página, reabrir, cerrar, salir del servidor o apagar el plugin.
@@ -30,7 +40,7 @@ Actualización de tiers/progreso de clanes para MDVCRAFT.
 mvn clean package
 ```
 
-Requiere Java 21. El jar queda en `target/MDVClans-1.11.2.jar`.
+Requiere Java 21. El jar queda en `target/MDVClans-1.11.3.jar`.
 
 
 ## 1.10.25 - Administración de clanes

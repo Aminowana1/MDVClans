@@ -1,65 +1,63 @@
 package com.mdvcraft.mdvclans;
 
+import io.papermc.paper.scoreboard.numbers.NumberFormat;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
-import org.bukkit.Color;
-import org.bukkit.GameMode;
-import org.bukkit.Location;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.entity.Display;
 import org.bukkit.entity.Player;
-import org.bukkit.entity.TextDisplay;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.scoreboard.Criteria;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.RenderType;
+import org.bukkit.scoreboard.Score;
+import org.bukkit.scoreboard.Scoreboard;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 
-/** A separate title line: never reads or modifies a player's scoreboard or name. */
+/** Native second nametag line. Only its own BELOW_NAME objective is modified. */
 final class EquippedTitleNametags implements Listener {
     private static final String CONFIG = "nametags.equipped-title-line.";
+    private static final String OBJECTIVE_NAME = "mdvc_title";
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.builder()
             .character('&').hexColors().useUnusualXRepeatedCharacterHexFormat().build();
 
     private final JavaPlugin plugin;
     private final Function<UUID, String> titleLookup;
-    private final Map<UUID, TitleLine> lines = new HashMap<>();
-    private final Map<UUID, Component> titles = new HashMap<>();
+    private final Map<Scoreboard, BoardTitles> boards = new IdentityHashMap<>();
+    private final Set<Scoreboard> warnedBoards = Collections.newSetFromMap(new IdentityHashMap<>());
     private BukkitTask task;
     private boolean registered;
-    private long tickNumber;
-    private long refreshTicks;
-    private double heightOffset;
-    private double maxDistanceSquared;
-    private String format;
-    private boolean shadow;
-    private boolean background;
+    private boolean enabled;
+    private boolean warnedPosition;
+    private String format = "{title}";
     private Plugin socialPlugin;
     private Method titleMethod;
-    private boolean warned;
+    private boolean warnedSocial;
 
     EquippedTitleNametags(JavaPlugin plugin) {
         this.plugin = plugin;
         this.titleLookup = this::readSocialTitle;
     }
 
-    // Injection keeps the entity lifecycle testable without loading MDVSocial.
+    // Injection allows testing native scoreboard updates without loading MDVSocial.
     EquippedTitleNametags(JavaPlugin plugin, Function<UUID, String> titleLookup) {
         this.plugin = plugin;
         this.titleLookup = titleLookup;
@@ -70,129 +68,126 @@ final class EquippedTitleNametags implements Listener {
         FileConfiguration config = plugin.getConfig();
         if (!config.getBoolean("nametags.enabled", true)
                 || !config.getBoolean(CONFIG + "enabled", true)) return;
-        refreshTicks = Math.max(1L, config.getLong(CONFIG + "update-interval-ticks", 20L));
-        double gap = finite(config.getDouble(CONFIG + "line-gap", 0.32), 0.32, 0.25, 2.0);
-        boolean below = "below".equalsIgnoreCase(config.getString(CONFIG + "position", "above"));
-        heightOffset = finite(config.getDouble(CONFIG + "name-height-offset", 0.5), 0.5, -2.0, 4.0)
-                + (below ? -gap : gap);
-        double distance = finite(config.getDouble(CONFIG + "max-distance-blocks", 32.0), 32.0, 1.0, 64.0);
-        maxDistanceSquared = distance * distance;
+        if (!"below".equalsIgnoreCase(config.getString(CONFIG + "position", "below"))
+                && !warnedPosition) {
+            plugin.getLogger().warning("El título nativo solo admite position: below; se mostrará debajo del nombre.");
+            warnedPosition = true;
+        }
         format = config.getString(CONFIG + "format", "{title}");
         if (format == null) format = "{title}";
-        shadow = config.getBoolean(CONFIG + "shadow", true);
-        background = config.getBoolean(CONFIG + "background", false);
-        tickNumber = 0L;
+        long refreshTicks = Math.max(1L, config.getLong(CONFIG + "update-interval-ticks", 20L));
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
         registered = true;
-        task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
+        enabled = true;
+        task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 1L, refreshTicks);
     }
 
     void close() {
+        enabled = false;
         if (task != null) task.cancel();
         task = null;
         if (registered) HandlerList.unregisterAll(this);
         registered = false;
-        for (TitleLine line : lines.values()) line.display.remove();
-        lines.clear();
-        titles.clear();
+        for (Map.Entry<Scoreboard, BoardTitles> entry : boards.entrySet()) {
+            unregisterOwned(entry.getKey(), entry.getValue());
+        }
+        boards.clear();
+        warnedBoards.clear();
         socialPlugin = null;
         titleMethod = null;
-        warned = false;
+        warnedSocial = false;
     }
 
     void tick() {
+        if (!enabled) return;
         List<Player> players = new ArrayList<>(plugin.getServer().getOnlinePlayers());
-        Set<UUID> online = new HashSet<>();
-        Map<UUID, Location> locations = new HashMap<>();
-        boolean refresh = tickNumber % refreshTicks == 0L;
-        boolean refreshVisibility = tickNumber++ % 5L == 0L;
+        Set<Scoreboard> activeBoards = Collections.newSetFromMap(new IdentityHashMap<>());
+        Map<String, Component> titles = new HashMap<>();
         for (Player player : players) {
-            UUID uuid = player.getUniqueId();
-            online.add(uuid);
-            locations.put(uuid, player.getLocation());
+            Scoreboard board = player.getScoreboard();
+            if (board != null) activeBoards.add(board);
+            Component title = titleText(titleLookup.apply(player.getUniqueId()));
+            if (title != null) titles.put(player.getName(), title);
         }
-        for (Player target : players) {
-            UUID uuid = target.getUniqueId();
-            if (refresh || !titles.containsKey(uuid)) titles.put(uuid, titleText(titleLookup.apply(uuid)));
-            update(target, players, locations, titles.get(uuid), refreshVisibility);
+
+        for (Scoreboard board : new ArrayList<>(boards.keySet())) {
+            if (!activeBoards.contains(board) || titles.isEmpty()) {
+                unregisterOwned(board, boards.remove(board));
+            }
         }
-        for (UUID uuid : new ArrayList<>(lines.keySet())) {
-            if (!online.contains(uuid)) remove(uuid);
+        warnedBoards.retainAll(activeBoards);
+        if (titles.isEmpty()) return;
+
+        // Shared boards are updated once; every target keeps their own fixed title text.
+        for (Scoreboard board : activeBoards) {
+            BoardTitles state = acquire(board);
+            if (state == null) continue;
+            for (String name : new ArrayList<>(state.applied.keySet())) {
+                if (!titles.containsKey(name)) {
+                    state.objective.getScore(name).resetScore();
+                    state.applied.remove(name);
+                }
+            }
+            for (Map.Entry<String, Component> entry : titles.entrySet()) {
+                Score score = state.objective.getScore(entry.getKey());
+                if (!score.isScoreSet() || !entry.getValue().equals(state.applied.get(entry.getKey()))) {
+                    score.numberFormat(NumberFormat.fixed(entry.getValue()));
+                    state.applied.put(entry.getKey(), entry.getValue());
+                }
+            }
         }
-        titles.keySet().retainAll(online);
     }
 
-    private void update(Player target, List<Player> players, Map<UUID, Location> locations,
-                        Component text, boolean refreshVisibility) {
-        UUID uuid = target.getUniqueId();
-        if (text == null || !target.isOnline() || target.isDead() || target.isSneaking()
-                || target.isInvisible() || target.getGameMode() == GameMode.SPECTATOR) {
-            removeLine(uuid);
-            return;
+    private BoardTitles acquire(Scoreboard board) {
+        BoardTitles state = boards.get(board);
+        Objective named = board.getObjective(OBJECTIVE_NAME);
+        if (state != null && !owns(board, state)) {
+            // Never adopt replacements or move an objective another plugin repurposed.
+            boards.remove(board);
+            state = null;
         }
+        Objective belowName = board.getObjective(DisplaySlot.BELOW_NAME);
+        if (belowName != null && (state == null || !state.objective.equals(belowName))) {
+            if (state != null) {
+                unregisterOwned(board, state);
+                boards.remove(board);
+            }
+            warnConflict(board);
+            return null;
+        }
+        if (state == null) {
+            if (named != null) {
+                warnConflict(board);
+                return null;
+            }
+            Objective objective = board.registerNewObjective(OBJECTIVE_NAME, Criteria.DUMMY,
+                    Component.empty(), RenderType.INTEGER);
+            // Blank fallback avoids numeric zero for entries without an equipped title.
+            objective.numberFormat(NumberFormat.blank());
+            objective.setDisplaySlot(DisplaySlot.BELOW_NAME);
+            state = new BoardTitles(objective);
+            boards.put(board, state);
+        } else if (belowName == null) {
+            state.objective.setDisplaySlot(DisplaySlot.BELOW_NAME);
+        }
+        return state;
+    }
 
-        Location targetLocation = locations.get(uuid);
-        Location position = targetLocation.clone().add(0.0, target.getHeight() + heightOffset, 0.0);
-        position.setYaw(0.0F);
-        position.setPitch(0.0F);
-        TitleLine line = lines.get(uuid);
-        if (line != null && (!line.display.isValid() || line.display.getWorld() != target.getWorld())) {
-            removeLine(uuid);
-            line = null;
+    private void warnConflict(Scoreboard board) {
+        if (warnedBoards.add(board)) {
+            plugin.getLogger().warning("No se muestra el título en un scoreboard: otro plugin ocupa BELOW_NAME o mdvc_title.");
         }
-        if (line == null) {
-            TextDisplay display = target.getWorld().spawn(position, TextDisplay.class, entity -> {
-                entity.setPersistent(false);
-                entity.setVisibleByDefault(false);
-                entity.setInvulnerable(true);
-                entity.setGravity(false);
-                entity.setSilent(true);
-                entity.setBillboard(Display.Billboard.CENTER);
-                entity.setTeleportDuration(1);
-                entity.setViewRange(1.0F);
-                entity.setAlignment(TextDisplay.TextAlignment.CENTER);
-                entity.setLineWidth(Integer.MAX_VALUE);
-                entity.setShadowed(shadow);
-                entity.setSeeThrough(false);
-                entity.setDefaultBackground(background);
-                if (!background) entity.setBackgroundColor(Color.fromARGB(0));
-                entity.text(text);
-            });
-            line = new TitleLine(display, text);
-            lines.put(uuid, line);
-            refreshVisibility = true;
-        } else {
-            if (!line.text.equals(text)) {
-                line.display.text(text);
-                line.text = text;
-            }
-            Location current = line.display.getLocation();
-            if (current.distanceSquared(position) > 0.000001) {
-                // Long teleports snap immediately rather than drawing the title across the map.
-                line.display.setTeleportDuration(current.distanceSquared(position) > 16.0 ? 0 : 1);
-                line.display.teleport(position);
-            }
-        }
+    }
 
-        if (!refreshVisibility) return;
-        Set<UUID> visible = new HashSet<>();
-        for (Player viewer : players) {
-            UUID viewerId = viewer.getUniqueId();
-            Location viewerLocation = locations.get(viewerId);
-            boolean shouldSee = !viewerId.equals(uuid) && viewerLocation.getWorld() == targetLocation.getWorld()
-                    && viewer.canSee(target)
-                    && viewerLocation.distanceSquared(targetLocation) <= maxDistanceSquared;
-            if (shouldSee) {
-                visible.add(viewerId);
-                if (!line.visibleTo.contains(viewerId) || !viewer.canSee(line.display)) {
-                    viewer.showEntity(plugin, line.display);
-                }
-            } else if (line.visibleTo.contains(viewerId)) {
-                viewer.hideEntity(plugin, line.display);
-            }
-        }
-        line.visibleTo.clear();
-        line.visibleTo.addAll(visible);
+    private boolean owns(Scoreboard board, BoardTitles state) {
+        // CraftBukkit returns new Objective wrappers; equals checks the underlying objective.
+        if (!state.objective.equals(board.getObjective(OBJECTIVE_NAME))) return false;
+        DisplaySlot slot = state.objective.getDisplaySlot();
+        return slot == null || slot == DisplaySlot.BELOW_NAME;
+    }
+
+    private void unregisterOwned(Scoreboard board, BoardTitles state) {
+        if (owns(board, state)) state.objective.unregister();
     }
 
     private Component titleText(String title) {
@@ -210,7 +205,7 @@ final class EquippedTitleNametags implements Listener {
         if (social != socialPlugin) {
             socialPlugin = social;
             titleMethod = null;
-            warned = false;
+            warnedSocial = false;
         }
         try {
             if (titleMethod == null) {
@@ -221,9 +216,9 @@ final class EquippedTitleNametags implements Listener {
             Object value = titleMethod.invoke(null, uuid);
             return value instanceof String text ? text : "";
         } catch (ReflectiveOperationException | LinkageError ex) {
-            if (!warned) {
+            if (!warnedSocial) {
                 plugin.getLogger().warning("No se pudo leer el título equipado de MDVSocial: " + ex.getMessage());
-                warned = true;
+                warnedSocial = true;
             }
             return "";
         }
@@ -231,47 +226,25 @@ final class EquippedTitleNametags implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
-        remove(event.getPlayer().getUniqueId());
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onWorldChange(PlayerChangedWorldEvent event) {
-        removeLine(event.getPlayer().getUniqueId());
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onTeleport(PlayerTeleportEvent event) {
-        // No passengers are attached, so titles never prevent another plugin's teleport.
-        removeLine(event.getPlayer().getUniqueId());
-    }
-
-    private void remove(UUID uuid) {
-        removeLine(uuid);
-        titles.remove(uuid);
-        for (TitleLine line : lines.values()) line.visibleTo.remove(uuid);
-    }
-
-    private void removeLine(UUID uuid) {
-        TitleLine line = lines.remove(uuid);
-        if (line != null) line.display.remove();
+        String name = event.getPlayer().getName();
+        for (Map.Entry<Scoreboard, BoardTitles> entry : boards.entrySet()) {
+            BoardTitles state = entry.getValue();
+            if (owns(entry.getKey(), state) && state.applied.remove(name) != null) {
+                state.objective.getScore(name).resetScore();
+            }
+        }
     }
 
     private static String singleLine(String text) {
         return text.replace('\n', ' ').replace('\r', ' ');
     }
 
-    private static double finite(double value, double fallback, double min, double max) {
-        return Double.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
-    }
+    private static final class BoardTitles {
+        private final Objective objective;
+        private final Map<String, Component> applied = new HashMap<>();
 
-    private static final class TitleLine {
-        private final TextDisplay display;
-        private final Set<UUID> visibleTo = new HashSet<>();
-        private Component text;
-
-        private TitleLine(TextDisplay display, Component text) {
-            this.display = display;
-            this.text = text;
+        private BoardTitles(Objective objective) {
+            this.objective = objective;
         }
     }
 }

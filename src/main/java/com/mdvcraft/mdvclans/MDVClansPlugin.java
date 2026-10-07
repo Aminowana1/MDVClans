@@ -184,7 +184,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.11.2 habilitado.");
+        getLogger().info("MDVClans 1.11.3 habilitado.");
     }
 
     @Override

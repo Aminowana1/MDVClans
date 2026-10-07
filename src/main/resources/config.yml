@@ -214,22 +214,16 @@ nametags:
   enabled: true
   update-interval-ticks: 200
 
-  # Línea independiente del título equipado en MDVSocial. No modifica el nombre,
-  # nivel, clan, equipos ni scoreboards existentes. Si no hay título, se oculta.
+  # Título equipado de MDVSocial en la línea NATIVA debajo del nombre.
+  # No crea entidades ni cambia el nombre, nivel, clan o scoreboard lateral.
+  # Usa un objetivo propio BELOW_NAME; si otro plugin ocupa ese espacio, lo respeta.
   equipped-title-line:
     enabled: true
-    # above = encima del nombre; below = debajo del nombre.
-    position: 'above'
+    # Minecraft solo admite esta línea nativa debajo. Valores antiguos se ignoran.
+    position: 'below'
     format: '{title}'
-    # Distancias en bloques: separación respecto al nombre y altura del nombre
-    # sobre la cabeza. Ajusta estos dos valores si quieres mover la línea.
-    line-gap: 0.32
-    name-height-offset: 0.5
-    max-distance-blocks: 32
-    # Relee el título cada segundo; la línea sigue al jugador en cada tick.
+    # Relee el título cada segundo. Altura y distancia las controla el cliente.
     update-interval-ticks: 20
-    shadow: true
-    background: false
 
   # Compatibilidad simple con AnimatedScoreboard.
   # Al entrar, ejecuta una sola vez desde consola el comando configurado.
