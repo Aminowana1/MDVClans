@@ -181,6 +181,8 @@ storage-chest:
   enabled: true
   size: 27
   title: '&8Almacén {id} &7{storage_page}/{storage_max_page}'
+  # Un editor por clan, también para admins, para evitar sobrescribir objetos.
+  busy-message: '&cOtra persona está usando el almacén de este clan. Espera a que lo cierre.'
 
 clan-mail:
   # Los correos se cortan automáticamente para que no queden en una sola línea gigante.
@@ -211,6 +213,23 @@ top:
 nametags:
   enabled: true
   update-interval-ticks: 200
+
+  # Línea independiente del título equipado en MDVSocial. No modifica el nombre,
+  # nivel, clan, equipos ni scoreboards existentes. Si no hay título, se oculta.
+  equipped-title-line:
+    enabled: true
+    # above = encima del nombre; below = debajo del nombre.
+    position: 'above'
+    format: '{title}'
+    # Distancias en bloques: separación respecto al nombre y altura del nombre
+    # sobre la cabeza. Ajusta estos dos valores si quieres mover la línea.
+    line-gap: 0.32
+    name-height-offset: 0.5
+    max-distance-blocks: 32
+    # Relee el título cada segundo; la línea sigue al jugador en cada tick.
+    update-interval-ticks: 20
+    shadow: true
+    background: false
 
   # Compatibilidad simple con AnimatedScoreboard.
   # Al entrar, ejecuta una sola vez desde consola el comando configurado.

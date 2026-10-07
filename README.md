@@ -1,4 +1,15 @@
-# MDVClans 1.10.25
+# MDVClans 1.11.2
+
+## 1.11.2 - Título equipado y almacén seguro
+
+- El título equipado de MDVSocial aparece en una línea independiente, encima o debajo del nombre. Se configura en `nametags.equipped-title-line`.
+- Los formatos existentes del nombre, nivel, clan, equipos y scoreboards conservan su funcionamiento.
+- El almacén admite una persona editando por clan, incluyendo administradores. Un segundo jugador recibe un aviso mientras está ocupado.
+- Los cambios se guardan al pasar de página, reabrir, cerrar, salir del servidor o apagar el plugin.
+- `/mdvclans almacen <ID> [pagina]` permite retirar y depositar objetos con `mdvclans.admin`, aunque el admin no pertenezca al clan.
+- Los espacios de navegación y los huecos fuera de la capacidad del clan están protegidos.
+
+Consulta `UPDATE_1.11.2_NOTES.md` para instalar y configurar esta actualización.
 
 Actualización de tiers/progreso de clanes para MDVCRAFT.
 
@@ -19,7 +30,7 @@ Actualización de tiers/progreso de clanes para MDVCRAFT.
 mvn clean package
 ```
 
-El jar queda en `target/MDVClans-1.10.25.jar`.
+Requiere Java 21. El jar queda en `target/MDVClans-1.11.2.jar`.
 
 
 ## 1.10.25 - Administración de clanes
@@ -33,7 +44,7 @@ Permiso requerido: `mdvclans.admin`.
 /mdvclans entrar <jugador> <ID>
 ```
 
-- El almacén administrativo es completamente de solo lectura y permite navegar todas sus páginas.
+- Desde 1.11.2, el almacén administrativo permite retirar y depositar objetos, además de navegar todas sus páginas.
 - El banco puede ajustarse sin retirar o entregar dinero a un jugador.
 - La disolución elimina inmediatamente el clan y expulsa a todos sus miembros.
 - La entrada forzada ignora invitaciones y estado abierto/cerrado; no mueve al líder de otro clan para evitar dejarlo sin liderazgo.

@@ -33,6 +33,7 @@ import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -114,7 +115,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private final Map<UUID, PendingTeleport> pendingTeleports = new ConcurrentHashMap<>();
     private final Map<UUID, Long> baseCooldowns = new ConcurrentHashMap<>();
     private final Map<UUID, Long> friendlyFireMessageCooldowns = new ConcurrentHashMap<>();
-    private final Map<UUID, Integer> openStorageViewers = new ConcurrentHashMap<>();
+    private final StorageSessionRegistry<Inventory> storageSessions = new StorageSessionRegistry<>();
     private final Map<UUID, String> pendingClanCreateName = new ConcurrentHashMap<>();
     private final Set<UUID> pendingBoardEdit = ConcurrentHashMap.newKeySet();
     private final Set<UUID> pendingClanNameEdit = ConcurrentHashMap.newKeySet();
@@ -132,6 +133,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private final Map<UUID, String> previousNativeMenu = new ConcurrentHashMap<>();
     private final Set<UUID> suppressHistoryOnce = ConcurrentHashMap.newKeySet();
     private int nametagTaskId = -1;
+    private final EquippedTitleNametags equippedTitleNametags = new EquippedTitleNametags(this);
     private BedrockClanUi bedrockUi;
 
     // 1.10.25: snapshot ligero para placeholders de rankings de clanes.
@@ -182,17 +184,27 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().info("PlaceholderAPI detectado: placeholders registrados.");
         }
 
-        getLogger().info("MDVClans 1.11.1 habilitado.");
+        getLogger().info("MDVClans 1.11.2 habilitado.");
     }
 
     @Override
     public void onDisable() {
         for (Player player : Bukkit.getOnlinePlayers()) {
             InventoryHolder holder = player.getOpenInventory().getTopInventory().getHolder();
+            if (holder instanceof StorageInventoryHolder) player.closeInventory();
             if (holder instanceof BannerEditorHolder bannerHolder && !bannerHolder.completed) {
                 returnSubmittedBanner(player, bannerHolder);
                 bannerHolder.completed = true;
                 player.closeInventory();
+            }
+        }
+        // Retry retained pages before closing SQLite if a close save failed.
+        for (StorageSessionRegistry.Session<Inventory> session : storageSessions.snapshot()) {
+            try {
+                persistStorageSession(session);
+                storageSessions.release(session.clanId(), session.owner(), session.inventory());
+            } catch (Exception e) {
+                getLogger().severe("No se pudo guardar el almacén " + session.clanId() + " al apagar: " + e.getMessage());
             }
         }
         for (PendingTeleport pending : pendingTeleports.values()) {
@@ -205,6 +217,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
         personalNametagBoards.clear();
         nametagAppliedTeams.clear();
+        equippedTitleNametags.close();
         closeDatabase();
     }
 
@@ -609,7 +622,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private void sendAdminHelp(CommandSender sender) {
         sender.sendMessage(color("&6MDVClans admin:"));
         sender.sendMessage(color("&e/mdvclans reload &7- Recarga config, mensajes, menús y nametags."));
-        sender.sendMessage(color("&e/mdvclans almacen <ID> [página] &7- Revisa el almacén del clan en modo solo lectura."));
+        sender.sendMessage(color("&e/mdvclans almacen <ID> [página] &7- Abre el almacén del clan para retirar y depositar objetos."));
         sender.sendMessage(color("&e/mdvclans banco <ID> <agregar|quitar> <cantidad> &7- Modifica su banco."));
         sender.sendMessage(color("&e/mdvclans disolver <ID> confirmar &7- Disuelve inmediatamente un clan."));
         sender.sendMessage(color("&e/mdvclans entrar <jugador> <ID> &7- Fuerza el ingreso de un jugador."));
@@ -1885,35 +1898,69 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         Member member = requireMember(player);
         if (member == null) return;
         if (!hasRank(player, member, "storage-open")) return;
-        Clan clan = getClan(member.clanId()).orElseThrow();
-        int totalSlots = storageSlotsForClan(clan);
+        openEditableClanStorage(player, member.clanId(), page, false);
+    }
+
+    private void openAdminClanStorage(Player player, Clan clan, int page) throws SQLException {
+        if (!player.hasPermission("mdvclans.admin")) {
+            msg(player, "&cNo tienes permiso.");
+            return;
+        }
+        openEditableClanStorage(player, clan.id(), page, true);
+    }
+
+    private void openEditableClanStorage(Player player, int clanId, int page, boolean admin) throws SQLException {
+        UUID owner = player.getUniqueId();
+        StorageSessionRegistry.Session<Inventory> previous = storageSessions.get(clanId);
+        if (previous != null) {
+            if (!previous.owner().equals(owner) && !previous.inventory().getViewers().isEmpty()) {
+                msg(player, getConfig().getString("storage-chest.busy-message", "&cOtra persona está usando el almacén de este clan. Espera a que lo cierre."));
+                return;
+            }
+            // Flush BEFORE reading the new snapshot, including command reopens and navigation.
+            // If persistence fails, keep the session so no stale database copy can be opened.
+            try {
+                persistStorageSession(previous);
+            } catch (IOException | SQLException e) {
+                getLogger().warning("No se pudo guardar almacén de clan " + clanId + ": " + e.getMessage());
+                msg(player, "&cNo se pudo guardar el almacén del clan. Avisa a un admin.");
+                return;
+            }
+            if (!previous.owner().equals(owner)) {
+                storageSessions.release(clanId, previous.owner(), previous.inventory());
+                previous = null;
+            }
+        }
+        Clan clan = getClan(clanId).orElseThrow();
+        int totalSlots = Math.max(storageSlotsForClan(clan), inventorySerializedSize(clan.storage()));
         int pages = storagePagesForSlots(totalSlots);
         page = Math.max(1, Math.min(page, pages));
         int invSize = storageInventorySize(totalSlots);
         Map<String, String> ph = clanPlaceholders(clan);
         ph.put("storage_page", String.valueOf(page));
         ph.put("storage_max_page", String.valueOf(pages));
-        String title = color(applyPlaceholders(getConfig().getString("storage-chest.title", "&8Almacén {id} &7{storage_page}/{storage_max_page}"), ph));
-        Inventory inv = Bukkit.createInventory(new StorageInventoryHolder(clan.id(), page, totalSlots), invSize, title);
+        String title = admin ? color("&8Admin " + clan.tag() + " &7" + page + "/" + pages)
+                : color(applyPlaceholders(getConfig().getString("storage-chest.title", "&8Almacén {id} &7{storage_page}/{storage_max_page}"), ph));
+        Inventory inv = Bukkit.createInventory(new StorageInventoryHolder(clanId, page, totalSlots, owner, admin), invSize, title);
         ItemStack[] allItems = deserializeInventory(clan.storage(), totalSlots);
         putStoragePage(inv, allItems, page, totalSlots);
+        int usable = storageUsableSlotsOnPage(invSize, page, totalSlots);
+        for (int slot = usable; slot < invSize; slot++) inv.setItem(slot, storageBlockedSlotItem());
         if (pages > 1) inv.setItem(STORAGE_NAV_SLOT, storageNavItem(page, pages));
+        if (!storageSessions.claim(clanId, owner, inv)) {
+            msg(player, getConfig().getString("storage-chest.busy-message", "&cOtra persona está usando el almacén de este clan. Espera a que lo cierre."));
+            return;
+        }
         openNativeInventory(player, inv);
-        logAction(clan.id(), player, "ALMACEN", "Abrió almacén página " + page + "/" + pages);
-    }
-
-    private void openAdminClanStorage(Player player, Clan clan, int page) throws SQLException {
-        int totalSlots = Math.max(storageSlotsForClan(clan), inventorySerializedSize(clan.storage()));
-        int pages = storagePagesForSlots(totalSlots);
-        page = Math.max(1, Math.min(page, pages));
-        int invSize = storageInventorySize(totalSlots);
-        String title = color("&8Revisión " + clan.tag() + " &7" + page + "/" + pages);
-        Inventory inv = Bukkit.createInventory(new AdminStorageInventoryHolder(clan.id(), page, totalSlots), invSize, title);
-        ItemStack[] allItems = deserializeInventory(clan.storage(), totalSlots);
-        putStoragePage(inv, allItems, page, totalSlots);
-        if (pages > 1) inv.setItem(STORAGE_NAV_SLOT, storageNavItem(page, pages));
-        openNativeInventory(player, inv);
-        player.sendMessage(color("&7Almacén de &8[&b" + clan.tag() + "&8] &7abierto en modo &csolo lectura&7."));
+        if (player.getOpenInventory().getTopInventory() != inv) {
+            storageSessions.release(clanId, owner, inv);
+            if (previous != null && player.getOpenInventory().getTopInventory() == previous.inventory()) {
+                storageSessions.claim(clanId, owner, previous.inventory());
+            }
+            return;
+        }
+        logAction(clanId, player, "ALMACEN", (admin ? "ADMIN: " : "") + "Abrió almacén página " + page + "/" + pages);
+        if (admin) player.sendMessage(color("&7Almacén de &8[&b" + clan.tag() + "&8] &7abierto: puedes &aretirar y depositar objetos&7."));
     }
 
     private void handleBanner(Player player, String[] args) throws SQLException {
@@ -2380,40 +2427,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             }
             return;
         }
-        if (event.getInventory().getHolder() instanceof AdminStorageInventoryHolder adminStorageHolder) {
-            int topSize = event.getView().getTopInventory().getSize();
-            int rawSlot = event.getRawSlot();
-            boolean clickedTop = rawSlot >= 0 && rawSlot < topSize;
-            if (clickedTop || event.isShiftClick() || event.getClick() == ClickType.DOUBLE_CLICK) event.setCancelled(true);
-            if (!clickedTop || event.getSlot() != STORAGE_NAV_SLOT || storagePagesForSlots(adminStorageHolder.totalSlots()) <= 1) return;
-            try {
-                Clan clan = getClan(adminStorageHolder.clanId()).orElseThrow();
-                int pages = storagePagesForSlots(adminStorageHolder.totalSlots());
-                int nextPage = event.getClick().isRightClick() ? adminStorageHolder.page() - 1 : adminStorageHolder.page() + 1;
-                if (nextPage < 1) nextPage = pages;
-                if (nextPage > pages) nextPage = 1;
-                openAdminClanStorage(player, clan, nextPage);
-            } catch (Exception e) {
-                getLogger().warning("Error navegando revisión administrativa del almacén: " + e.getMessage());
-                msg(player, "&cNo se pudo cambiar de página del almacén.");
-            }
-            return;
-        }
         if (event.getInventory().getHolder() instanceof StorageInventoryHolder storageHolder) {
-            if (event.getClickedInventory() == null || !event.getClickedInventory().equals(event.getView().getTopInventory())) return;
-            if (event.getSlot() != STORAGE_NAV_SLOT || storagePagesForSlots(storageHolder.totalSlots()) <= 1) return;
-            event.setCancelled(true);
-            try {
-                saveStoragePage(storageHolder.clanId(), event.getInventory(), storageHolder.page(), storageHolder.totalSlots());
-                int pages = storagePagesForSlots(storageHolder.totalSlots());
-                int nextPage = event.getClick().isRightClick() ? storageHolder.page() - 1 : storageHolder.page() + 1;
-                if (nextPage < 1) nextPage = pages;
-                if (nextPage > pages) nextPage = 1;
-                openClanStorage(player, nextPage);
-            } catch (Exception e) {
-                getLogger().warning("Error navegando almacén de clan: " + e.getMessage());
-                msg(player, "&cNo se pudo cambiar de página del almacén.");
-            }
+            handleStorageClick(event, player, storageHolder);
             return;
         }
         if (!(event.getInventory().getHolder() instanceof ClanMenuHolder holder)) return;
@@ -2425,6 +2440,44 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             getLogger().warning("Error en GUI de clan: " + e.getMessage());
             msg(player, "&cOcurrió un error usando el menú de clan.");
         }
+    }
+
+    private void handleStorageClick(InventoryClickEvent event, Player player, StorageInventoryHolder holder) {
+        Inventory top = event.getView().getTopInventory();
+        if (!storageSessions.owns(holder.clanId(), player.getUniqueId(), top)
+                || (holder.admin() && !player.hasPermission("mdvclans.admin"))) {
+            event.setCancelled(true);
+            return;
+        }
+        int usable = storageUsableSlotsOnPage(top.getSize(), holder.page(), holder.totalSlots());
+        // Collection from the lower inventory can also collect protected top-inventory items.
+        if (usable < top.getSize() && (event.getClick() == ClickType.DOUBLE_CLICK
+                || event.getAction() == InventoryAction.COLLECT_TO_CURSOR)) {
+            event.setCancelled(true);
+            return;
+        }
+        int rawSlot = event.getRawSlot();
+        if (rawSlot < 0 || rawSlot >= top.getSize() || rawSlot < usable) return;
+        event.setCancelled(true);
+        if (rawSlot != STORAGE_NAV_SLOT || storagePagesForSlots(holder.totalSlots()) <= 1
+                || (event.getClick() != ClickType.LEFT && event.getClick() != ClickType.RIGHT)) return;
+        int direction = event.getClick() == ClickType.RIGHT ? -1 : 1;
+        // Open the next page after Bukkit has finished this inventory transaction.
+        Bukkit.getScheduler().runTask(this, () -> {
+            if (!player.isOnline() || player.getOpenInventory().getTopInventory() != top
+                    || !storageSessions.owns(holder.clanId(), player.getUniqueId(), top)) return;
+            try {
+                int pages = storagePagesForSlots(holder.totalSlots());
+                int nextPage = holder.page() + direction;
+                if (nextPage < 1) nextPage = pages;
+                if (nextPage > pages) nextPage = 1;
+                if (holder.admin()) openAdminClanStorage(player, getClan(holder.clanId()).orElseThrow(), nextPage);
+                else openClanStorage(player, nextPage);
+            } catch (Exception e) {
+                getLogger().warning("Error navegando almacén de clan: " + e.getMessage());
+                msg(player, "&cNo se pudo cambiar de página del almacén.");
+            }
+        });
     }
 
     private void handleBannerEditorClick(InventoryClickEvent event, Player player, BannerEditorHolder holder) {
@@ -2486,9 +2539,24 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     @EventHandler(ignoreCancelled = true)
     public void onInventoryDrag(InventoryDragEvent event) {
         InventoryHolder holder = event.getInventory().getHolder();
+        if (holder instanceof StorageInventoryHolder storageHolder) {
+            Inventory top = event.getView().getTopInventory();
+            if (!storageSessions.owns(storageHolder.clanId(), event.getWhoClicked().getUniqueId(), top)
+                    || (storageHolder.admin() && !event.getWhoClicked().hasPermission("mdvclans.admin"))) {
+                event.setCancelled(true);
+                return;
+            }
+            int usable = storageUsableSlotsOnPage(top.getSize(), storageHolder.page(), storageHolder.totalSlots());
+            for (int rawSlot : event.getRawSlots()) {
+                if (rawSlot >= usable && rawSlot < top.getSize()) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
+            return;
+        }
         boolean protectedBanner = holder instanceof BannerEditorHolder || holder instanceof BannerViewHolder;
-        boolean adminStorageReview = holder instanceof AdminStorageInventoryHolder;
-        if (!protectedBanner && !adminStorageReview) return;
+        if (!protectedBanner) return;
         int topSize = event.getView().getTopInventory().getSize();
         for (int rawSlot : event.getRawSlots()) {
             if (rawSlot >= 0 && rawSlot < topSize) {
@@ -2508,13 +2576,24 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             }
             return;
         }
-        if (!(event.getInventory().getHolder() instanceof StorageInventoryHolder holder)) return;
+        finishStorageSession(player, event.getInventory());
+    }
+
+    private void finishStorageSession(Player player, Inventory inventory) {
+        if (!(inventory.getHolder() instanceof StorageInventoryHolder holder)
+                || !storageSessions.owns(holder.clanId(), player.getUniqueId(), inventory)) return;
         try {
-            saveStoragePage(holder.clanId(), event.getInventory(), holder.page(), holder.totalSlots());
-            logAction(holder.clanId(), player, "ALMACEN", "Cerró y guardó el almacén");
+            saveStoragePage(holder.clanId(), inventory, holder.page(), holder.totalSlots());
+            storageSessions.release(holder.clanId(), player.getUniqueId(), inventory);
         } catch (Exception e) {
             getLogger().warning("No se pudo guardar almacén de clan " + holder.clanId() + ": " + e.getMessage());
             msg(player, "&cNo se pudo guardar el almacén del clan. Avisa a un admin.");
+            return;
+        }
+        try {
+            logAction(holder.clanId(), player, "ALMACEN", (holder.admin() ? "ADMIN: " : "") + "Cerró y guardó el almacén");
+        } catch (SQLException e) {
+            getLogger().warning("No se pudo registrar el cierre del almacén " + holder.clanId() + ": " + e.getMessage());
         }
     }
 
@@ -2701,6 +2780,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
+        finishStorageSession(player, player.getOpenInventory().getTopInventory());
         InventoryHolder holder = player.getOpenInventory().getTopInventory().getHolder();
         if (holder instanceof BannerEditorHolder bannerHolder && !bannerHolder.completed) {
             returnSubmittedBanner(player, bannerHolder);
@@ -3730,6 +3810,11 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private synchronized void disbandClan(int clanId) throws SQLException {
+        StorageSessionRegistry.Session<Inventory> session = storageSessions.get(clanId);
+        if (session != null) {
+            for (var viewer : List.copyOf(session.inventory().getViewers())) viewer.closeInventory();
+            storageSessions.release(clanId, session.owner(), session.inventory());
+        }
         try (PreparedStatement ps = connection.prepareStatement("DELETE FROM clans WHERE id=?")) {
             ps.setInt(1, clanId);
             ps.executeUpdate();
@@ -3786,7 +3871,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private ItemStack storageNavItem(int page, int pages) {
-        ItemStack item = new ItemStack(Material.ARROW);
+        ItemStack item = new ItemStack(Material.ARROW, 64);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             meta.setDisplayName(color("&ePágina " + page + "/" + pages));
@@ -3798,6 +3883,22 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    private ItemStack storageBlockedSlotItem() {
+        ItemStack item = new ItemStack(Material.GRAY_STAINED_GLASS_PANE, 64);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(color("&8Espacio no disponible"));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private void persistStorageSession(StorageSessionRegistry.Session<Inventory> session) throws SQLException, IOException {
+        if (session.inventory().getHolder() instanceof StorageInventoryHolder holder) {
+            saveStoragePage(holder.clanId(), session.inventory(), holder.page(), holder.totalSlots());
+        }
     }
 
     private void putStoragePage(Inventory inv, ItemStack[] allItems, int page, int totalSlots) {
@@ -3816,6 +3917,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private synchronized void saveStoragePage(int clanId, Inventory inv, int page, int totalSlots) throws SQLException, IOException {
+        if (!(inv.getHolder() instanceof StorageInventoryHolder holder)
+                || !storageSessions.owns(clanId, holder.owner(), inv)) return;
         Clan clan = getClan(clanId).orElseThrow();
         int mergeSize = Math.max(totalSlots, inventorySerializedSize(clan.storage()));
         ItemStack[] allItems = deserializeInventory(clan.storage(), mergeSize);
@@ -3857,7 +3960,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         try (PreparedStatement ps = connection.prepareStatement("UPDATE clans SET storage=? WHERE id=?")) {
             ps.setString(1, data);
             ps.setInt(2, clanId);
-            ps.executeUpdate();
+            if (ps.executeUpdate() != 1) throw new SQLException("El clan ya no existe: " + clanId);
         }
     }
 
@@ -6660,6 +6763,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     }
 
     private void startNametagTask() {
+        equippedTitleNametags.reload();
         if (!getConfig().getBoolean("nametags.enabled", true)) return;
         long interval = Math.max(20L, getConfig().getLong("nametags.update-interval-ticks", 100L));
         nametagTaskId = Bukkit.getScheduler().runTaskTimer(this, this::syncNametags, 40L, interval).getTaskId();
@@ -7800,11 +7904,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         @Override public Inventory getInventory() { return null; }
     }
 
-    private record StorageInventoryHolder(int clanId, int page, int totalSlots) implements InventoryHolder {
-        @Override public Inventory getInventory() { return null; }
-    }
-
-    private record AdminStorageInventoryHolder(int clanId, int page, int totalSlots) implements InventoryHolder {
+    private record StorageInventoryHolder(int clanId, int page, int totalSlots, UUID owner, boolean admin) implements InventoryHolder {
         @Override public Inventory getInventory() { return null; }
     }
 

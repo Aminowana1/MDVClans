@@ -1,3 +1,0 @@
--proc:none
--XDshould-stop.at=PARSE
-src/main/java/com/mdvcraft/mdvclans/MDVClansPlugin.java
