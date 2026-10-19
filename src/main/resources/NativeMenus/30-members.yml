@@ -22,6 +22,18 @@ menus:
       name: '&6&lVolver'
       lore:
       - '&7Regresa al menú de clanes.'
+    # Solo lo ven quienes tienen el permiso de rango "invite" y si el clan no está lleno.
+    # Al pulsarlo, el nombre se escribe en el chat (invites.chat-input-seconds).
+    invite:
+      slot: 51
+      material: WRITABLE_BOOK
+      name: '&a&lInvitar jugador'
+      lore:
+      - ''
+      - '&7Escribe en el chat el nombre'
+      - '&7del jugador que quieres invitar.'
+      - ''
+      - '&eClick para invitar.'
   member-action:
     title: '&8Miembro &b{player}'
     items:
