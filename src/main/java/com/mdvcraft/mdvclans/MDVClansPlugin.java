@@ -967,7 +967,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     private void handleInvite(Player player, String[] args) throws SQLException {
         if (args.length < 2) {
-            msg(player, "&cUso: &e/clan invitar <jugador>");
+            // Without a name the name is asked in the chat (menu buttons use this).
+            beginInviteChat(player);
             return;
         }
         Member inviter = requireMember(player);

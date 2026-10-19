@@ -1,0 +1,317 @@
+prefix: '&8[&6MDVClans&8]&r '
+
+storage:
+  # V1.5: carpeta separada para dejar todo más ordenado y facilitar migración futura a MySQL.
+  type: SQLITE
+  sqlite-file: 'Data/clans.db'
+  mysql:
+    enabled: false
+    host: 'localhost'
+    port: 3306
+    database: 'mdvcraft'
+    username: 'root'
+    password: ''
+
+worlds:
+  # Si está vacío, permite todos. Recomendado para MDVCRAFT: world, world_nether, world_the_end.
+  allowed: ['world', 'world_nether', 'world_the_end']
+
+creation:
+  enabled: true
+  cost-enabled: false
+  cost: 10.0
+  id-min: 3
+  id-max: 5
+  name-min: 3
+  name-max: 19
+  id-regex: '^[A-Za-z0-9]+$'
+
+# Color automático del nombre visible según el tier interno del clan.
+# Tier interno 0 = Tier visible 1, hasta tier interno 4 = Tier visible 5.
+# Solo afecta el nombre mostrado en listas, menús e información; el nametag conserva su formato actual.
+clan-name-colors:
+  '0': '&a' # Tier 1: verde claro
+  '1': '&2' # Tier 2: verde oscuro
+  '2': '&9' # Tier 3: azul
+  '3': '&5' # Tier 4: morado
+  '4': '&e' # Tier 5: amarillo
+
+
+clan-description:
+  enabled: true
+  max-length: 180
+  # La descripción se divide automáticamente en esta cantidad de líneas.
+  # Ejemplo: max-length 150 / lines 5 = aprox. 30 caracteres por línea.
+  lines: 5
+  default-text: 'Este clan aún no tiene descripción.'
+
+
+# Menús raíz legacy de MDVClans.
+# MDVCRAFT usa MDVSocial como raíz: clan_con_clan / clan_sin_clan.
+# Si enabled=false, /clan menu, /clan menu gestion, /clan menu hub, /clan menu sinclan y /clan menu crear
+# redirigen al menú social correspondiente en vez de abrir los menús viejos internos.
+native-menus:
+  legacy-main:
+    enabled: false
+    with-clan-target: 'clan_con_clan'
+    without-clan-target: 'clan_sin_clan'
+
+limits:
+  max-clans: 60
+  # Fallback viejo. Desde 1.10 el límite real de miembros sale de clan-tiers.<tier>.max-members.
+  max-members: 20
+
+# Tiers de clan. Se compran usando dinero del banco del clan.
+# Tier 4 usa 3 páginas de almacén con 53 slots útiles cada una, porque 1 slot se reserva para la flecha de navegación.
+clan-tiers:
+  0:
+    name: 'Banda'
+    cost: 0
+    max-members: 8
+    max-bases: 1
+    storage-slots: 9
+    storage-pages: 1
+    max-allies: 2
+  1:
+    name: 'Hermandad'
+    cost: 5000
+    max-members: 12
+    max-bases: 1
+    storage-slots: 18
+    storage-pages: 1
+    max-allies: 3
+  2:
+    name: 'Compañía'
+    cost: 15000
+    max-members: 16
+    max-bases: 2
+    storage-slots: 27
+    storage-pages: 1
+    max-allies: 4
+  3:
+    name: 'Gremio'
+    cost: 50000
+    max-members: 24
+    max-bases: 2
+    storage-slots: 54
+    storage-pages: 1
+    max-allies: 6
+  4:
+    name: 'Reino'
+    cost: 250000
+    max-members: 55
+    max-bases: 2
+    storage-slots: 159
+    storage-pages: 3
+    max-allies: 8
+
+invites:
+  # Duración de invitaciones de clan y cartas personales de invitación.
+  # 3 días por defecto. Si prefieres segundos exactos, borra expire-days y usa expire-seconds.
+  expire-days: 3
+  expire-seconds: 259200
+  # Menú de miembros (Java) > "Invitar jugador": segundos para escribir el nombre en el chat.
+  chat-input-seconds: 60
+
+roles:
+  min: 0
+  max: 4
+  defaults:
+    '0': 'Recluta'
+    '1': 'Miembro'
+    '2': 'Veterano'
+    '3': 'Oficial'
+    '4': 'Líder'
+
+# Valores por defecto para clanes nuevos o clanes sin permisos custom.
+# Desde 1.9.0 cada clan puede sobrescribir esto desde Ajustes > Configurar permisos.
+# El líder/rango 4 siempre conserva todos los permisos.
+rank-permissions:
+  invite: 2
+  kick: 3
+  promote: 3
+  demote: 3
+  set-rank: 4
+  rename-role: 4
+  setbase: 3
+  relation: 3
+  open: 3
+  disband: 4
+  bank-deposit: 0
+  bank-withdraw: 3
+  storage-open: 0
+  banner-set: 3
+  logs-view: 3
+  board-edit: 3
+  description-edit: 3
+  mail-send: 3
+  mail-delete: 3
+  settings: 3
+  permissions-edit: 4
+  tier-upgrade: 4
+  rename-tag: 4
+  rename-clan: 4
+  join-requests: 2
+
+chat:
+  format: '&8[&3Clan&8] &b{player}&7: &f{message}'
+  spy-permission: 'mdvclans.admin'
+
+base:
+  teleport-delay-seconds: 10
+  cooldown-seconds: 60
+  cancel-on-move: true
+  cancel-on-damage: true
+
+friendly-fire:
+  cancel-members: true
+  cancel-allies: false
+  message-cooldown-seconds: 3
+
+relations:
+  # Aliado necesita confirmación del otro clan.
+  ally-requires-accept: true
+  # Mensaje que llega al buzón del clan cuando otro clan solicita alianza.
+  ally-request-mail-message: 'El clan {from_name} [{from_id}] solicita una alianza con tu clan.'
+  # Mensaje que llega al buzón del clan cuando un enemigo solicita paz/neutralidad.
+  neutral-request-mail-message: 'El clan {from_name} [{from_id}] solicita un tratado de paz para volver a neutralidad.'
+
+bank:
+  enabled: true
+
+storage-chest:
+  enabled: true
+  size: 27
+  title: '&8Almacén {id} &7{storage_page}/{storage_max_page}'
+  # Un editor por clan, también para admins, para evitar sobrescribir objetos.
+  busy-message: '&cOtra persona está usando el almacén de este clan. Espera a que lo cierre.'
+
+clan-mail:
+  # Los correos se cortan automáticamente para que no queden en una sola línea gigante.
+  lines: 10
+  line-length: 45
+
+logs:
+  enabled: true
+  cleanup:
+    enabled: true
+    auto-delete-days: 30
+    max-per-clan: 250
+
+kills:
+  enabled: true
+  # Anti-farmeo: el mismo atacante no puede sumar puntos contra la misma víctima durante este tiempo.
+  same-victim-cooldown-seconds: 900
+
+top:
+  # Los placeholders de hologramas comparten una instantánea para no consultar SQLite por cada línea.
+  placeholder-cache-seconds: 30
+  strength:
+    kill-weight: 10.0
+    bank-divisor: 10.0
+    bank-cap: 500.0
+    member-weight: 5.0
+
+nametags:
+  enabled: true
+  update-interval-ticks: 200
+
+  # Título equipado de MDVSocial en la línea NATIVA debajo del nombre.
+  # No crea entidades ni cambia el nombre, nivel, clan o scoreboard lateral.
+  # Usa un objetivo propio BELOW_NAME; si otro plugin ocupa ese espacio, lo respeta.
+  equipped-title-line:
+    enabled: true
+    # Minecraft solo admite esta línea nativa debajo. Valores antiguos se ignoran.
+    position: 'below'
+    format: '{title}'
+    # Relee el título cada segundo. Altura y distancia las controla el cliente.
+    update-interval-ticks: 20
+
+  # Compatibilidad simple con AnimatedScoreboard.
+  # Al entrar, ejecuta una sola vez desde consola el comando configurado.
+  # "toggle on" fuerza el scoreboard encendido y no lo apaga si ya estaba activo.
+  animated-scoreboard-compatibility:
+    enabled: true
+    join-delay-ticks: 60
+    join-command: 'asb toggle on {player}'
+
+  # Mantiene el sistema clásico de nametags que funciona con tus relaciones.
+  force-personal-scoreboard-if-main: true
+  force-personal-scoreboard: false
+
+  formats:
+    same: '&a[{id}] '
+    ally: '&9[{id}] '
+    enemy: '&c[{id}] '
+    neutral: '&7[{id}] '
+    no-clan: ''
+
+  # Se muestra siempre, tenga o no tenga clan.
+  level-suffix:
+    enabled: true
+    format: ' &a[&2{level}&a]'
+
+placeholders:
+  # Texto usado cuando todavía no existe un clan para esa posición del ranking.
+  top-empty-text: '&8---'
+  # Formato opcional para %mdvclans_top_strength_<posición>_line%.
+  top-line-format: '&8[&b{id}&8] {name} &8- &6{value}'
+  no-clan: ''
+  # Texto usado para placeholders de otro jugador, por ejemplo %mdvclans_clan_line_of_Jugador%.
+  other-no-clan: '&8Sin clan'
+  # Formato para %mdvclans_clan_line_of_<jugador>%.
+  # Placeholders disponibles: {id}, {tag}, {name}, {name_plain}, {tier}, {tier_name}, {role}, {role_number}, {members}, {max_members}
+  clan-line-format: '&5{tier_name} &8- &f{name} &8[&6{id}&8]'
+  tag-format: '&8[&b{id}&8]&r'
+  lpc-tag-format: '&8[&b{id}&8]&r '
+  # %mdvclans_chat_prefix% devuelve este bloque si tiene clan y siempre queda vacío si no tiene clan.
+  # Pensado para LPC y otros formatos de chat; incluye el espacio final.
+  chat-prefix-format: '&8[&6{id}&8]&r '
+
+integrations:
+  mdvsocial:
+    # Invitaciones directas (/clan invitar, menús): no se puede invitar a quien tienes
+    # bloqueado, y si él te bloqueó la invitación no llega (aviso genérico).
+    # No impide que jugadores bloqueados compartan clan por otras vías.
+    respect-blocks: true
+    unknown-title-text: 'Sin título'
+    clan-invite-mail:
+      enabled: true
+      debug: false
+      from-name: '{inviter}'
+      message: '{inviter} te invitó al clan {clan_name} [{clan_id}]. Abre esta carta para aceptar o rechazar.'
+  mmocore:
+    # Intenta leer PlayerData de MMOCore por reflexión. Sirve para datos offline si MMOCore los tiene cargados.
+    use-direct-api: true
+    # MDVClans probará estos placeholders en orden y usará el primero que devuelva algo válido.
+    # Se ignoran respuestas como NoMatch, none, null, n/a o placeholders sin resolver.
+    level-placeholders:
+      - '%mmocore_level%'
+    race-placeholders:
+      - '%mmocore_race%'
+      - '%mmocore_class%'
+      - '%mmocore_class_name%'
+      - '%mmocore_player_class%'
+      - '%mmocore_profession%'
+
+
+profile-cache:
+  # Guarda la última raza/nivel conocidos para poder mostrarlos aunque el jugador esté desconectado.
+  enabled: true
+  update-on-join-delay-ticks: 80
+  unknown-level-text: 'Sin datos'
+  unknown-race-text: 'Sin raza'
+
+gui:
+  native-enabled: true
+  # Los menús nativos se abren con /clan abrir <ui>.
+  # Edita títulos/items/lore en NativeMenus/*.yml.
+  # MDVSocial debe crear sus propios puentes y ejecutar /clan abrir <ui>.
+
+
+banners:
+  # Oculta en los banners del clan el tooltip de patrones/ingredientes.
+  hide-patterns: true
+  # Espera entre cada copia retirada desde /clan estandarte ver.
+  copy-cooldown-seconds: 10
+  copy-cooldown-message: '&cDebes esperar &e{seconds}s &cantes de sacar otro estandarte.'

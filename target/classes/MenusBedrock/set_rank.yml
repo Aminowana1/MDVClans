@@ -1,0 +1,10 @@
+title: '&6&lRango de {player}'
+content:
+  - '&7Rango actual: &f{current_role_name} &8({current_role})'
+  - ''
+  - '&7Selecciona el nuevo rango.'
+role:
+  text: '&fRango {role}\n&r&7{role_name}'
+buttons:
+  back:
+    text: '&6Volver'

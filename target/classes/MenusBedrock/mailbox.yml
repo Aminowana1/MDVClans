@@ -1,0 +1,9 @@
+title: '&d&lBuzón del clan &8({page}/{pages})'
+content:
+  - '&7Correos: &f{count}'
+page-size: 8
+entry: '&6&lCarta #{mail_id}\n&r&7De: &d{from_name} &8[&6{from_id}&8]'
+buttons:
+  previous: '&ePágina anterior'
+  next: '&ePágina siguiente'
+  back: '&6Volver'

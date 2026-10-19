@@ -1,0 +1,94 @@
+menus:
+  bases:
+    title: '&8Bases del clan &b{id}'
+    max-visible-bases: 2
+    items:
+      info:
+        slot: 13
+        material: LODESTONE
+        name: '&b&lBases del clan'
+        lore:
+        - ''
+        - '&7Tier actual: &d{clan_tier_name}'
+        - '&7Bases establecidas: &e{bases}&7/&e{max_bases}'
+        - ''
+        - '&7Izquierda: &bteletransportarse&7.'
+        - '&7Derecha: &6establecer/cambiar&7.'
+        - ''
+        - '&8Las bases bloqueadas dependen del tier.'
+    teleport:
+      slot-1: 10
+      slot-2: 19
+      slot-3: 28
+      slot-4: 37
+      available:
+        material: ENDER_PEARL
+        name: '&b&lIr a Base {base_number}'
+        lore:
+        - ''
+        - '&7Estado: {base_status}'
+        - '&7Mundo: &f{base_world}'
+        - '&7Coordenadas: &e{base_x}&7, &e{base_y}&7, &e{base_z}'
+        - ''
+        - '&eClick para teletransportarte.'
+      missing:
+        material: GRAY_DYE
+        name: '&7&lBase {base_number}'
+        lore:
+        - ''
+        - '&7Estado: &cNo establecida'
+        - ''
+        - '&8Un rango con permiso debe'
+        - '&8establecer esta base primero.'
+      locked:
+        material: BARRIER
+        name: '&8&lBase {base_number} bloqueada'
+        lore:
+        - ''
+        - '&7Estado: &cBloqueada por tier'
+        - '&7Requiere: &d{base_required_tier_name}'
+        - '&7Tu clan: &e{clan_tier_name}'
+        - ''
+        - '&8Sube el tier del clan para desbloquearla.'
+    set:
+      slot-1: 16
+      slot-2: 25
+      slot-3: 34
+      slot-4: 43
+      available:
+        material: COMPASS
+        name: '&6&lEstablecer Base {base_number}'
+        lore:
+        - ''
+        - '&7Guarda tu ubicación actual'
+        - '&7como Base {base_number} del clan.'
+        - ''
+        - '&7Estado actual: {base_status}'
+        - '&7Ubicación actual: &e{base_x}&7, &e{base_y}&7, &e{base_z}'
+        - ''
+        - '&eClick para establecer/cambiar.'
+      no-permission:
+        material: GRAY_DYE
+        name: '&7&lEstablecer Base {base_number}'
+        lore:
+        - ''
+        - '&cNo tienes permiso para cambiar bases.'
+        - '&8Permiso requerido: setbase'
+      locked:
+        material: BARRIER
+        name: '&8&lEstablecer Base {base_number}'
+        lore:
+        - ''
+        - '&7Estado: &cBloqueada por tier'
+        - '&7Requiere: &d{base_required_tier_name}'
+        - '&7Tu clan: &e{clan_tier_name}'
+        - ''
+        - '&8Todavía no puedes fijar esta base.'
+    back:
+      slot: 49
+      action: NATIVE
+      target: gestion
+      material: ARROW
+      name: '&6&lVolver'
+      lore:
+      - '&7Regresa a gestión del clan.'

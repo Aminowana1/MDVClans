@@ -1,0 +1,5 @@
+# MDVClans 1.10.7
+# Menús raíz legacy desactivados por defecto.
+# MDVCRAFT usa MDVSocial como raíz: clan_con_clan y clan_sin_clan.
+# Los menús útiles se mantienen en otros archivos NativeMenus.
+menus: {}

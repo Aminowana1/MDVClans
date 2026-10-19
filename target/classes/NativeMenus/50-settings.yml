@@ -1,0 +1,241 @@
+menus:
+  settings:
+    title: '&8Ajustes &b{id}'
+    items:
+      rename-name:
+        slot: 10
+        material: NAME_TAG
+        name: '&e&lCambiar nombre'
+        lore:
+        - ''
+        - '&7Nombre actual: &f{name}'
+        - ''
+        - '&eClick para escribir el nuevo nombre.'
+      rename-id:
+        slot: 11
+        material: OAK_SIGN
+        name: '&b&lCambiar ID'
+        lore:
+        - ''
+        - '&7ID actual: &b{id}'
+        - '&7El ID se ve en chat/listas.'
+        - ''
+        - '&eClick para escribir el nuevo ID.'
+      roles:
+        slot: 12
+        material: WRITABLE_BOOK
+        name: '&d&lNombres de rangos'
+        lore:
+        - ''
+        - '&7Cambia los nombres visibles'
+        - '&7de los rangos 0-4.'
+        - ''
+        - '&eClick para abrir.'
+      banner:
+        slot: 13
+        name: '&f&lCambiar banner'
+        lore:
+        - ''
+        - '&7Abre el editor de estandarte'
+        - '&7oficial del clan.'
+        - ''
+        - '&eClick para abrir.'
+      permissions:
+        slot: 14
+        material: KNOWLEDGE_BOOK
+        name: '&b&lConfigurar permisos'
+        lore:
+        - ''
+        - '&7Edita qué acciones puede usar'
+        - '&7cada rango del clan.'
+        - ''
+        - '&eClick para abrir el editor.'
+      open:
+        slot: 15
+        material: OAK_DOOR
+        name: '&a&lEntrada del clan'
+        lore:
+        - ''
+        - '&7Estado actual: {entry}'
+        - ''
+        - '&eClick para alternar.'
+      description:
+        slot: 18
+        material: MAP
+        name: '&6&lDescripción pública'
+        lore:
+        - ''
+        - '&7Descripción actual:'
+        - '&f{description_line_1}'
+        - '&f{description_line_2}'
+        - '&f{description_line_3}'
+        - ''
+        - '&eClick: editar.'
+        - '&8Se dividirá automáticamente.'
+        - '&cClick derecho: limpiar.'
+      disband:
+        slot: 16
+        material: TNT
+        name: '&4&lDisolver clan'
+        lore:
+        - ''
+        - '&cAcción peligrosa.'
+        - '&7Usa el comando de confirmación.'
+        - ''
+        - '&eClick para instrucciones.'
+      leave:
+        slot: 24
+        material: OAK_DOOR
+        name: '&c&lSalir del clan'
+        lore:
+        - ''
+        - '&5&l● &7&lAbandonar clan'
+        - '&7Te permite salir de tu clan'
+        - '&7actual usando &f/clan salir&7.'
+        - ''
+        - '&8Si eres líder y hay miembros,'
+        - '&8no podrás salir hasta transferir'
+        - '&8el liderazgo o disolver el clan.'
+        - ''
+        - '&cAcción delicada.'
+        - '&eClick para salir.'
+      tier-upgrade:
+        slot: 20
+        material: NETHER_STAR
+        name: '&d&lMejorar clan'
+        lore:
+        - ''
+        - '&7Tier actual: &d{clan_tier_name}'
+        - '&7Siguiente: &d{clan_next_tier_name}'
+        - ''
+        - '&7Costo: &e{clan_tier_cost} monedas'
+        - '&7Pago: &6Banco del clan'
+        - '&7Banco actual: &e{bank}'
+        - ''
+        - '&6&lMejoras actuales:'
+        - '&7Miembros: &e{members}&7/&e{max_members}'
+        - '&7Bases: &e{bases}&7/&e{max_bases}'
+        - '&7Almacén: &e{storage_display}'
+        - '&7Aliados: &e{allies}&7/&e{max_allies}'
+        - ''
+        - '&eClick para mejorar.'
+    back:
+      slot: 49
+      action: MDVSOCIAL
+      target: clan_con_clan
+      material: PLAYER_HEAD
+      texture: eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYmQ2OWUwNmU1ZGFkZmQ4NGU1ZjNkMWMyMTA2M2YyNTUzYjJmYTk0NWVlMWQ0ZDcxNTJmZGM1NDI1YmMxMmE5In19fQ==
+      name: '&6&lVolver'
+  banner-editor:
+    title: '&8Cambiar estandarte &b{id}'
+    items:
+      cancel:
+        slot: 2
+        material: RED_STAINED_GLASS_PANE
+        name: '&c&lRechazar cambio'
+        lore:
+        - ''
+        - '&7No modifica el estandarte'
+        - '&7actual del clan.'
+        - ''
+        - '&eClick para volver.'
+      input:
+        slot: 4
+      confirm:
+        slot: 6
+        material: LIME_STAINED_GLASS_PANE
+        name: '&a&lConfirmar estandarte'
+        lore:
+        - ''
+        - '&7Coloca un estandarte en'
+        - '&7el espacio central.'
+        - ''
+        - '&eClick para confirmar.'
+
+  role-settings:
+    title: '&8Rangos &b{id}'
+    role-item:
+      slot-0: 10
+      slot-1: 11
+      slot-2: 12
+      slot-3: 13
+      slot-4: 14
+      material: PAPER
+      name: '&eRango {role_number} &8- &b{role_name}'
+      lore:
+      - ''
+      - '&7Este es el nombre visible'
+      - '&7del rango {role_number}.'
+      - ''
+      - '&eClick para renombrar.'
+    back:
+      slot: 22
+      action: NATIVE
+      target: ajustes
+      material: ARROW
+      name: '&6&lVolver'
+
+  permissions-edit:
+    title: '&8Editar permisos &7({page}/{max_page})'
+    table:
+      rows-per-page: 4
+      role-header-slots: [3, 4, 5, 6, 7]
+      permission-row-start-slots: [9, 18, 27, 36]
+    role-header:
+      material: GRAY_BANNER
+      name: '&6&lRango {role_number}'
+      lore:
+        - '&f{role_name}'
+        - ''
+        - '{leader_note}'
+    permission-item:
+      material: BOOK
+      name: '&e#{permission_index} {permission_name}'
+      lore:
+        - ''
+        - '&7Descripción:'
+        - '{permission_description}'
+        - ''
+        - '&7Default config: rango &6{required_rank}'
+        - '&7Rol default: &f{required_role}'
+        - ''
+        - '&8Click en las lanas para alternar'
+        - '&8el permiso de cada rango.'
+    allowed-item:
+      material: LIME_WOOL
+      name: '&a✔ Permitido'
+      lore:
+        - '&7Rango: &6{role_number} &8- &f{role_name}'
+        - '&7Permiso: {permission_name}'
+        - ''
+        - '&aEste rango puede usarlo.'
+        - '{edit_hint}'
+    denied-item:
+      material: RED_WOOL
+      name: '&c✖ Bloqueado'
+      lore:
+        - '&7Rango: &6{role_number} &8- &f{role_name}'
+        - '&7Permiso: {permission_name}'
+        - ''
+        - '&cEste rango no puede usarlo.'
+        - '{edit_hint}'
+    items:
+      reset:
+        slot: 50
+        material: REDSTONE_BLOCK
+        name: '&c&lResetear permisos'
+        lore:
+          - ''
+          - '&7Borra la configuración custom'
+          - '&7de este clan y vuelve a'
+          - '&7los valores de config.yml.'
+          - ''
+          - '&eClick para resetear.'
+    back:
+      slot: 49
+      action: NATIVE
+      target: ajustes
+      material: ARROW
+      name: '&6&lVolver'
+      lore:
+        - '&7Regresa a Ajustes.'

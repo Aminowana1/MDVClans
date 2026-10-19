@@ -1,0 +1,13 @@
+title: '&a&lSolicitudes &8({page}/{pages})'
+content:
+  - '&7Pendientes: &f{count}'
+page-size: 8
+entry: '&e&l{player}\n&r&7Nivel: &e{level} &8• &7Raza: &d{race}'
+previous: '&ePágina anterior'
+next: '&ePágina siguiente'
+back: '&6Volver'
+action-title: '&e&lSolicitud de {player}'
+action-content: '&7¿Quieres aceptar o rechazar esta solicitud?'
+accept: '&a&lAceptar'
+reject: '&c&lRechazar'
+action-back: '&6Volver'

@@ -1,0 +1,30 @@
+title: '&8Clan'
+size: 27
+items:
+  detectar:
+    slot: 13
+    material: SHIELD
+    name: '&a&lClanes'
+    lore:
+      - ''
+      - '&7Este menu puente detecta'
+      - '&7si tienes clan o no.'
+      - ''
+      - '&eClick para continuar.'
+    action: OPEN_CONDITIONAL_MENU
+    condition-placeholder: '%mdvclans_is_in_clan%'
+    condition-equals: 'true'
+    true-menu: clan_con_clan
+    false-menu: clan_sin_clan
+
+  volver:
+    slot: 22
+    material: ARROW
+    name: '&eVolver'
+    action: BACK
+
+  cerrar:
+    slot: 26
+    material: BARRIER
+    name: '&cCerrar'
+    action: CLOSE

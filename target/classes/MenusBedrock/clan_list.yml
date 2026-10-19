@@ -1,0 +1,10 @@
+title: '&f&lLista de clanes &8({page}/{pages})'
+content:
+  - '&7Clanes registrados: &f{count}'
+  - '&8Selecciona uno para consultar opciones.'
+page-size: 8
+entry: '&f{name} &8[&6{id}&8]\n&r&7{tier_name} • {members}/{max_members} miembros'
+buttons:
+  previous: '&ePágina anterior'
+  next: '&ePágina siguiente'
+  back: '&6Volver'

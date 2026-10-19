@@ -1,0 +1,120 @@
+title: '&8&lClan'
+size: 27
+items:
+  gestion:
+    slot: 10
+    material: SHIELD
+    name: '&a&lGestion del clan'
+    lore:
+      - ''
+      - '&7Abre la interfaz dinamica'
+      - '&7principal de tu clan.'
+      - ''
+      - '&eClick para abrir.'
+    action: MDVCLANS_OPEN
+    clans-menu: gestion
+
+  miembros:
+    slot: 11
+    material: PLAYER_HEAD
+    head-owner: '{player}'
+    name: '&b&lMiembros'
+    lore:
+      - ''
+      - '&7Lista dinamica con cabezas,'
+      - '&7rangos y opciones por permiso.'
+      - ''
+      - '&eClick para abrir.'
+    action: MDVCLANS_OPEN
+    clans-menu: miembros
+
+  info:
+    slot: 12
+    material: WRITABLE_BOOK
+    name: '&e&lTablero e informacion'
+    lore:
+      - ''
+      - '&7Banner, tablero, buzon,'
+      - '&7solicitudes y logs.'
+      - ''
+      - '&eClick para abrir.'
+    action: MDVCLANS_OPEN
+    clans-menu: info
+
+  relaciones:
+    slot: 13
+    material: MAP
+    name: '&9&lRelaciones'
+    lore:
+      - ''
+      - '&7Aliados, enemigos,'
+      - '&7bajas y ranking.'
+      - ''
+      - '&eClick para abrir.'
+    action: MDVCLANS_OPEN
+    clans-menu: relaciones
+
+  recursos:
+    slot: 14
+    material: CHEST
+    name: '&6&lBanco y almacen'
+    lore:
+      - ''
+      - '&7Accede al banco y al'
+      - '&7almacen del clan.'
+      - ''
+      - '&eClick para abrir.'
+    action: MDVCLANS_OPEN
+    clans-menu: almacen
+
+  lista:
+    slot: 15
+    material: WHITE_BANNER
+    name: '&f&lLista de clanes'
+    lore:
+      - ''
+      - '&7Explora otros clanes'
+      - '&7de MDVCRAFT.'
+      - ''
+      - '&eClick para abrir.'
+    action: MDVCLANS_OPEN
+    clans-menu: lista
+
+  ajustes:
+    slot: 16
+    material: REDSTONE_TORCH
+    name: '&c&lAjustes del clan'
+    lore:
+      - ''
+      - '&7Opciones de administracion'
+      - '&7para rangos altos.'
+      - ''
+      - '&eClick para abrir.'
+    action: MDVCLANS_OPEN
+    clans-menu: ajustes
+
+  base:
+    slot: 22
+    material: ENDER_PEARL
+    name: '&b&lIr a la base'
+    lore:
+      - ''
+      - '&7Teletransportate a la base'
+      - '&7definida por el clan.'
+      - ''
+      - '&eClick para viajar.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan base'
+
+  volver:
+    slot: 18
+    material: ARROW
+    name: '&6&lVolver'
+    action: BACK
+
+  cerrar:
+    slot: 26
+    material: BARRIER
+    name: '&c&lCerrar'
+    action: CLOSE
