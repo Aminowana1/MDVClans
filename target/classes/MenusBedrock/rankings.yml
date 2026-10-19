@@ -1,0 +1,9 @@
+title: '&6&lRanking: {mode}'
+content:
+  - '&7Clasificación de clanes.'
+page-size: 10
+entry: '&e#{position} &f{name} &8[&6{id}&8]\n&r&7{value}'
+back: '&6Volver'
+kill-stats-title: '&c&lBajas de {name}'
+kill-stats-content: '&7Kills contra clanes: &a{kills}\n&7Bajas sufridas: &c{deaths}'
+kill-entry: '&c{name} &8[&6{id}&8]\n&r&7{value} bajas causadas'

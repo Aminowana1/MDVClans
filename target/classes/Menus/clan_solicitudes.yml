@@ -1,0 +1,29 @@
+# Puente MDVSocial -> solicitudes pendientes nativas de MDVClans.
+title: '&8&lSolicitudes de clan'
+size: 27
+items:
+  abrir:
+    slot: 13
+    material: PLAYER_HEAD
+    name: '&a&lSolicitudes pendientes'
+    lore:
+      - ''
+      - '&7Jugadores que pidieron unirse'
+      - '&7a tu clan cuando estaba'
+      - '&7en modo invitación.'
+      - ''
+      - '&eClick para abrir.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan menu solicitudes'
+  volver:
+    slot: 22
+    material: ARROW
+    name: '&6&lVolver'
+    action: OPEN_MENU
+    target-menu: clan_info
+  cerrar:
+    slot: 26
+    material: BARRIER
+    name: '&c&lCerrar'
+    action: CLOSE

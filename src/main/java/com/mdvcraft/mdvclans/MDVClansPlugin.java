@@ -124,6 +124,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     private final Map<UUID, String> pendingClanMailReply = new ConcurrentHashMap<>();
     private final Map<UUID, String> pendingPersonalMail = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> pendingBankAmount = new ConcurrentHashMap<>();
+    /** Players typing in the chat the name of someone to invite, with the time the prompt expires. */
+    private final Map<UUID, Long> pendingInviteName = new ConcurrentHashMap<>();
     private final Set<UUID> pendingDescriptionEdit = ConcurrentHashMap.newKeySet();
     private final Map<UUID, String> currentLogFilter = new ConcurrentHashMap<>();
     private final Map<UUID, Scoreboard> personalNametagBoards = new ConcurrentHashMap<>();
@@ -965,7 +967,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
     private void handleInvite(Player player, String[] args) throws SQLException {
         if (args.length < 2) {
-            msg(player, "&cUso: &e/clan invitar <jugador>");
+            // Without a name the name is asked in the chat (menu buttons use this).
+            beginInviteChat(player);
             return;
         }
         Member inviter = requireMember(player);
@@ -989,6 +992,11 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
         if (getMember(targetUuid).isPresent()) {
             msg(player, "&cEse jugador ya pertenece a un clan.");
+            return;
+        }
+        String blockedMessage = mdvsocialInviteBlock(player.getUniqueId(), targetUuid, targetName);
+        if (blockedMessage != null) {
+            msg(player, blockedMessage);
             return;
         }
 
@@ -1016,6 +1024,60 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         } else {
             msg(player, "&7La invitación interna quedó guardada. Cuando vuelva podrá usar &e/clan aceptar " + clan.tag() + "&7.");
         }
+    }
+
+    /**
+     * MDVSocial's block list, applied only to direct invites: players who blocked each
+     * other can still end up in the same clan by other means.
+     * @return the message for the inviter, or null when the invite may go on
+     */
+    private String mdvsocialInviteBlock(UUID inviter, UUID target, String targetName) {
+        if (!getConfig().getBoolean("integrations.mdvsocial.respect-blocks", true)) return null;
+        if (!Bukkit.getPluginManager().isPluginEnabled("MDVSocial")) return null;
+        try {
+            java.lang.reflect.Method isBlocked = Class.forName("com.mdvcraft.mdvsocial.MDVSocialAPI")
+                    .getMethod("isBlocked", UUID.class, UUID.class);
+            if (Boolean.TRUE.equals(isBlocked.invoke(null, inviter, target)))
+                return msgConfig("invites.target-blocked",
+                        "&cTienes bloqueado a &e{target}&c. Desbloquéalo para poder invitarlo al clan.")
+                        .replace("{target}", targetName);
+            // Generic on purpose, like letters and parties: the inviter must not learn about the block.
+            if (Boolean.TRUE.equals(isBlocked.invoke(null, target, inviter)))
+                return msgConfig("invites.not-delivered", "&cNo se pudo invitar a &e{target} &cal clan.")
+                        .replace("{target}", targetName);
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    /** Opens MDVSocial's Bedrock "Invitar al clan" player picker; false when MDVSocial can't. */
+    private boolean openMDVSocialClanInvite(Player player, Runnable onBack) {
+        if (!Bukkit.getPluginManager().isPluginEnabled("MDVSocial")) return false;
+        try {
+            Object opened = Class.forName("com.mdvcraft.mdvsocial.MDVSocialAPI")
+                    .getMethod("openClanInvitePicker", Player.class, Runnable.class).invoke(null, player, onBack);
+            return Boolean.TRUE.equals(opened);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    /** Java members menu "Invitar jugador": the name is typed in the chat (see onChat). */
+    private void beginInviteChat(Player player) throws SQLException {
+        Member member = requireMember(player); if (member == null) return;
+        if (!hasRank(player, member, "invite")) return;
+        Clan clan = getClan(member.clanId()).orElseThrow();
+        if (countMembers(clan.id()) >= maxMembersForClan(clan)) {
+            msg(player, "&cTu clan ya alcanzó el límite de miembros.");
+            return;
+        }
+        long seconds = Math.max(10L, getConfig().getLong("invites.chat-input-seconds", 60L));
+        pendingInviteName.put(player.getUniqueId(), System.currentTimeMillis() + seconds * 1000L);
+        runAfterGuiClick(player, () -> {
+            player.closeInventory();
+            msg(player, msgConfig("invites.chat-prompt",
+                    "&7Escribe en el chat el nombre del jugador que quieres invitar. Escribe &ccancelar &7para cancelar."));
+        });
     }
 
     private long inviteExpireMillis() {
@@ -2600,6 +2662,21 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
     @EventHandler(priority = EventPriority.NORMAL)
     public void onChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
+        Long inviteUntil = pendingInviteName.remove(player.getUniqueId());
+        if (inviteUntil != null && inviteUntil >= System.currentTimeMillis()) {
+            event.setCancelled(true);
+            String text = event.getMessage().trim();
+            if (text.equalsIgnoreCase("cancelar")) {
+                msg(player, msgConfig("invites.chat-cancelled", "&7Invitación cancelada."));
+                return;
+            }
+            String name = text.split("\\s+")[0];
+            Bukkit.getScheduler().runTask(this, () -> {
+                try { handleInvite(player, new String[]{"invitar", name}); }
+                catch (SQLException e) { getLogger().warning("Error invitando desde el chat: " + e.getMessage()); }
+            });
+            return;
+        }
         Boolean bankDeposit = pendingBankAmount.remove(player.getUniqueId());
         if (bankDeposit != null) {
             event.setCancelled(true);
@@ -2788,6 +2865,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         }
         PendingTeleport pending = pendingTeleports.remove(player.getUniqueId());
         if (pending != null) Bukkit.getScheduler().cancelTask(pending.taskId());
+        pendingInviteName.remove(player.getUniqueId());
     }
 
     private void sendClanChat(Player player, String message) throws SQLException {
@@ -4640,6 +4718,10 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             inv.setItem(contentSlot(i - start), memberHead(m, clan.id(), player));
         }
         nav(inv, page, members.size(), pageSize, "members", clan.id());
+        if (can(viewer, "invite") && members.size() < maxMembersForClan(clan))
+            inv.setItem(nativeSlot("menus.members.invite.slot", 51), nativeItem("menus.members.invite", Material.WRITABLE_BOOK,
+                    "&a&lInvitar jugador", List.of("", "&7Escribe en el chat el nombre", "&7del jugador que quieres invitar.", "", "&eClick para invitar."),
+                    clanPlaceholders(clan)));
         setBackItem(inv, "members", 49, "&6&lVolver", List.of("&7Regresa al menú principal."));
         openNativeInventory(player, inv);
     }
@@ -5588,6 +5670,7 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
 
 
     private void handleMembersClick(Player player, int page, int slot, ClickType click) throws SQLException {
+        if (slot == nativeSlot("menus.members.invite.slot", 51)) { beginInviteChat(player); return; }
         Member actor = requireMember(player); if (actor == null) return;
         List<Member> members = getMembers(actor.clanId());
         int index = pageIndexFromSlot(page, slot);
@@ -7227,6 +7310,21 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
         return tags;
     }
 
+    /**
+     * UUIDs of every member of {@code playerUuid}'s clan, the player included; empty
+     * without a clan. MDVSocial lists clan mates first when choosing a player.
+     */
+    public List<UUID> getClanMemberUuids(UUID playerUuid) {
+        if (playerUuid == null) return List.of();
+        try {
+            Optional<Member> member = getMember(playerUuid);
+            if (member.isEmpty()) return List.of();
+            return getMembers(member.get().clanId()).stream().map(Member::uuid).toList();
+        } catch (SQLException ignored) {
+            return List.of();
+        }
+    }
+
     public boolean isPlayerInClan(UUID playerUuid) {
         if (playerUuid == null) return false;
         try {
@@ -7540,8 +7638,8 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
                     .content(content("members", "content", "&7Selecciona un miembro.", base));
             List<Runnable> actions = new ArrayList<>();
             if (can(viewer, "invite") && all.size() < maxMembersForClan(clan)) {
-                addButton(builder, "members", "buttons.invite", "&a&lInvitar jugador\n&r&8Escribe el nombre del jugador.", base);
-                actions.add(() -> openInviteForm(player, safePage));
+                addButton(builder, "members", "buttons.invite", "&2&lInvitar jugador\n&r&8Elige o escribe un jugador.", base);
+                actions.add(() -> openInvitePicker(player, safePage));
             }
             for (int i = start; i < Math.min(start + pageSize, all.size()); i++) {
                 Member m = all.get(i);
@@ -7560,6 +7658,13 @@ public final class MDVClansPlugin extends JavaPlugin implements Listener, Comman
             }));
             send(player, builder);
             return true;
+        }
+
+        /** MDVSocial's "Escoger jugador" when available; otherwise the plain name form. */
+        private void openInvitePicker(Player player, int returnPage) {
+            if (openMDVSocialClanInvite(player, () -> run(player, () -> sql(player, () -> openMembers(player, returnPage)))))
+                return;
+            openInviteForm(player, returnPage);
         }
 
         private void openInviteForm(Player player, int returnPage) {

@@ -1,0 +1,11 @@
+title: '&6&lTransferir liderazgo'
+content:
+  - '&7¿Seguro que quieres transferir el liderazgo'
+  - '&7del clan a &f{player}&7?'
+  - ''
+  - '&cEsta acción te quitará el rango de líder.'
+buttons:
+  confirm:
+    text: '&6&lSí, transferir'
+  back:
+    text: '&6Volver'

@@ -1,0 +1,44 @@
+# MDVClans 1.7.4 - Mensajes editables
+# Nota: esta versión centraliza el prefijo y deja preparada la estructura para ir moviendo
+# todos los textos del plugin a este archivo sin romper compatibilidad.
+prefix: '&8[&6MDVClans&8]&r '
+
+common:
+  no-permission: '&cNo tienes permiso.'
+  player-only: '&cEste comando solo puede usarlo un jugador.'
+  internal-sql-error: '&cOcurrió un error interno de base de datos.'
+  unknown-command: '&cSubcomando desconocido. Usa &e/clan ayuda&c.'
+  no-clan: '&cNo perteneces a ningún clan.'
+  clan-not-found: '&cClan no encontrado.'
+  player-not-found: '&cEse jugador no está conectado.'
+  cancel-word: 'cancelar'
+
+creation:
+  usage: '&cUso: &e/clan crear &7(inicia creación guiada por chat)'
+  already-in-clan: '&cYa perteneces a un clan.'
+  max-clans: '&cEl servidor alcanzó el máximo de clanes.'
+  duplicate-id: '&cYa existe un clan con ese ID.'
+  duplicate-name: '&cYa existe un clan con ese nombre.'
+  created: '&aClan creado: &8[&b{id}&8] &f{name}'
+  chat-name-prompt: '&7Escribe el &enombre completo &7del clan. No se permiten colores ni formatos. Ejemplo: &fMedieval Craft&7. Escribe &ccancelar &7para cancelar.'
+  chat-id-prompt: '&7Ahora escribe el &eID/tag &7del clan. Solo letras y números, sin colores ni formatos. Ejemplo: &bMDV&7. Escribe &ccancelar &7para cancelar.'
+
+edit:
+  name-prompt: '&7Escribe el nuevo &enombre &7del clan. Escribe &ccancelar &7para cancelar.'
+  id-prompt: '&7Escribe el nuevo &eID &7del clan. Escribe &ccancelar &7para cancelar.'
+  duplicate-id: '&cYa existe un clan con ese ID.'
+  duplicate-name: '&cYa existe un clan con ese nombre.'
+
+menu:
+  requires-clan: '&cNo perteneces a ningún clan. Solo puedes abrir la lista de clanes o crear uno.'
+  no-rank: '&cNo tienes rango para esta función.'
+  locked-line: '&8No puedes usar esta función.'
+
+invites:
+  # Menú de miembros (Java) > "Invitar jugador".
+  chat-prompt: '&7Escribe en el chat el nombre del jugador que quieres invitar. Escribe &ccancelar &7para cancelar.'
+  chat-cancelled: '&7Invitación cancelada.'
+  # Si tienes bloqueado al jugador (bloqueos de MDVSocial).
+  target-blocked: '&cTienes bloqueado a &e{target}&c. Desbloquéalo para poder invitarlo al clan.'
+  # Si el jugador te bloqueó. Es genérico a propósito: no revela el bloqueo.
+  not-delivered: '&cNo se pudo invitar a &e{target} &cal clan.'

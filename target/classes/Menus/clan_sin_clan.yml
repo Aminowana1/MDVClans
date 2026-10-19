@@ -1,0 +1,42 @@
+title: '&8&lClanes'
+size: 27
+items:
+  lista:
+    slot: 11
+    material: WHITE_BANNER
+    name: '&f&lLista de clanes'
+    lore:
+      - ''
+      - '&7Mira los clanes existentes.'
+      - '&7Si uno esta abierto, puedes unirte.'
+      - '&7Si esta cerrado, puedes solicitar ingreso.'
+      - ''
+      - '&eClick para abrir.'
+    action: MDVCLANS_OPEN
+    clans-menu: lista_sinclan
+
+  crear:
+    slot: 15
+    material: EMERALD
+    name: '&a&lCrear clan'
+    lore:
+      - ''
+      - '&7Inicia la creacion de un clan.'
+      - '&7El chat te pedira ID y nombre.'
+      - ''
+      - '&eClick para comenzar.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan crear'
+
+  volver:
+    slot: 22
+    material: ARROW
+    name: '&6&lVolver'
+    action: BACK
+
+  cerrar:
+    slot: 26
+    material: BARRIER
+    name: '&c&lCerrar'
+    action: CLOSE

@@ -1,0 +1,9 @@
+title: '&d&lRangos del clan'
+content:
+  - '&7Selecciona un rango para cambiar su nombre.'
+role: '&d&lRango {role}\n&r&f{name}'
+back: '&6Volver'
+rename-form:
+  title: '&d&lRenombrar rango {role}'
+  label: '&eNuevo nombre'
+  placeholder: 'Máximo 16 caracteres'

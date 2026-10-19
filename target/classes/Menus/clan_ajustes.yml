@@ -1,0 +1,29 @@
+# Puente MDVSocial -> ajustes nativos dinámicos de MDVClans.
+title: '&8&lAjustes del clan'
+size: 27
+items:
+  abrir:
+    slot: 13
+    material: COMPARATOR
+    name: '&6&lAjustes del clan'
+    lore:
+      - ''
+      - '&7Nombre, ID, rangos,'
+      - '&7banner, permisos y disolver.'
+      - ''
+      - '&8Requiere rango alto dentro del clan.'
+      - '&eClick para abrir.'
+    action: COMMAND_PLAYER
+    commands:
+      - 'clan menu ajustes'
+  volver:
+    slot: 22
+    material: ARROW
+    name: '&6&lVolver'
+    action: OPEN_MENU
+    target-menu: clan
+  cerrar:
+    slot: 26
+    material: BARRIER
+    name: '&c&lCerrar'
+    action: CLOSE

@@ -110,6 +110,8 @@ invites:
   # 3 días por defecto. Si prefieres segundos exactos, borra expire-days y usa expire-seconds.
   expire-days: 3
   expire-seconds: 259200
+  # Menú de miembros (Java) > "Invitar jugador": segundos para escribir el nombre en el chat.
+  chat-input-seconds: 60
 
 roles:
   min: 0
@@ -268,6 +270,10 @@ placeholders:
 
 integrations:
   mdvsocial:
+    # Invitaciones directas (/clan invitar, menús): no se puede invitar a quien tienes
+    # bloqueado, y si él te bloqueó la invitación no llega (aviso genérico).
+    # No impide que jugadores bloqueados compartan clan por otras vías.
+    respect-blocks: true
     unknown-title-text: 'Sin título'
     clan-invite-mail:
       enabled: true

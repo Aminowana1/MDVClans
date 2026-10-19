@@ -33,3 +33,12 @@ menu:
   requires-clan: '&cNo perteneces a ningún clan. Solo puedes abrir la lista de clanes o crear uno.'
   no-rank: '&cNo tienes rango para esta función.'
   locked-line: '&8No puedes usar esta función.'
+
+invites:
+  # Menú de miembros (Java) > "Invitar jugador".
+  chat-prompt: '&7Escribe en el chat el nombre del jugador que quieres invitar. Escribe &ccancelar &7para cancelar.'
+  chat-cancelled: '&7Invitación cancelada.'
+  # Si tienes bloqueado al jugador (bloqueos de MDVSocial).
+  target-blocked: '&cTienes bloqueado a &e{target}&c. Desbloquéalo para poder invitarlo al clan.'
+  # Si el jugador te bloqueó. Es genérico a propósito: no revela el bloqueo.
+  not-delivered: '&cNo se pudo invitar a &e{target} &cal clan.'
